@@ -20,6 +20,20 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Build, unit test and lint
         run: ./gradlew assembleDebug testDebugUnitTest lintDebug
+      - name: Name the APK artifact
+        if: success()
+        id: apk
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          echo "name=ai-car-companion-${version}-debug-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
