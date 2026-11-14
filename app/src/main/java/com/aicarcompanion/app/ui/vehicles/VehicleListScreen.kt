@@ -20,7 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import com.aicarcompanion.app.data.photos.rememberVehiclePhoto
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -76,7 +76,7 @@ fun VehicleListScreen(
                 }
             }
             items(state.vehicles, key = { it.id }) { vehicle ->
-                val photo by produceState<Bitmap?>(null, vehicle.id, versions[vehicle.id]) { value = home.photos.load(vehicle.id) }
+                val photo = rememberVehiclePhoto(home.photos, vehicle.id, versions[vehicle.id])
                 GarageCard(
                     vehicle = vehicle,
                     photo = photo,

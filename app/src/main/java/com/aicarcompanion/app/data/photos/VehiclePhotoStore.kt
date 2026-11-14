@@ -56,3 +56,13 @@ class VehiclePhotoStore(context: Context) {
 
     private companion object { const val MAX_EDGE = 1280 }
 }
+
+/** Loads a vehicle's photo off the main thread and reloads when it changes. */
+@androidx.compose.runtime.Composable
+fun rememberVehiclePhoto(store: VehiclePhotoStore, vehicleId: String?, version: Int?): Bitmap? {
+    val photo = androidx.compose.runtime.remember(vehicleId) { androidx.compose.runtime.mutableStateOf<Bitmap?>(null) }
+    androidx.compose.runtime.LaunchedEffect(vehicleId, version) {
+        photo.value = vehicleId?.let { store.load(it) }
+    }
+    return photo.value
+}

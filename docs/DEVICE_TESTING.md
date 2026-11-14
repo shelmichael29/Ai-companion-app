@@ -19,6 +19,18 @@
 - Airplane mode: lists you opened before still appear ("Saved list"); new ones show an
   error with Retry; **Manual** always works.
 
+## 1b. Penelope UI 2.0 (Phase 4)
+1. Home: greeting, glowing orb, "Talk to Penelope". Tap the orb or button → orb shows ripples
+   that react to your voice → thinking arc → speaking waveform. Pause/End buttons appear.
+2. Tap "My car is shaking." → opens Chat with Penelope's answer. Try "More ideas" chips.
+3. Vehicle showcase: "Add photo" → pick a picture of your car → it appears on Home and in Garage.
+   The badge says "Connected to your car" only when the adapter is actually connected.
+4. Bottom nav: Home, Garage, Chat (named after your assistant), History. Settings is the gear.
+5. Settings → Appearance: try Light, Dark, Match phone; turn on Reduce motion (orb and waves stop).
+6. Android Settings → Accessibility → Remove animations: the orb should be still.
+7. Large font size (Settings → Display → Font size) and TalkBack: check labels and wrapping.
+8. Car health (Home card or History): result cards with plain explanations; details expand.
+
 ## 2. Penelope — hands-free conversation (Phase 3)
 1. Settings → Penelope's voice → **Reset to natural voice**, then **Hear a sample**. If it still
    sounds high, try lowering pitch, or switch **Speech engine** to Google and pick a voice that

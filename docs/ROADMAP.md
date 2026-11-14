@@ -9,6 +9,9 @@
   voice/engine choice), Everyday/DIY/Advanced explanations, symptom conversations, Smart
   Diagnostics / SmartFix / Mechanic Pro contracts.
 
+- **M4 (Phase 4)** — Penelope UI 2.0: design system, voice orb, floating navigation, redesigned
+  home/chat/garage, vehicle showcase with user photos, beginner-first diagnostic result cards.
+
 ## Next (recommended order)
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
    ELM327 transcripts (add a debug log export) and turn them into parser test fixtures.
@@ -25,6 +28,8 @@
 8. Predictive maintenance, health trends, trip summaries, proactive spoken warnings.
 
 ## Housekeeping
+- Add Paparazzi (test-only) screenshot tests to CI once golden images are agreed; Phase 4 used it
+  temporarily for visual review.
 - AGP/Kotlin/AndroidX upgrades (AGP 9 is a larger migration; do separately).
 - Compose UI tests and Room DAO instrumented tests (need an emulator/device in CI).
 - Units preference (miles/km, °F/°C); currently U.S. units with metric in parentheses.

@@ -17,6 +17,8 @@ data class DtcInfo(
     /** Technical explanation and test approach. */
     val technical: String,
     val severity: DtcSeverity,
+    /** Short plain-language title, e.g. "Engine running lean". */
+    val headline: String = description,
 ) {
     /** Back-compat alias used by older call sites. */
     val explanation: String get() = simple
@@ -83,6 +85,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
             "calibration allows. Compare fuel trims at idle and around 2,500 rpm: lean mainly at idle suggests " +
             "unmetered air (a vacuum leak); lean at all loads suggests the MAF under-reporting or low fuel delivery.",
         DtcSeverity.MODERATE,
+        headline = "Engine running lean",
     )
 
     private fun cat(bank: Int) = DtcInfo(
@@ -93,6 +96,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
         "Downstream O2 sensor activity is approaching upstream activity, indicating reduced oxygen-storage capacity. " +
             "Rule out exhaust leaks ahead of the rear sensor, check sensor response, and rule out misfire or rich running.",
         DtcSeverity.MODERATE,
+        headline = "Catalytic converter not working well",
     )
 
     private fun misfire(cyl: Int) = DtcInfo(
@@ -103,6 +107,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
         "Misfire on cylinder $cyl detected from crankshaft speed variation. Coil swap test, spark plug inspection, " +
             "injector test, then compression or leak-down if ignition and fuel check out.",
         DtcSeverity.SEVERE,
+        headline = "Misfire in cylinder $cyl",
     )
 
     private val entries = (
@@ -115,6 +120,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Bank 1 fuel trims exceeded the rich limit (the computer is removing fuel). Check for MAF over-reporting, " +
                     "leaking injectors, excessive fuel pressure, or a purge valve stuck open.",
                 DtcSeverity.MODERATE,
+        headline = "Engine running rich",
             ),
             DtcInfo(
                 "P0133", "O2 sensor circuit slow response (bank 1, sensor 1)",
@@ -123,6 +129,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Bank 1 sensor 1 rich/lean switching response time exceeded the threshold. Verify no exhaust leaks or " +
                     "contamination, then check sensor response on live data.",
                 DtcSeverity.MODERATE,
+        headline = "Aging oxygen sensor",
             ),
             DtcInfo(
                 "P0300", "Random/multiple cylinder misfire detected",
@@ -132,6 +139,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Crankshaft speed variation indicates misfire on random or multiple cylinders. Check per-cylinder misfire " +
                     "counters (mode 06) if supported, fuel trims for a lean condition, ignition, injector balance and compression.",
                 DtcSeverity.SEVERE,
+        headline = "Engine misfire",
             ),
             DtcInfo(
                 "P0442", "Evaporative emission system leak detected (small leak)",
@@ -140,6 +148,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "EVAP leak test detected a small leak (about 0.040 in). Check the cap seal, filler neck, purge and vent " +
                     "valves and hoses; a smoke test locates it.",
                 DtcSeverity.INFO,
+        headline = "Small fuel-vapor leak",
             ),
             DtcInfo(
                 "P0455", "Evaporative emission system leak detected (large leak)",
@@ -147,6 +156,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Check that the gas cap is on and tight. If you smell fuel, have it checked soon.",
                 "EVAP system could not hold vacuum (gross leak). Check the cap, filler neck, purge and vent valves, and hoses; smoke test.",
                 DtcSeverity.INFO,
+        headline = "Fuel-vapor leak",
             ),
             DtcInfo(
                 "P0456", "Evaporative emission system leak detected (very small leak)",
@@ -154,6 +164,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Check the gas cap and its seal first.",
                 "EVAP very small leak (about 0.020 in) detected. Check cap seal, then smoke test hoses and valves.",
                 DtcSeverity.INFO,
+        headline = "Tiny fuel-vapor leak",
             ),
             DtcInfo(
                 "P0128", "Coolant thermostat (coolant temperature below thermostat regulating temperature)",
@@ -162,6 +173,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Engine coolant temperature didn't reach the regulating temperature in the expected time. Common causes: " +
                     "thermostat stuck open, or a biased coolant temperature sensor.",
                 DtcSeverity.MODERATE,
+        headline = "Engine warming up slowly",
             ),
             DtcInfo(
                 "P0101", "Mass air flow (MAF) circuit range/performance",
@@ -170,6 +182,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "MAF signal inconsistent with expected airflow for load, rpm and throttle. Check for intake leaks after the " +
                     "sensor, contamination and wiring; compare grams per second at idle with expected values.",
                 DtcSeverity.MODERATE,
+        headline = "Air-flow sensor readings are off",
             ),
             DtcInfo(
                 "P0335", "Crankshaft position sensor A circuit",
@@ -177,6 +190,7 @@ object GenericDtcCatalog : DtcKnowledgeSource {
                 "Check the sensor's connector and wiring. If the car stalls, don't plan long trips until it's fixed.",
                 "No or erratic crankshaft position signal. Inspect the sensor, reluctor ring, wiring and connector; verify the signal on a scope.",
                 DtcSeverity.SEVERE,
+        headline = "Engine position sensor signal problem",
             ),
         ) + (1..8).map(::misfire)
         ).associateBy { it.code }

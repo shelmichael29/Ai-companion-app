@@ -232,7 +232,9 @@ fun BrandWordmark(name: String, modifier: Modifier = Modifier, fontSizeSp: Int =
         name,
         modifier = modifier.semantics { heading() },
         style = TextStyle(
-            brush = Brush.linearGradient(listOf(t.brandColors[1], t.brandColors[2])),
+            brush = Brush.linearGradient(
+                if (t.isDark) listOf(Color(0xFF7FD8FA), Color(0xFFC3A8FF)) else listOf(t.brandColors[1], t.brandColors[2]),
+            ),
             fontSize = fontSizeSp.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = (-0.4).sp,
@@ -240,19 +242,19 @@ fun BrandWordmark(name: String, modifier: Modifier = Modifier, fontSizeSp: Int =
     )
 }
 
-/** Small logo: a luminous badge with a road-like arc, hinting at cars without looking like a scanner. */
+/** Small logo: a luminous badge with a minimal steering wheel, automotive without looking like a scanner. */
 @Composable
 fun LogoMark(modifier: Modifier = Modifier, size: Dp = 36.dp) {
     val t = Penelope.tokens
     Canvas(modifier.size(size)) {
-        drawCircle(Brush.linearGradient(t.brandColors, start = Offset.Zero, end = Offset(this.size.width, this.size.height)))
         val w = this.size.width
-        val road = Path().apply {
-            moveTo(w * 0.22f, w * 0.68f)
-            cubicTo(w * 0.38f, w * 0.40f, w * 0.62f, w * 0.40f, w * 0.78f, w * 0.68f)
-        }
-        drawPath(road, Color.White, style = Stroke(width = w * 0.09f, cap = StrokeCap.Round))
-        drawCircle(Color.White, radius = w * 0.07f, center = Offset(w * 0.5f, w * 0.36f))
+        val c = Offset(w / 2f, w / 2f)
+        drawCircle(Brush.linearGradient(t.brandColors, start = Offset.Zero, end = Offset(w, w)))
+        val stroke = w * 0.075f
+        drawCircle(Color.White, radius = w * 0.30f, center = c, style = Stroke(stroke))
+        drawCircle(Color.White, radius = w * 0.075f, center = c)
+        drawLine(Color.White, Offset(c.x - w * 0.29f, c.y), Offset(c.x + w * 0.29f, c.y), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(Color.White, c, Offset(c.x, c.y + w * 0.29f), strokeWidth = stroke, cap = StrokeCap.Round)
     }
 }
 

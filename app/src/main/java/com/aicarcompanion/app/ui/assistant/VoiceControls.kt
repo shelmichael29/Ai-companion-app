@@ -16,7 +16,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -89,7 +89,16 @@ fun VoiceState.statusText(name: String): String = when (this) {
     is VoiceState.Error -> message
 }
 
-/** What tapping the main voice control does right now (used as the button text and TalkBack label). */
+/** Short button text for the main voice control. */
+fun micButtonText(state: VoiceState, name: String): String = when (state) {
+    is VoiceState.Listening -> "Done talking"
+    is VoiceState.Speaking -> "Interrupt"
+    is VoiceState.Processing -> "Thinking…"
+    is VoiceState.Paused -> "Resume"
+    else -> "Talk to $name"
+}
+
+/** What tapping the main voice control does right now (full TalkBack label). */
 fun micActionLabel(state: VoiceState, name: String): String = when (state) {
     is VoiceState.Listening -> "Done talking"
     is VoiceState.Speaking -> "Interrupt $name"
@@ -102,6 +111,7 @@ fun micActionLabel(state: VoiceState, name: String): String = when (state) {
  * Primary voice control plus session controls. The gradient button always describes what it
  * will do; Pause and End appear only while a conversation is running or paused.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun VoiceSessionControls(
     state: VoiceState,
@@ -114,9 +124,14 @@ fun VoiceSessionControls(
 ) {
     val running = conversationActive || state is VoiceState.Listening || state is VoiceState.Speaking || state is VoiceState.Processing
     val paused = state is VoiceState.Paused
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    FlowRow(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         GradientButton(
-            text = micActionLabel(state, name),
+            text = micButtonText(state, name),
+            contentDescription = micActionLabel(state, name),
             onClick = micAction,
             enabled = state !is VoiceState.Processing,
             leading = iconFor(state),
@@ -132,7 +147,7 @@ fun VoiceSessionControls(
 
 private fun iconFor(state: VoiceState): ImageVector = when (state) {
     is VoiceState.Listening -> PenelopeIcons.Check
-    is VoiceState.Speaking -> PenelopeIcons.Pause
+    is VoiceState.Speaking -> MicIcon
     is VoiceState.Paused -> PenelopeIcons.Play
     else -> MicIcon
 }

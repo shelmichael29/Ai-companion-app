@@ -124,10 +124,14 @@ class Phase4Test {
 
     @Test fun `result card for a known code`() {
         val info = GenericDtcCatalog.lookup("P0300")!!
-        val dtc = DiagnosticTroubleCode("P0300", info.description, info.simple, info.diyChecks, info.technical, DtcStatus.STORED, info.severity, DataOrigin.OBD_BLUETOOTH)
+        val dtc = DiagnosticTroubleCode(
+            code = "P0300", description = info.description, explanation = info.simple, diyChecks = info.diyChecks,
+            technicalDetail = info.technical, headline = info.headline, status = DtcStatus.STORED, severity = info.severity,
+            origin = DataOrigin.OBD_BLUETOOTH,
+        )
         val r = DiagnosticPresentation.fromCode(dtc, "checked today")
         assertEquals(UrgencyLevel.HIGH, r.urgency)
-        assertTrue(r.title, r.title.startsWith("Engine is misfiring"))
+        assertEquals("Engine misfire", r.title)
         assertFalse(r.isSample)
         assertTrue(r.nextSteps.any { it.contains("as soon as you can") })
         assertTrue(r.details.any { it.first == "Code" && it.second == "P0300" })
@@ -135,9 +139,10 @@ class Phase4Test {
     }
 
     @Test fun `unknown code is not dressed up as a known diagnosis`() {
-        val dtc = DiagnosticTroubleCode("P1999", "Powertrain code", null, null, null, DtcStatus.STORED, DtcSeverity.UNKNOWN, DataOrigin.OBD_BLUETOOTH)
+        val dtc = DiagnosticTroubleCode(code = "P1999", description = "Powertrain code", status = DtcStatus.STORED, severity = DtcSeverity.UNKNOWN, origin = DataOrigin.OBD_BLUETOOTH)
         val r = DiagnosticPresentation.fromCode(dtc, null)
         assertEquals(UrgencyLevel.UNKNOWN, r.urgency)
+        assertEquals("Something in the engine or transmission was flagged", r.title)
         assertTrue(r.whatsHappening.contains("don't have a plain-language explanation"))
         assertTrue(r.nextSteps.first().contains("don't have details"))
     }

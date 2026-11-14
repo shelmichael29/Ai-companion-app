@@ -38,7 +38,7 @@ object DiagnosticPresentation {
         val known = dtc.explanation != null
         val system = DtcCodeFormat.system(dtc.code)
         val title = when {
-            known -> dtc.explanation!!.substringBefore(". ").substringBefore(": ").trimEnd('.').let { firstSentenceTitle(it) }
+            dtc.headline != null -> dtc.headline
             system != null -> "Something in the ${system.plainLabel} was flagged"
             else -> "Your car flagged code ${dtc.code}"
         }
@@ -59,7 +59,6 @@ object DiagnosticPresentation {
                     add("Have a mechanic look, especially if the car drives differently.")
                 }
             }
-            dtc.diyChecks?.substringBefore(". ")?.trimEnd('.')?.let { if (urgency != UrgencyLevel.HIGH) add("Something you can check: ${it.replaceFirstChar(Char::lowercase)}.") }
             add("Ask your assistant to explain it in more detail.")
         }
         val details = buildList {
@@ -81,7 +80,4 @@ object DiagnosticPresentation {
             sourceLabel = if (dtc.origin == DataOrigin.SAMPLE) "Sample data, not from your car" else dtc.origin.label,
         )
     }
-
-    /** Turns "Your engine is misfiring" into a short card title. */
-    private fun firstSentenceTitle(s: String): String = s.replaceFirst(Regex("^(Your|The) "), "").replaceFirstChar(Char::uppercase)
 }

@@ -9,7 +9,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 > Live values are shown/spoken only when read from a connected adapter; every item carries
 > its origin (vehicle, saved history, entered by you, sample).
 
-## Features (v0.3)
+## Features (v0.4)
 
 | Area | Status |
 |---|---|
@@ -20,6 +20,8 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 | Natural voice: explicit pitch + separate speed, voice/engine choice, sample, reset | Implemented; **needs on-device listening check** |
 | Everyday / DIY / Advanced explanations; "explain more simply", "technical explanation", "sensor readings" | Implemented, unit-tested |
 | Symptom conversations ("why is my car shaking?") with safety-first guidance and one follow-up question | Implemented (general guidance only), unit-tested |
+| Penelope UI 2.0: brand design system (light + dark), glowing voice orb driven by real voice state and mic level, floating nav, redesigned Home/Chat/Garage, vehicle showcase with your own photo, car-health result cards | Implemented; rendered off-device for review; **needs on-device check** |
+| Suggested questions: warning lights, "can I still drive?", repair-estimate explanations | Implemented (general guidance only), unit-tested |
 | Smart Diagnostics engine, SmartFix, Mechanic Pro integration | Contracts/interfaces only |
 | Rename assistant, opt-in demo data | Implemented |
 | Bluetooth Classic ELM327: paired-device selection, init, status, reconnect, live PIDs, read stored/pending codes | Implemented; tested against a scripted fake adapter; **needs real-adapter verification** |

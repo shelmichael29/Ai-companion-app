@@ -78,6 +78,7 @@ fun CarIllustration(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun VehicleShowcase(
     vehicle: Vehicle?,
@@ -133,10 +134,10 @@ fun VehicleShowcase(
             }
         }
         val (connText, connected) = connectionSummary(obdState)
-        Row(
-            Modifier.fillMaxWidth().padding(top = 12.dp).horizontalScroll(rememberScrollState()),
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.fillMaxWidth().padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Box(
                 Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(50))

@@ -30,7 +30,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.setValue
+import com.aicarcompanion.app.data.photos.rememberVehiclePhoto
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,9 +89,7 @@ fun HomeScreen(
     val micAction = rememberMicAction(assistant.session)
     val context = androidx.compose.ui.platform.LocalContext.current
     val vehicleId = ui.vehicle?.id
-    val photo: Bitmap? by produceState<Bitmap?>(null, vehicleId, versions[vehicleId]) {
-        value = vehicleId?.let { home.photos.load(it) }
-    }
+    val photo: Bitmap? = rememberVehiclePhoto(home.photos, vehicleId, versions[vehicleId])
     HomeContent(
         contentPadding = contentPadding,
         voice = voice,
@@ -142,6 +141,7 @@ fun HomeContent(
 ) {
     val t = Penelope.tokens
     val name = assistantName
+    var showAllSuggestions by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     Column(
         Modifier
             .verticalScroll(rememberScrollState())
@@ -200,8 +200,11 @@ fun HomeContent(
             horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            HOME_SUGGESTIONS.forEach { q ->
+            (if (showAllSuggestions) HOME_SUGGESTIONS else HOME_SUGGESTIONS.take(2)).forEach { q ->
                 SuggestionPill(q, { onSuggestion(q) })
+            }
+            if (!showAllSuggestions) {
+                SuggestionPill("More ideas", { showAllSuggestions = true }, leading = PenelopeIcons.Sparkle)
             }
         }
 

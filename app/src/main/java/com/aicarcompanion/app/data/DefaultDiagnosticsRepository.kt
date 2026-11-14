@@ -40,6 +40,7 @@ class DefaultDiagnosticsRepository(
                     explanation = info?.simple,
                     diyChecks = info?.diyChecks,
                     technicalDetail = info?.technical,
+                    headline = info?.headline,
                     status = recorded.status,
                     severity = info?.severity ?: DtcSeverity.UNKNOWN,
                     origin = recorded.origin,
