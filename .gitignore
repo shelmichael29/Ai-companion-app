@@ -1,0 +1,22 @@
+# Gradle / build
+.gradle/
+build/
+**/build/
+.kotlin/
+
+# Local configuration (contains SDK path; never commit)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Secrets / signing (never commit)
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
