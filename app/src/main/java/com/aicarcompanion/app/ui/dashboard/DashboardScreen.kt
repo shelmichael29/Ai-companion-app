@@ -44,6 +44,9 @@ import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SampleDataBanner
 import com.aicarcompanion.app.ui.components.SectionCard
 import java.text.NumberFormat
+import java.time.ZoneId
+import com.aicarcompanion.app.domain.model.DataOrigin
+import com.aicarcompanion.app.domain.model.TroubleCodeRead
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -51,6 +54,7 @@ import java.time.format.FormatStyle
 fun DashboardScreen(
     onOpenAssistant: () -> Unit,
     onOpenAdapter: () -> Unit,
+    onOpenHistory: () -> Unit,
     onAddVehicle: () -> Unit,
     onEditVehicle: (String) -> Unit,
     contentPadding: PaddingValues,
@@ -73,7 +77,7 @@ fun DashboardScreen(
             Button(onClick = onAddVehicle, modifier = Modifier.padding(top = 16.dp)) { Text("Add vehicle") }
         }
 
-        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, onOpenAssistant, onOpenAdapter, contentPadding)
+        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, onOpenAssistant, onOpenAdapter, onOpenHistory, contentPadding)
     }
 }
 
@@ -83,6 +87,7 @@ private fun DashboardContent(
     onEditVehicle: (String) -> Unit,
     onOpenAssistant: () -> Unit,
     onOpenAdapter: () -> Unit,
+    onOpenHistory: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -97,9 +102,9 @@ private fun DashboardContent(
         if (state.containsSampleData) item { SampleDataBanner() }
         item { VehicleCard(state.vehicle, onEdit = { onEditVehicle(state.vehicle.id) }) }
         item { ConnectionCard(state.obdState, onOpenAdapter) }
-        item { TroubleCodesCard(state.troubleCodes) }
+        item { TroubleCodesCard(state.troubleCodes, state.lastCodeRead) }
         item { SensorCard(state.sensorReadings) }
-        item { MaintenanceCard(state.maintenance) }
+        item { MaintenanceCard(state.maintenance, onOpenHistory) }
     }
 }
 
@@ -159,9 +164,18 @@ private fun ConnectionCard(state: ObdConnectionState, onOpenAdapter: () -> Unit)
 }
 
 @Composable
-private fun TroubleCodesCard(codes: List<DiagnosticTroubleCode>) {
+private fun TroubleCodesCard(codes: List<DiagnosticTroubleCode>, lastRead: TroubleCodeRead?) {
+    val isSample = codes.firstOrNull()?.origin == DataOrigin.SAMPLE
     SectionCard(title = "Trouble codes", origin = codes.firstOrNull()?.origin) {
-        if (codes.isEmpty()) Text("No trouble codes.")
+        if (!isSample && lastRead != null) {
+            Text(
+                "Last read ${DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withZone(ZoneId.systemDefault()).format(lastRead.readAt)}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (codes.isEmpty()) {
+            Text(if (lastRead == null) "Codes haven't been read yet. Connect your adapter and tap Read trouble codes." else "No trouble codes were reported.")
+        }
         codes.forEachIndexed { index, dtc ->
             if (index > 0) HorizontalDivider()
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -194,10 +208,11 @@ private fun SensorCard(readings: List<SensorReading>) {
 }
 
 @Composable
-private fun MaintenanceCard(records: List<MaintenanceRecord>) {
+private fun MaintenanceCard(records: List<MaintenanceRecord>, onOpenHistory: () -> Unit) {
     val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
     SectionCard(title = "Service history", origin = records.firstOrNull()?.origin) {
         if (records.isEmpty()) Text("No service records yet.")
+        TextButton(onClick = onOpenHistory) { Text("Open history, notes and add records") }
         records.forEachIndexed { index, record ->
             if (index > 0) HorizontalDivider()
             Column {

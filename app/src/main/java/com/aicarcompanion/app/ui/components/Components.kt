@@ -70,8 +70,8 @@ fun SampleDataBanner(modifier: Modifier = Modifier) {
             Icon(Icons.Filled.Info, contentDescription = null)
             Spacer(Modifier.width(12.dp))
             Text(
-                "Diagnostics and service history below are SAMPLE DATA for demonstration. " +
-                    "They did not come from your vehicle. No OBD-II adapter is connected.",
+                "Demo mode: trouble codes and sensor values below are SAMPLE DATA. " +
+                    "They did not come from your vehicle. Turn this off in Settings.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

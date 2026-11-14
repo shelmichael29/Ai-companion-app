@@ -12,6 +12,8 @@ import com.aicarcompanion.app.domain.model.Vehicle
 import com.aicarcompanion.app.domain.repository.DiagnosticsRepository
 import com.aicarcompanion.app.domain.repository.MaintenanceRepository
 import com.aicarcompanion.app.domain.repository.VehicleRepository
+import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
+import com.aicarcompanion.app.domain.model.TroubleCodeRead
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +31,8 @@ sealed interface DashboardUiState {
         val sensorReadings: List<SensorReading>,
         val maintenance: List<MaintenanceRecord>,
         val obdState: ObdConnectionState,
+        /** Most recent saved code read (null if codes were never read for this vehicle). */
+        val lastCodeRead: TroubleCodeRead? = null,
     ) : DashboardUiState {
         /** True if anything shown is demonstration data rather than real data. */
         val containsSampleData: Boolean
@@ -43,6 +47,7 @@ class DashboardViewModel(
     vehicleRepository: VehicleRepository,
     diagnosticsRepository: DiagnosticsRepository,
     maintenanceRepository: MaintenanceRepository,
+    historyRepository: VehicleHistoryRepository,
     obdConnection: ObdConnection,
 ) : ViewModel() {
 
@@ -56,13 +61,13 @@ class DashboardViewModel(
                     diagnosticsRepository.troubleCodes(id),
                     diagnosticsRepository.sensorReadings(id),
                     maintenanceRepository.history(id),
-                    obdConnection.state,
-                ) { vehicle, codes, readings, history, obd ->
+                    combine(obdConnection.state, historyRepository.latestTroubleCodeRead(id)) { o, r -> o to r },
+                ) { vehicle, codes, readings, history, (obd, lastRead) ->
                     if (vehicle == null) {
                         DashboardUiState.NoVehicle
                     } else {
                         DashboardUiState.Ready(
-                            vehicle, codes, readings, history.sortedByDescending { it.date }, obd,
+                            vehicle, codes, readings, history.sortedByDescending { it.date }, obd, lastRead,
                         )
                     }
                 }

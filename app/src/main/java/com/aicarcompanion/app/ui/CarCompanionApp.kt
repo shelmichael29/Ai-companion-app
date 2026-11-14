@@ -27,6 +27,7 @@ import com.aicarcompanion.app.R
 import com.aicarcompanion.app.ui.adapter.AdapterScreen
 import com.aicarcompanion.app.ui.assistant.AssistantScreen
 import com.aicarcompanion.app.ui.settings.SettingsScreen
+import com.aicarcompanion.app.ui.history.HistoryScreen
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -46,6 +47,7 @@ private object Routes {
     const val ADAPTER = "adapter"
     const val VEHICLES = "vehicles"
     const val SETTINGS = "settings"
+    const val HISTORY = "history"
     const val VEHICLE_EDIT = "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}={${VehicleEditViewModel.VEHICLE_ID_ARG}}"
 
     fun vehicleEdit(id: String?) = if (id == null) "vehicle/edit" else "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}=$id"
@@ -116,6 +118,7 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                 DashboardScreen(
                     onOpenAssistant = { navController.navigateTopLevel(Routes.ASSISTANT) },
                     onOpenAdapter = { navController.navigateTopLevel(Routes.ADAPTER) },
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
                     onEditVehicle = { navController.navigate(Routes.vehicleEdit(it)) },
                     contentPadding = padding,
@@ -126,6 +129,9 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             }
             composable(Routes.ADAPTER) {
                 AdapterScreen(contentPadding = padding)
+            }
+            composable(Routes.HISTORY) {
+                HistoryScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(onBack = { navController.popBackStack() })
