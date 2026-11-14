@@ -19,7 +19,25 @@
 - Airplane mode: lists you opened before still appear ("Saved list"); new ones show an
   error with Retry; **Manual** always works.
 
-## 2. Penelope
+## 2. Penelope — hands-free conversation (Phase 3)
+1. Settings → Penelope's voice → **Reset to natural voice**, then **Hear a sample**. If it still
+   sounds high, try lowering pitch, or switch **Speech engine** to Google and pick a voice that
+   "works offline".
+2. Assistant tab → tap the mic once. Ask "Why is my car shaking?" → she answers and asks a
+   follow-up → **without tapping**, answer "when I'm stopped" → she replies → keeps listening.
+3. "Explain P0171" → "explain that more simply" → "give me the technical explanation".
+4. Stay silent twice → she says she'll pause; the pill shows **Paused**; mic is off (Android's
+   green mic privacy dot disappears).
+5. Say "goodbye" → conversation ends; the mic dot disappears.
+6. While she's talking, tap the mic → she stops and listens. Tap **End conversation** anytime.
+7. Press Home mid-conversation → it pauses; the mic indicator turns off.
+8. Play music, start a conversation → music pauses and resumes after "goodbye".
+9. On car Bluetooth: her voice should come through the car speakers. Note whether the phone
+   or car microphone is used and how well she hears you.
+10. Settings → **How much detail?** → try each level on the dashboard and with "explain P0300".
+11. TalkBack on: controls are announced; status changes are spoken.
+
+## 2b. Penelope (earlier checks)
 - Assistant tab → tap the mic → allow microphone. Try: "Penelope, what vehicle am I driving?",
   "Tell me about my engine", "Read my trouble codes", "Explain P0420",
   "What's my coolant temperature?", "What can you do?"

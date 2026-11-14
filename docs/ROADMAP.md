@@ -5,6 +5,10 @@
 - **M2 (Phase 2)** — Vehicle database selection + VIN decode, Room persistence, Penelope
   push-to-talk voice, read-only Bluetooth Classic OBD-II, per-vehicle history.
 
+- **M3 (Phase 3)** — Hands-free continuous conversation, natural voice settings (pitch fix,
+  voice/engine choice), Everyday/DIY/Advanced explanations, symptom conversations, Smart
+  Diagnostics / SmartFix / Mechanic Pro contracts.
+
 ## Next (recommended order)
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
    ELM327 transcripts (add a debug log export) and turn them into parser test fixtures.
@@ -14,8 +18,8 @@
    origin/time, freeze frame, history, observations (facts vs. hypotheses clearly separated).
 4. **AI reasoning provider (opt-in)** — behind `ReasoningProvider`; grounded in
    `VehicleContext`; key handling without bundling secrets.
-5. **Voice upgrades** — ElevenLabs `SpeechOutput`, Android Auto / steering-wheel button
-   activation, opt-in hands-free mode with a visible foreground service.
+5. **Voice upgrades** — voice barge-in with echo cancellation (see ARCHITECTURE), ElevenLabs
+   `SpeechOutput`, car hands-free microphone routing, steering-wheel/media-button activation.
 6. **BLE and Wi-Fi adapters** — `ElmLink` implementations.
 7. **Knowledge packs** — vehicle-specific `DtcKnowledgeSource` (e.g. BMW/N52 notes), offline.
 8. Predictive maintenance, health trends, trip summaries, proactive spoken warnings.

@@ -9,15 +9,19 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 > Live values are shown/spoken only when read from a connected adapter; every item carries
 > its origin (vehicle, saved history, entered by you, sample).
 
-## Features (v0.2)
+## Features (v0.3)
 
 | Area | Status |
 |---|---|
 | Vehicle lookup: year → make → model → engine → transmission (FuelEconomy.gov), searchable | Implemented, unit-tested with captured API responses |
 | VIN entry, validation and decoding (NHTSA vPIC) with review/correction | Implemented, unit-tested |
 | Offline: cached lookups, manual entry, profiles stored on-device (Room) | Implemented |
-| Penelope: push-to-talk speech recognition + spoken replies, stop/interrupt, transcript, typed fallback | Implemented; conversation logic unit-tested; speech engines need on-device check |
-| Rename assistant, speaking speed, opt-in demo data | Implemented |
+| Penelope hands-free conversation: listens again after each reply; goodbye/pause; tap to interrupt; auto-pause on silence, background or calls | Implemented; state machine unit-tested with fake engines; **needs on-device check** |
+| Natural voice: explicit pitch + separate speed, voice/engine choice, sample, reset | Implemented; **needs on-device listening check** |
+| Everyday / DIY / Advanced explanations; "explain more simply", "technical explanation", "sensor readings" | Implemented, unit-tested |
+| Symptom conversations ("why is my car shaking?") with safety-first guidance and one follow-up question | Implemented (general guidance only), unit-tested |
+| Smart Diagnostics engine, SmartFix, Mechanic Pro integration | Contracts/interfaces only |
+| Rename assistant, opt-in demo data | Implemented |
 | Bluetooth Classic ELM327: paired-device selection, init, status, reconnect, live PIDs, read stored/pending codes | Implemented; tested against a scripted fake adapter; **needs real-adapter verification** |
 | Read-only safety allowlist (no code clearing / actuator / write commands) | Implemented, unit-tested |
 | Per-vehicle history: service & repairs, notes (symptom / verified finding / possible cause), code reads, sensor snapshots, mileage | Implemented |
