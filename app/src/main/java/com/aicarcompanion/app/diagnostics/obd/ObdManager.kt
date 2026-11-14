@@ -3,6 +3,7 @@ package com.aicarcompanion.app.diagnostics.obd
 import com.aicarcompanion.app.assistant.conversation.CodeReadResult
 import com.aicarcompanion.app.assistant.conversation.DiagnosticCommandHandler
 import com.aicarcompanion.app.assistant.conversation.LiveValueResult
+import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DtcStatus
 import com.aicarcompanion.app.domain.model.SensorReading
@@ -57,6 +58,9 @@ class ObdManager(
     private var connectionJob: Job? = null
 
     private val transport = ObdTransport.BLUETOOTH_CLASSIC
+
+    @Volatile private var liveDetail = ExplanationLevel.EVERYDAY
+    override fun setLiveDetail(level: ExplanationLevel) { liveDetail = level }
 
     override fun connect(device: AdapterDevice) {
         if (device.radio == AdapterRadio.LE_ONLY) {
@@ -215,7 +219,7 @@ class ObdManager(
             }
             val latest = linkedMapOf<ObdPid, SensorReading>()
             while (true) {
-                val pids = LIVE_PIDS.filter { it.pid in _supported.value }
+                val pids = LIVE_PIDS.filter { it.pid in _supported.value && it.visibleAt(liveDetail) }
                 for (pid in pids) {
                     val raw = guarded { it.execute(pid.command) } ?: continue
                     Elm327ResponseParser.decodePid(raw, pid)?.let { latest[pid] = reading(pid, it) }
@@ -232,8 +236,10 @@ class ObdManager(
     companion object {
         /** Standard PIDs polled for the live view, most useful first. */
         val LIVE_PIDS = listOf(
-            ObdPid.ENGINE_RPM, ObdPid.VEHICLE_SPEED, ObdPid.COOLANT_TEMP, ObdPid.CONTROL_MODULE_VOLTAGE,
-            ObdPid.ENGINE_LOAD, ObdPid.THROTTLE_POSITION, ObdPid.INTAKE_AIR_TEMP, ObdPid.FUEL_LEVEL,
+            ObdPid.ENGINE_RPM, ObdPid.VEHICLE_SPEED, ObdPid.COOLANT_TEMP, ObdPid.CONTROL_MODULE_VOLTAGE, ObdPid.FUEL_LEVEL,
+            ObdPid.ENGINE_LOAD, ObdPid.THROTTLE_POSITION, ObdPid.INTAKE_AIR_TEMP,
+            ObdPid.SHORT_TERM_FUEL_TRIM_B1, ObdPid.LONG_TERM_FUEL_TRIM_B1,
+            ObdPid.SHORT_TERM_FUEL_TRIM_B2, ObdPid.LONG_TERM_FUEL_TRIM_B2, ObdPid.MAF_RATE, ObdPid.INTAKE_MAP,
         )
     }
 }

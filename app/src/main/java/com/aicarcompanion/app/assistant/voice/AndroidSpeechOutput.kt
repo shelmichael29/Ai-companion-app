@@ -1,96 +1,119 @@
 package com.aicarcompanion.app.assistant.voice
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Locale
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Android TextToSpeech with transient audio focus (music/navigation duck while Penelope talks)
- * and interruption: losing focus, [stop], or cancellation ends the current utterance.
+ * Android TextToSpeech.
+ *
+ * Voice quality notes: pitch is always set explicitly (default 1.0) so a raised system-wide
+ * pitch setting can't make Penelope sound squeaky; rate and pitch are clamped to natural
+ * ranges; audio is played by the engine itself (no resampling in the app). Only one utterance
+ * plays at a time: [speak] is serialized and flushes anything already queued.
  */
-class AndroidSpeechOutput(context: Context) : SpeechOutput {
+class AndroidSpeechOutput(
+    context: Context,
+    private val focus: AudioFocusController,
+    private val attributes: android.media.AudioAttributes,
+) : SpeechOutput {
 
     private val appContext = context.applicationContext
-    private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val _state = MutableStateFlow<SpeechOutputState>(SpeechOutputState.Initializing)
     override val state: StateFlow<SpeechOutputState> = _state.asStateFlow()
 
-    private val pending = ConcurrentHashMap<String, CompletableDeferred<SpeakResult>>()
-    private val attributes = AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_ASSISTANT)
-        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-        .build()
-    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-        .setAudioAttributes(attributes)
-        .setOnAudioFocusChangeListener { change ->
-            if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) stop()
-        }
-        .build()
+    private val speakMutex = Mutex()
+    @Volatile private var current: Pair<String, CompletableDeferred<SpeakResult>>? = null
+    @Volatile private var config = VoiceConfig()
+    private var tts: TextToSpeech = create(null)
+    private var engineInUse: String? = null
 
-    private val tts: TextToSpeech = TextToSpeech(appContext) { status ->
-        if (status == TextToSpeech.SUCCESS) configure() else {
-            _state.value = SpeechOutputState.Unavailable("No text-to-speech engine is available on this phone.")
-        }
+    private fun create(engine: String?): TextToSpeech {
+        _state.value = SpeechOutputState.Initializing
+        engineInUse = engine
+        lateinit var instance: TextToSpeech
+        instance = TextToSpeech(appContext, { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                configureEngine(instance)
+            } else if (engine != null) {
+                // Selected engine failed; fall back to the phone default.
+                tts = create(null)
+            } else {
+                _state.value = SpeechOutputState.Unavailable("No text-to-speech engine is available on this phone.")
+            }
+        }, engine)
+        return instance
     }
 
-    private fun configure() {
-        val result = tts.setLanguage(Locale.getDefault())
-        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-            val fallback = tts.setLanguage(Locale.US)
-            if (fallback == TextToSpeech.LANG_MISSING_DATA || fallback == TextToSpeech.LANG_NOT_SUPPORTED) {
-                _state.value = SpeechOutputState.Unavailable("Voice data isn't installed. Check your phone's text-to-speech settings.")
-                return
-            }
+    private fun configureEngine(engine: TextToSpeech) {
+        if (!applyLanguageAndVoice(engine)) {
+            _state.value = SpeechOutputState.Unavailable("Voice data isn't installed. Check your phone's text-to-speech settings.")
+            return
         }
-        tts.setAudioAttributes(attributes)
-        tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+        engine.setAudioAttributes(attributes)
+        engine.setSpeechRate(VoiceTuning.rate(config.rate))
+        engine.setPitch(VoiceTuning.pitch(config.pitch))
+        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) { _state.value = SpeechOutputState.Speaking }
-            override fun onDone(utteranceId: String) = finish(utteranceId, SpeakResult.Completed)
-            override fun onStop(utteranceId: String, interrupted: Boolean) = finish(utteranceId, SpeakResult.Interrupted)
+            override fun onDone(utteranceId: String) { if (utteranceId.endsWith(LAST)) finish(SpeakResult.Completed) }
+            override fun onStop(utteranceId: String, interrupted: Boolean) = finish(SpeakResult.Interrupted)
             @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String) = finish(utteranceId, SpeakResult.Failed("Speech engine error"))
-            override fun onError(utteranceId: String, errorCode: Int) =
-                finish(utteranceId, SpeakResult.Failed("Speech engine error $errorCode"))
+            override fun onError(utteranceId: String) = finish(SpeakResult.Failed("Speech engine error"))
+            override fun onError(utteranceId: String, errorCode: Int) = finish(SpeakResult.Failed("Speech engine error $errorCode"))
         })
         _state.value = SpeechOutputState.Ready
     }
 
-    private fun finish(id: String, result: SpeakResult) {
-        pending.remove(id)?.complete(result)
-        if (pending.isEmpty()) {
-            audioManager.abandonAudioFocusRequest(focusRequest)
-            if (_state.value == SpeechOutputState.Speaking) _state.value = SpeechOutputState.Ready
-        }
+    /** Applies the chosen voice if it exists, otherwise the language default. Returns false if no usable language. */
+    private fun applyLanguageAndVoice(engine: TextToSpeech): Boolean {
+        val chosen = config.voice?.let { name -> runCatching { engine.voices?.firstOrNull { it.name == name } }.getOrNull() }
+        if (chosen != null && engine.setVoice(chosen) == TextToSpeech.SUCCESS) return true
+        val ok = { r: Int -> r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED }
+        return ok(engine.setLanguage(Locale.getDefault())) || ok(engine.setLanguage(Locale.US))
     }
 
-    override suspend fun speak(text: String): SpeakResult {
-        val current = _state.value
-        if (current is SpeechOutputState.Unavailable) return SpeakResult.Failed(current.reason)
-        if (current is SpeechOutputState.Initializing) {
-            // Wait briefly for the engine to finish initializing.
-            repeat(30) { if (_state.value is SpeechOutputState.Initializing) kotlinx.coroutines.delay(100) }
-            if (_state.value !is SpeechOutputState.Ready) return SpeakResult.Failed("Text-to-speech isn't ready")
+    private fun finish(result: SpeakResult) {
+        val c = current ?: return
+        current = null
+        c.second.complete(result)
+        focus.release()
+        if (_state.value == SpeechOutputState.Speaking) _state.value = SpeechOutputState.Ready
+    }
+
+    override suspend fun speak(text: String): SpeakResult = speakMutex.withLock {
+        // Wait briefly for initialization (first use, or after an engine change).
+        repeat(50) { if (_state.value is SpeechOutputState.Initializing) delay(100) }
+        when (val s = _state.value) {
+            is SpeechOutputState.Unavailable -> return SpeakResult.Failed(s.reason)
+            SpeechOutputState.Initializing -> return SpeakResult.Failed("Text-to-speech isn't ready")
+            else -> Unit
         }
         stop()
-        audioManager.requestAudioFocus(focusRequest)
-        val id = UUID.randomUUID().toString()
         val done = CompletableDeferred<SpeakResult>()
-        pending[id] = done
-        val chunk = text.take(TextToSpeech.getMaxSpeechInputLength() - 1)
-        val queued = tts.speak(chunk, TextToSpeech.QUEUE_FLUSH, Bundle(), id)
-        if (queued != TextToSpeech.SUCCESS) finish(id, SpeakResult.Failed("Couldn't start speaking"))
-        return try {
+        val id = UUID.randomUUID().toString()
+        current = id to done
+        focus.acquire()
+        val chunks = VoiceTuning.chunk(text, TextToSpeech.getMaxSpeechInputLength() - 1)
+        chunks.forEachIndexed { i, chunk ->
+            val mode = if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            val uid = if (i == chunks.lastIndex) "$id-$i$LAST" else "$id-$i"
+            if (tts.speak(chunk, mode, Bundle(), uid) != TextToSpeech.SUCCESS) {
+                finish(SpeakResult.Failed("Couldn't start speaking"))
+                return@withLock done.await()
+            }
+        }
+        try {
             done.await()
         } finally {
             if (!done.isCompleted) stop()
@@ -98,12 +121,39 @@ class AndroidSpeechOutput(context: Context) : SpeechOutput {
     }
 
     override fun stop() {
-        if (pending.isEmpty()) return
+        if (current == null) return
         tts.stop()
-        pending.keys.toList().forEach { finish(it, SpeakResult.Interrupted) }
+        finish(SpeakResult.Interrupted)
     }
 
-    override fun setRate(rate: Float) {
-        tts.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
+    override fun configure(config: VoiceConfig) {
+        val engineChanged = config.engine != engineInUse
+        this.config = config
+        if (engineChanged) {
+            stop()
+            runCatching { tts.shutdown() }
+            tts = create(config.engine)
+            return
+        }
+        if (_state.value is SpeechOutputState.Initializing) return // Applied when ready.
+        tts.setSpeechRate(VoiceTuning.rate(config.rate))
+        tts.setPitch(VoiceTuning.pitch(config.pitch))
+        applyLanguageAndVoice(tts)
+    }
+
+    override suspend fun voices(): List<VoiceOption> {
+        repeat(50) { if (_state.value is SpeechOutputState.Initializing) delay(100) }
+        val all: Set<Voice> = runCatching { tts.voices }.getOrNull().orEmpty()
+        return VoiceTuning.voiceOptions(
+            all.map { VoiceTuning.RawVoice(it.name, it.locale, it.isNetworkConnectionRequired, it.quality, it.features.orEmpty()) },
+            Locale.getDefault(),
+        )
+    }
+
+    override fun engines(): List<EngineOption> =
+        runCatching { tts.engines }.getOrNull().orEmpty().map { EngineOption(it.name, it.label) }
+
+    private companion object {
+        const val LAST = "#last"
     }
 }

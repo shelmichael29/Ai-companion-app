@@ -50,10 +50,10 @@ import com.aicarcompanion.app.assistant.conversation.Speaker
 import com.aicarcompanion.app.ui.AppViewModelProvider
 
 private val SUGGESTIONS = listOf(
-    "What vehicle am I driving?",
-    "Tell me about my engine",
+    "Why is my car shaking?",
     "Read my trouble codes",
-    "What's my coolant temperature?",
+    "Tell me about my engine",
+    "What's my engine temperature?",
     "What can you do?",
 )
 
@@ -64,7 +64,9 @@ fun AssistantScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val turns by viewModel.turns.collectAsStateWithLifecycle()
-    val name by viewModel.assistantName.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val active by viewModel.conversationActive.collectAsStateWithLifecycle()
+    val name = settings.assistantName
     val micAction = rememberMicAction(viewModel.session)
     val context = LocalContext.current
     val listState = rememberLazyListState()
@@ -90,7 +92,9 @@ fun AssistantScreen(
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        "Tap the microphone and ask me something, or try one of these:",
+                        "You don't need to know anything about cars. Tap the microphone and tell me what's going on. " +
+                            (if (settings.continuousConversation) "I'll keep listening after each answer, so you can just keep talking. Say \"goodbye\" when you're done. " else "") +
+                            "Or try one of these:",
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
@@ -105,6 +109,7 @@ fun AssistantScreen(
             items(turns, key = { it.id }) { TurnBubble(it, name) }
         }
 
+        VoiceStatePill(state, Modifier.padding(top = 8.dp))
         VoiceStatusText(state, name, Modifier.fillMaxWidth().padding(vertical = 8.dp))
         if (state is VoiceState.Error && (state as VoiceState.Error).needsPermission) {
             TextButton(onClick = { openAppSettings(context) }) { Text("Open app settings") }
@@ -125,12 +130,13 @@ fun AssistantScreen(
                         onClick = viewModel.session::stopSpeaking,
                         modifier = Modifier.heightIn(min = 64.dp).widthIn(min = 64.dp),
                     ) {
-                        Icon(painterResource(R.drawable.ic_stop), contentDescription = "Stop speaking")
+                        Icon(painterResource(R.drawable.ic_stop), contentDescription = "Stop $name talking")
                     }
                     Text("Stop", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
+        EndConversationButton(state, active, viewModel.session, Modifier.padding(top = 4.dp))
 
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(

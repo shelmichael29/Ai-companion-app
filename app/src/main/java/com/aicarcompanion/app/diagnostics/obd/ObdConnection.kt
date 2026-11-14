@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.diagnostics.obd
 
+import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.domain.model.SensorReading
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,4 +66,7 @@ interface ObdConnection {
 
     /** Re-checks whether the vehicle responds (e.g. after turning the ignition on). */
     fun retryVehicle()
+
+    /** Which readings live polling includes; fewer readings = faster updates for beginners. */
+    fun setLiveDetail(level: ExplanationLevel) {}
 }

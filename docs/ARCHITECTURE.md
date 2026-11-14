@@ -51,33 +51,105 @@ Offline: responses are cached in Room (cache-first, 30-day freshness, stale copy
 network fails). Manual entry always works. Another provider (proprietary backend, offline
 knowledge pack) implements `VehicleCatalogProvider` / `VinDecoder`.
 
-## Penelope (voice)
+## Penelope (voice) — hands-free conversation
 
 ```
- Mic button ─▶ VoiceSession ─▶ SpeechInput (Android SpeechRecognizer)
-                    │                      └─ on network error: one retry with on-device recognizer (API 31+)
-                    ▼
-            ConversationManager ─▶ ReasoningProvider (RuleBasedReasoningProvider)
-                    │                   ├─ CommandParser (intents, spoken DTCs, assistant name)
-                    │                   ├─ VehicleContextProvider (profile, last code read, service, OBD state)
-                    │                   ├─ DiagnosticCommandHandler (ObdManager: live reads, code reads)
-                    │                   └─ DtcKnowledgeSource (GenericDtcCatalog)
-                    ▼
-            SpeechOutput (Android TextToSpeech, USAGE_ASSISTANT, transient audio focus w/ ducking)
+ Mic button ─▶ VoiceSession (state machine, app-scoped)
+                 │  Idle → Listening → Processing → Speaking → (auto) Listening → …
+                 │  Paused / Error: microphone off
+                 ├─ SpeechInput   (AndroidSpeechRecognizer; one on-device retry after a network error)
+                 ├─ ConversationManager ─▶ ReasoningProvider (RuleBasedReasoningProvider)
+                 │                           ├─ CommandParser (intents, spoken DTCs, symptoms, assistant name)
+                 │                           ├─ VehicleContextProvider / DiagnosticCommandHandler / DtcKnowledgeSource
+                 │                           └─ follow-up memory (last topic, pending question)
+                 ├─ SpeechOutput  (AndroidSpeechOutput: rate + pitch + engine + voice; serialized utterances)
+                 └─ AudioFocusController (one ref-counted GAIN_TRANSIENT request, USAGE_ASSISTANT)
 ```
 
-- Push-to-talk only. Tap while listening = finish; tap while speaking = interrupt and listen;
-  Stop button; losing audio focus (e.g. a phone call) stops speech.
-- **ElevenLabs later:** implement `SpeechOutput` (stream audio, honor `stop()`); keep keys out
-  of the APK (user-supplied key in encrypted storage or a small backend).
-- **AI reasoning later:** implement `ReasoningProvider`; give it the same origin-labeled
-  `VehicleContext` and route live reads through `DiagnosticCommandHandler`, never let it
-  produce numbers itself.
-- **Hands-free / wake word later:** a separate activation component that decides when to call
-  `VoiceSession.startListening()`; Android restricts background microphone use, so this would
-  need a visible foreground service and explicit user opt-in.
-- Assistant name comes from `AppSettings.assistantName` (default "Penelope") and is stripped
-  from the start of requests ("Hey Penelope, …").
+**Continuous conversation.** `VoiceSession.start()` begins a conversation when "Keep listening
+after Penelope answers" is on (default). After each reply finishes, listening resumes
+automatically. It ends on "goodbye / that's all / stop" (`ConversationAction.END`), pauses on
+"pause", or via the End / mic buttons.
+
+**Safety rails (all unit-tested with fake engines):**
+- *Half-duplex.* `listen()` stops collecting at the final result, which closes the recognizer
+  before Penelope thinks or speaks; listening resumes `resumeDelayMillis` (450 ms) after speech
+  ends so speaker audio can die away. `EchoGuard` drops transcripts that match what she just said.
+- *No runaway loops.* Two silent turns → pause ("I'll pause for now"). Recognizer-busy retries
+  are capped (2). Network, audio, language, and permission errors stop the session with a clear
+  message.
+- *Microphone never left on.* The mic is open only in `Listening`. `onAppBackgrounded()`
+  (Activity `ON_STOP`) pauses; losing audio focus to another app (e.g. a call) while speaking
+  or thinking pauses.
+- *No overlapping speech.* `AndroidSpeechOutput.speak` is mutex-serialized and flushes the queue.
+
+**Audio routing.** Speech uses `USAGE_ASSISTANT` attributes and transient audio focus, so it
+plays on the current media route (car speakers when the phone is on car Bluetooth; other
+media pauses during the conversation). The microphone is whatever the system recognizer
+chooses, normally the phone's mic. Using the car's hands-free (HFP/SCO) microphone would need
+`AudioManager.setCommunicationDevice` and changes recognition quality, so it's left for
+real-car testing.
+
+**Barge-in (voice interruption) path.** Today: tap to interrupt (mic button or Stop), which is
+reliable. Android's `SpeechRecognizer` can't safely run while TTS plays: it would hear Penelope.
+True voice barge-in needs echo cancellation: capture with `AudioRecord` using
+`MediaRecorder.AudioSource.VOICE_COMMUNICATION` (hardware AEC), run a small voice-activity
+detector during speech, and on detected user speech call `VoiceSession.interrupt()`; or move to
+a streaming voice service with built-in echo cancellation behind `SpeechInput`/`SpeechOutput`.
+`VoiceSession.interrupt()` is already the single entry point for that.
+
+**Voice quality.** The old build never set pitch, so the phone's system TTS pitch applied (and
+the speed slider allowed 1.6×). Now rate (0.5–1.5×) and pitch (0.75–1.25) are separate settings,
+both default 1.0 and always applied, clamped on read. Users can choose the speech engine
+(e.g. Samsung vs Google) and a voice (filtered to their language, offline and higher-quality
+first), preview it, and reset to natural. A failed engine falls back to the phone default.
+
+**ElevenLabs later:** implement `SpeechOutput` (stream audio, honor `stop()`, report `Completed`
+only after playback ends so auto-listening stays half-duplex). Keep keys out of the APK.
+
+**AI reasoning later:** implement `ReasoningProvider`; it receives `AssistantRequest`
+(utterance, name, level) and must use `VehicleContextProvider`/`DiagnosticCommandHandler` for
+facts and readings, never generating numbers itself.
+
+**TalkBack.** Penelope's voice and TalkBack are independent. Controls have content
+descriptions and state descriptions; the status line is a polite live region.
+
+## Beginner-first explanations
+
+`ExplanationLevel` = Everyday (default) / DIY / Advanced, stored in settings and passed in every
+`AssistantRequest`. The reasoning is identical across levels; only rendering changes:
+- `DtcInfo` carries `simple`, `diyChecks` and `technical` text plus a plain `severity.advice`.
+- `ObdPid.friendlyName` and `minLevel` control which live readings beginners see, and live
+  polling only requests readings visible at the current level.
+- Conversational overrides: "explain that more simply" (Everyday), "give me the technical
+  explanation" (Advanced), "tell me more" (one level up), "show me the sensor readings".
+
+## Smart Diagnostics (foundation only)
+
+Package `diagnostics/smart`:
+- `SymptomClassifier` and `SymptomGuide`: recognize everyday descriptions ("it's shaking", "a
+  noise when I turn", "using so much gas", "losing power", "won't start"); urgent categories
+  (overheating, smoke or burning, brakes, fuel smell, flashing check-engine light, oil pressure)
+  get safety guidance first. Penelope asks one simple follow-up question, gives general
+  guidance framed as possibilities, and saves the description and answer as a `SYMPTOM`
+  observation in the car's history.
+- Data contracts for the future engine: `SymptomReport`, `DiagnosticEvidence` (always with
+  origin and time), `PossibleCause` (cannot be `CONFIRMED` without a recorded test result),
+  `DiagnosticAssessment` (urgency, next steps, explicit `missingData`), `SmartDiagnosticsEngine`.
+- `DiagnosticDataPlan`: which readings matter per symptom (fuel trims, MAF, MAP, misfire
+  counters, freeze frame…), flagging what needs manufacturer-specific support.
+- New standard PIDs: short- and long-term fuel trims (banks 1 and 2), MAF, MAP.
+
+## SmartFix and Mechanic Pro (contracts only)
+
+- `smartfix/`: `RepairKnowledgeSource` → `RemedyLookup` with up to three `RemedyCandidate`s.
+  Each must cite sources (TSB, documented failure, repair outcomes); numeric success rates exist
+  only as `SourcedFigure`. Confirmatory tests come before part replacement. Shipped default:
+  `NoRepairKnowledge`.
+- `mechanic/`: `MechanicNetwork` (search, send request), `MechanicHandoffReport`,
+  `ShareConsent` (nothing is shared without it), `MechanicProfile`. Shipped default:
+  `MechanicNetworkNotAvailable`. The contract lives here so the two apps stay loosely coupled
+  (a future HTTPS API, not shared code).
 
 ## OBD-II (read-only)
 
@@ -103,7 +175,7 @@ knowledge pack) implements `VehicleCatalogProvider` / `VinDecoder`.
 
 ## Persistence
 
-Room schema v1 (`app/schemas/…/1.json`): `vehicles`, `service_records`, `dtc_reads` +
+Room schema v1 (unchanged in Phase 3) (`app/schemas/…/1.json`): `vehicles`, `service_records`, `dtc_reads` +
 `dtc_records` (a read with zero codes is still recorded), `sensor_readings`, `observations`,
 `mileage`, `response_cache`. All history tables cascade-delete with their vehicle. Enum columns
 are stored by name and read with safe fallbacks (an unknown observation kind becomes an
