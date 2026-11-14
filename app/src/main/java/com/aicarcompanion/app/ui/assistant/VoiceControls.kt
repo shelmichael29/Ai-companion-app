@@ -10,41 +10,28 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.aicarcompanion.app.R
 import com.aicarcompanion.app.assistant.VoiceSession
 import com.aicarcompanion.app.assistant.VoiceState
+import com.aicarcompanion.app.ui.design.GlassIconButton
+import com.aicarcompanion.app.ui.design.GradientButton
+import com.aicarcompanion.app.ui.design.PenelopeIcons
+import com.aicarcompanion.app.ui.theme.Penelope
 
 /** Returns the microphone action: requests permission if needed, then starts/finishes/interrupts. */
 @Composable
@@ -83,7 +70,7 @@ private fun Context.findActivity(): Activity? {
     return null
 }
 
-/** Short state name for the status pill. */
+/** Short state name. */
 fun VoiceState.shortLabel(): String = when (this) {
     VoiceState.Idle -> "Ready"
     is VoiceState.Listening -> "Listening"
@@ -94,119 +81,77 @@ fun VoiceState.shortLabel(): String = when (this) {
 }
 
 fun VoiceState.statusText(name: String): String = when (this) {
-    VoiceState.Idle -> "Tap the microphone and talk to $name. She'll keep listening after each answer."
-    is VoiceState.Listening -> if (partialText.isBlank()) "I'm listening…" else "\"$partialText\""
+    VoiceState.Idle -> "Tap $name or the button below and just start talking."
+    is VoiceState.Listening -> if (partialText.isBlank()) "I'm listening…" else "“$partialText”"
     is VoiceState.Processing -> "Thinking…"
-    is VoiceState.Speaking -> "$name is talking. Tap the microphone to interrupt."
+    is VoiceState.Speaking -> "$name is talking. Tap to interrupt."
     is VoiceState.Paused -> reason
     is VoiceState.Error -> message
 }
 
-private fun VoiceState.buttonLabel(name: String): String = when (this) {
+/** What tapping the main voice control does right now (used as the button text and TalkBack label). */
+fun micActionLabel(state: VoiceState, name: String): String = when (state) {
     is VoiceState.Listening -> "Done talking"
-    is VoiceState.Speaking -> "Interrupt"
+    is VoiceState.Speaking -> "Interrupt $name"
     is VoiceState.Processing -> "$name is thinking"
-    is VoiceState.Paused -> "Resume"
+    is VoiceState.Paused -> "Resume conversation"
     else -> "Talk to $name"
 }
 
-private fun VoiceState.buttonDescription(name: String): String = when (this) {
-    is VoiceState.Listening -> "Done talking. $name will answer."
-    is VoiceState.Speaking -> "Interrupt $name and talk"
-    is VoiceState.Processing -> "$name is thinking"
-    is VoiceState.Paused -> "Resume conversation with $name"
-    else -> "Start a conversation with $name"
-}
-
+/**
+ * Primary voice control plus session controls. The gradient button always describes what it
+ * will do; Pause and End appear only while a conversation is running or paused.
+ */
 @Composable
-private fun stateColor(state: VoiceState): Pair<Color, Color> = when (state) {
-    is VoiceState.Listening -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
-    is VoiceState.Speaking -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.onPrimary
-    is VoiceState.Processing -> MaterialTheme.colorScheme.secondary to MaterialTheme.colorScheme.onSecondary
-    is VoiceState.Paused -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
-    is VoiceState.Error -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-    VoiceState.Idle -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-}
-
-/** Colored pill naming the current state ("Listening", "Speaking"…). No animation, for driving. */
-@Composable
-fun VoiceStatePill(state: VoiceState, modifier: Modifier = Modifier) {
-    val (bg, fg) = stateColor(state)
-    Surface(color = bg, contentColor = fg, shape = RoundedCornerShape(50), modifier = modifier) {
-        Text(
-            state.shortLabel(),
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+fun VoiceSessionControls(
+    state: VoiceState,
+    conversationActive: Boolean,
+    name: String,
+    onPause: () -> Unit,
+    onEnd: () -> Unit,
+    micAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val running = conversationActive || state is VoiceState.Listening || state is VoiceState.Speaking || state is VoiceState.Processing
+    val paused = state is VoiceState.Paused
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        GradientButton(
+            text = micActionLabel(state, name),
+            onClick = micAction,
+            enabled = state !is VoiceState.Processing,
+            leading = iconFor(state),
         )
+        AnimatedVisibility(running && !paused, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+            GlassIconButton(PenelopeIcons.Pause, "Pause conversation", onPause, size = 56.dp)
+        }
+        AnimatedVisibility(running || paused, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+            GlassIconButton(PenelopeIcons.Close, "End conversation", onEnd, size = 56.dp, tint = Penelope.tokens.danger)
+        }
     }
 }
 
-/** The large microphone button with a short visible caption. */
-@Composable
-fun MicButton(
-    state: VoiceState,
-    assistantName: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    size: Dp = 96.dp,
-) {
-    val listening = state is VoiceState.Listening
-    val label = state.buttonLabel(assistantName)
-    val description = state.buttonDescription(assistantName)
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        FilledIconButton(
-            onClick = onClick,
-            enabled = state !is VoiceState.Processing,
-            shape = CircleShape,
-            colors = if (listening) {
-                IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError,
-                )
-            } else {
-                IconButtonDefaults.filledIconButtonColors()
-            },
-            modifier = Modifier.size(size).semantics {
-                contentDescription = description
-                stateDescription = state.shortLabel()
-            },
-        ) {
-            Icon(
-                painterResource(if (listening) R.drawable.ic_stop else R.drawable.ic_mic),
-                contentDescription = null,
-                modifier = Modifier.size(size * 0.45f),
+private fun iconFor(state: VoiceState): ImageVector = when (state) {
+    is VoiceState.Listening -> PenelopeIcons.Check
+    is VoiceState.Speaking -> PenelopeIcons.Pause
+    is VoiceState.Paused -> PenelopeIcons.Play
+    else -> MicIcon
+}
+
+/** Microphone line icon. */
+val MicIcon: ImageVector by lazy {
+    androidx.compose.ui.graphics.vector.ImageVector.Builder("mic", 24.dp, 24.dp, 24f, 24f).apply {
+        listOf(
+            "M12,3.5 A2.8,2.8 0 0 1 14.8,6.3 V11.5 A2.8,2.8 0 0 1 9.2,11.5 V6.3 A2.8,2.8 0 0 1 12,3.5 Z",
+            "M6.5,11 A5.5,5.5 0 0 0 17.5,11", "M12,16.5 V20", "M9,20 H15",
+        ).forEach {
+            addPath(
+                androidx.compose.ui.graphics.vector.addPathNodes(it),
+                stroke = androidx.compose.ui.graphics.SolidColor(androidx.compose.ui.graphics.Color.Black),
+                strokeLineWidth = 1.8f,
+                strokeLineCap = androidx.compose.ui.graphics.StrokeCap.Round,
+                strokeLineJoin = androidx.compose.ui.graphics.StrokeJoin.Round,
             )
         }
-        Text(label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
-    }
+    }.build()
 }
 
-/** "End conversation" control shown while a conversation is running or paused. */
-@Composable
-fun EndConversationButton(state: VoiceState, active: Boolean, session: VoiceSession, modifier: Modifier = Modifier) {
-    if (active || state is VoiceState.Paused || state is VoiceState.Listening || state is VoiceState.Speaking) {
-        OutlinedButton(onClick = session::end, modifier = modifier.heightIn(min = 48.dp)) { Text("End conversation") }
-    }
-}
-
-/** Status line; announced politely by TalkBack when it changes. */
-@Composable
-fun VoiceStatusText(state: VoiceState, assistantName: String, modifier: Modifier = Modifier) {
-    Text(
-        state.statusText(assistantName),
-        style = MaterialTheme.typography.bodyLarge,
-        color = if (state is VoiceState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        textAlign = TextAlign.Center,
-        modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite },
-    )
-}
-
-/** Pill + status text in one row, used on the dashboard card. */
-@Composable
-fun VoiceStatusRow(state: VoiceState, assistantName: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        VoiceStatePill(state)
-    }
-    VoiceStatusText(state, assistantName)
-}

@@ -4,6 +4,7 @@ import com.aicarcompanion.app.diagnostics.dtc.DtcCodeFormat
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.diagnostics.smart.SymptomCategory
 import com.aicarcompanion.app.diagnostics.smart.SymptomClassifier
+import com.aicarcompanion.app.diagnostics.smart.RepairGlossary
 
 /** Live values Penelope can be asked about, each backed by a standard OBD-II PID. */
 enum class LiveMetric(val spokenName: String, val pid: ObdPid) {
@@ -40,6 +41,10 @@ sealed interface AssistantIntent {
     data object Repeat : AssistantIntent
     /** "Show me the sensor readings." */
     data object SensorReadings : AssistantIntent
+    /** "Can I still drive my car?" */
+    data object CanIDrive : AssistantIntent
+    /** "Help me understand a repair." [term] is a recognized repair item, if any. */
+    data class RepairHelp(val term: String?) : AssistantIntent
     /** An everyday problem description ("why is my car shaking?"). */
     data class Symptom(val category: SymptomCategory, val text: String) : AssistantIntent
     data object LastService : AssistantIntent
@@ -68,17 +73,21 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
         if (symptom != null && symptom.isUrgent) return AssistantIntent.Symptom(symptom, utterance.trim())
 
         return when {
+            has("repair", "estimate", "quote", "the shop said", "mechanic said", "they said i need", "what is a", "what's a", "what does a") &&
+                (has("repair", "estimate", "quote", "shop", "mechanic") || RepairGlossary.find(text) != null) ->
+                AssistantIntent.RepairHelp(RepairGlossary.find(text)?.name)
             has("what can you do", "help", "what do you do", "what are your commands", "what can i ask") -> AssistantIntent.Help
             has("more simply", "simpler", "simple terms", "plain english", "plain language", "dumb it down", "i don't understand", "i dont understand", "like i'm five", "like im five") -> AssistantIntent.Simpler
             has("technical", "for a mechanic", "mechanic's explanation", "in depth", "nerd") -> AssistantIntent.MoreTechnical
             has("tell me more", "more detail", "more details", "go on", "elaborate", "what else") -> AssistantIntent.MoreDetail
             has("say that again", "repeat that", "repeat", "what did you say", "come again") -> AssistantIntent.Repeat
             has("sensor readings", "sensor data", "live data", "all the readings", "the readings", "all readings", "all sensors") -> AssistantIntent.SensorReadings
+            has("still drive", "safe to drive", "okay to drive", "ok to drive", "can i drive", "should i drive", "is it safe") -> AssistantIntent.CanIDrive
             has("explain", "what does", "what is", "what's", "meaning", "mean") && has("code", "codes", "dtc") ->
                 AssistantIntent.ExplainCode(null)
             has("trouble code", "trouble codes", "error code", "error codes", "check engine", "dtc", "dtcs",
                 "diagnostic code", "diagnostic codes", "fault code", "fault codes", "codes") -> AssistantIntent.ReadTroubleCodes
-            symptom != null && symptom != SymptomCategory.WARNING_LIGHT -> AssistantIntent.Symptom(symptom, utterance.trim())
+            symptom != null -> AssistantIntent.Symptom(symptom, utterance.trim())
             has("coolant", "engine temperature", "engine temp", "running hot", "overheating", "water temperature") ->
                 AssistantIntent.LiveValue(LiveMetric.COOLANT_TEMP)
             has("intake air", "intake temperature") -> AssistantIntent.LiveValue(LiveMetric.INTAKE_AIR_TEMP)

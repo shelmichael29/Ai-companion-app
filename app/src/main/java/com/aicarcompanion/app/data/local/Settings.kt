@@ -14,6 +14,8 @@ enum class ExplanationLevel(val label: String, val description: String) {
     ADVANCED("Advanced / professional", "Technical terms, code definitions and all available live data."),
 }
 
+enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark") }
+
 /** User preferences. Small enough for SharedPreferences; no extra dependency needed. */
 data class AppSettings(
     val activeVehicleId: String? = null,
@@ -34,6 +36,9 @@ data class AppSettings(
     /** Keep listening after each reply (hands-free conversation). On by default. */
     val continuousConversation: Boolean = true,
     val explanationLevel: ExplanationLevel = ExplanationLevel.EVERYDAY,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Calmer visuals: static orb, no background motion. Android's "Remove animations" also applies. */
+    val reduceMotion: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_ASSISTANT_NAME = "Penelope"
@@ -100,6 +105,8 @@ object SettingsCodec {
     private const val KEY_VOICE = "tts_voice"
     private const val KEY_CONTINUOUS = "continuous_conversation"
     private const val KEY_LEVEL = "explanation_level"
+    private const val KEY_THEME = "theme_mode"
+    private const val KEY_REDUCE_MOTION = "reduce_motion"
 
     fun read(store: KeyValueStore): AppSettings {
         val defaults = AppSettings()
@@ -115,6 +122,8 @@ object SettingsCodec {
             continuousConversation = store.getBoolean(KEY_CONTINUOUS) ?: defaults.continuousConversation,
             explanationLevel = ExplanationLevel.entries.firstOrNull { it.name == store.getString(KEY_LEVEL) }
                 ?: defaults.explanationLevel,
+            themeMode = ThemeMode.entries.firstOrNull { it.name == store.getString(KEY_THEME) } ?: defaults.themeMode,
+            reduceMotion = store.getBoolean(KEY_REDUCE_MOTION) ?: defaults.reduceMotion,
         )
     }
 
@@ -130,6 +139,8 @@ object SettingsCodec {
             KEY_VOICE to s.ttsVoice,
             KEY_CONTINUOUS to s.continuousConversation,
             KEY_LEVEL to s.explanationLevel.name,
+            KEY_THEME to s.themeMode.name,
+            KEY_REDUCE_MOTION to s.reduceMotion,
         ),
     )
 }

@@ -117,6 +117,21 @@ object SymptomGuide {
             ),
             "Thanks, I've noted that. A weak-feeling engine is worth having checked, especially if it's getting worse.",
         )
+        SymptomCategory.WARNING_LIGHT -> FollowUpQuestion(
+            category,
+            "What color is the light, and what does the symbol look like? For example: an engine, a battery, a thermometer, an oil can, or an exclamation mark.",
+            listOf(
+                listOf("thermometer", "temperature", "temp") to "That's usually the engine temperature warning. If it's red or the gauge is high, pull over safely and turn the engine off; driving while overheating can cause serious damage.",
+                listOf("oil", "lamp", "genie") to "An oil can symbol is the oil pressure warning. Pull over safely and turn the engine off, because driving without enough oil pressure can ruin the engine. Check the oil level once it's off.",
+                listOf("battery") to "A battery symbol usually means the car isn't charging properly. The car may run for a while on battery power alone, so head somewhere safe or to a mechanic soon and avoid using extra electrical things.",
+                listOf("brake", "exclamation", "!") to "A red exclamation mark or brake symbol can mean the parking brake is on, or a brake system problem such as low brake fluid. If the parking brake is off and the light stays on, have the brakes checked before driving far.",
+                listOf("tire", "tyre", "horseshoe") to "A horseshoe shape with an exclamation mark is the tire pressure warning. Check your tire pressures, which is often free at gas stations, and look for a flat.",
+                listOf("engine", "check") to "That's the check-engine light. If it's steady and the car drives normally, it's usually OK to drive gently and get it checked soon. If it's flashing, it's more serious: avoid hard acceleration and get it checked as soon as you can. With your adapter connected, I can read the code.",
+                listOf("red") to "Red warning lights generally mean stop as soon as it's safe and find out what's wrong. If you can describe the symbol, I can tell you more.",
+                listOf("yellow", "amber", "orange") to "Yellow or amber lights generally mean something should be checked soon, but it's not usually an emergency. If you can describe the symbol, I can tell you more.",
+            ),
+            "Thanks. As a general rule, red lights mean stop when it's safe, and yellow or amber lights mean get it checked soon. Your owner's manual has a page showing every dashboard symbol.",
+        )
         SymptomCategory.HARD_START -> FollowUpQuestion(
             category,
             "When you try to start it, does the engine crank, making a turning sound, or do you just hear a click or nothing at all?",
@@ -131,7 +146,7 @@ object SymptomGuide {
 
     /** First plain-language response to a non-urgent symptom (before the follow-up question). */
     fun opening(category: SymptomCategory): String = when (category) {
-        SymptomCategory.WARNING_LIGHT -> "A warning light is the car's way of saying it noticed something. If it's the check-engine light and your adapter is connected, I can read the codes and explain them."
+        SymptomCategory.WARNING_LIGHT -> "A warning light is the car's way of saying it noticed something. Let's figure out which one it is."
         SymptomCategory.SMELL -> "Smells can tell us a lot. A sweet smell can mean a coolant leak, and a rotten-egg smell often points to the exhaust system. If it smells like fuel or burning, pull over safely."
         else -> "I can help with that. You don't need to know anything about cars; I'll ask a couple of simple questions."
     }

@@ -7,7 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.aicarcompanion.app.CarCompanionApplication
 import com.aicarcompanion.app.ui.adapter.AdapterViewModel
 import com.aicarcompanion.app.ui.assistant.AssistantViewModel
-import com.aicarcompanion.app.ui.dashboard.DashboardViewModel
+import com.aicarcompanion.app.ui.home.HomeViewModel
 import com.aicarcompanion.app.ui.history.HistoryViewModel
 import com.aicarcompanion.app.ui.settings.SettingsViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
@@ -18,7 +18,7 @@ object AppViewModelProvider {
     val Factory = viewModelFactory {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            DashboardViewModel(c.vehicleRepository, c.diagnosticsRepository, c.maintenanceRepository, c.historyRepository, c.obdConnection, c.settings)
+            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

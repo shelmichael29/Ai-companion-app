@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 sealed interface SpeechInputEvent {
     data object Ready : SpeechInputEvent
     data class Partial(val text: String) : SpeechInputEvent
+    /** Microphone loudness, normalized to 0..1. Used only for visual feedback. */
+    data class Level(val level: Float) : SpeechInputEvent
     data class Final(val text: String) : SpeechInputEvent
     data class Error(val error: SpeechInputError) : SpeechInputEvent
 }
@@ -37,6 +39,9 @@ interface SpeechInput {
     /** Stops capturing audio and delivers a [SpeechInputEvent.Final] for what was heard so far. */
     fun finishListening()
 }
+
+/** Converts the recognizer's RMS dB (roughly -2..10) to 0..1. */
+fun normalizeRms(rmsDb: Float): Float = ((rmsDb + 2f) / 12f).coerceIn(0f, 1f)
 
 /** Maps android.speech.SpeechRecognizer error codes (kept as ints so this is JVM-testable). */
 object SpeechErrorMapper {

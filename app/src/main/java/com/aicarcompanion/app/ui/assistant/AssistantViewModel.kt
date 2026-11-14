@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 class AssistantViewModel(val session: VoiceSession, private val store: SettingsStore) : ViewModel() {
     val state = session.state
     val conversationActive = session.conversationActive
+    val inputLevel = session.inputLevel
     val turns = session.conversation.turns
     val settings: StateFlow<AppSettings> = store.settings
         .stateIn(viewModelScope, SharingStarted.Eagerly, store.settings.value)

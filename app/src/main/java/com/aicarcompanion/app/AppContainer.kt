@@ -61,6 +61,7 @@ interface AppContainer {
     val bluetooth: BluetoothGateway
     val voiceSession: VoiceSession
     val speechOutput: SpeechOutput
+    val vehiclePhotos: com.aicarcompanion.app.data.photos.VehiclePhotoStore
 
     /** Called when the app leaves the foreground: the microphone must never stay on in the background. */
     fun onAppBackgrounded()
@@ -112,6 +113,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
+    override val vehiclePhotos by lazy { com.aicarcompanion.app.data.photos.VehiclePhotoStore(appContext) }
     private val audioFocus by lazy { AndroidAudioFocus(appContext) }
 
     override val speechOutput: SpeechOutput by lazy {
