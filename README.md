@@ -1,59 +1,56 @@
 # AI Car Companion
 
-A native Android app (Kotlin + Jetpack Compose) that acts as an intelligent automotive
-assistant: vehicle profiles, a vehicle dashboard, and — in upcoming milestones — OBD-II
-diagnostics over Bluetooth/Wi-Fi, plain-language trouble-code explanations, maintenance
-tracking, mechanic handoff reports and AI-assisted troubleshooting.
+A native Android app (Kotlin + Jetpack Compose) with **Penelope**, a voice-first automotive
+assistant. It identifies your vehicle from free public databases, talks with you
+(push-to-talk speech in, spoken answers out), reads standard OBD-II data from an
+ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 
-> **Status: foundation (v0.1.0).** The app runs on sample data. **No OBD-II adapter support
-> exists yet, and nothing shown in the app comes from a real vehicle.** Every sample item is
-> labeled "Sample data" in the UI.
+> **Honesty rule:** the app never presents sample or guessed data as coming from your car.
+> Live values are shown/spoken only when read from a connected adapter; every item carries
+> its origin (vehicle, saved history, entered by you, sample).
 
-## What works today
+## Features (v0.2)
 
-- **Vehicle profiles** — add, edit, delete and select vehicles (year, make, model, trim,
-  engine displacement/cylinders/fuel/aspiration, optional VIN, odometer, nickname) with
-  input validation. Stored in memory only for now (reset when the app process ends).
-- **Dashboard** — vehicle summary, OBD-II adapter status (honestly reports "not available
-  yet"), sample trouble codes with explanations, a sample sensor snapshot and sample
-  service history, under a clear sample-data banner.
-- **OBD-II groundwork (pure Kotlin, unit-tested)** — DTC byte decoding (SAE J2012), standard
-  mode 01 PID formulas (RPM, coolant temp, speed, voltage, …), ELM327 response parsing
-  (including `NO DATA` / error handling), and a small offline catalog of generic codes.
+| Area | Status |
+|---|---|
+| Vehicle lookup: year → make → model → engine → transmission (FuelEconomy.gov), searchable | Implemented, unit-tested with captured API responses |
+| VIN entry, validation and decoding (NHTSA vPIC) with review/correction | Implemented, unit-tested |
+| Offline: cached lookups, manual entry, profiles stored on-device (Room) | Implemented |
+| Penelope: push-to-talk speech recognition + spoken replies, stop/interrupt, transcript, typed fallback | Implemented; conversation logic unit-tested; speech engines need on-device check |
+| Rename assistant, speaking speed, opt-in demo data | Implemented |
+| Bluetooth Classic ELM327: paired-device selection, init, status, reconnect, live PIDs, read stored/pending codes | Implemented; tested against a scripted fake adapter; **needs real-adapter verification** |
+| Read-only safety allowlist (no code clearing / actuator / write commands) | Implemented, unit-tested |
+| Per-vehicle history: service & repairs, notes (symptom / verified finding / possible cause), code reads, sensor snapshots, mileage | Implemented |
+| BLE adapters, Wi-Fi adapters, wake word, AI reasoning, ElevenLabs voice, mechanic export | Planned (interfaces in place) |
 
 ## Requirements
 
-- Android Studio (Ladybug or newer) or the command line with JDK 17+
-- Android SDK Platform 35
-- A device or emulator running Android 8.0 (API 26) or newer
+- Android 8.0 (API 26)+; developed for a Samsung Galaxy S26 Ultra.
+- JDK 17+, Android SDK Platform 35 (Android Studio does this for you).
+- Optional: an ELM327-compatible **Bluetooth Classic** OBD-II adapter (e.g. Panlong).
 
-No accounts, API keys, paid services or credentials are needed.
+No accounts, API keys, paid services or credentials.
 
 ## Build & run
 
 ```bash
-# Point Gradle at your Android SDK (or open the project in Android Studio, which does this)
-echo "sdk.dir=$HOME/Android/Sdk" > local.properties   # local.properties is git-ignored
-
-./gradlew assembleDebug          # build the APK -> app/build/outputs/apk/debug/
-./gradlew installDebug           # install on a connected device/emulator
-./gradlew testDebugUnitTest      # run unit tests
-./gradlew lintDebug              # Android lint
+echo "sdk.dir=$HOME/Android/Sdk" > local.properties   # git-ignored
+./gradlew assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
+./gradlew installDebug         # install on a connected phone
+./gradlew testDebugUnitTest    # JVM unit tests
+./gradlew lintDebug
 ```
 
-## Project layout
+See **[docs/DEVICE_TESTING.md](docs/DEVICE_TESTING.md)** for installing and testing on the
+Galaxy S26 Ultra with a Bluetooth adapter, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
-```
-app/src/main/java/com/aicarcompanion/app/
-├── AppContainer.kt              Manual dependency wiring (swap sample -> real here)
-├── domain/model/                Vehicle, EngineSpec, DTCs, SensorReading, MaintenanceRecord, DataOrigin
-├── domain/repository/           Repository interfaces (UI depends only on these)
-├── data/memory/                 In-memory VehicleRepository
-├── data/sample/                 Labeled sample data + sample repositories
-├── diagnostics/obd/             ObdConnection abstraction, PIDs, ELM327 parser
-├── diagnostics/dtc/             DTC decoder, code-format helpers, generic code catalog
-└── ui/                          Compose theme, navigation, dashboard and vehicle screens
-```
+## Permissions
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design decisions and
-[docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
+| Permission | Why | When asked |
+|---|---|---|
+| `INTERNET` | Vehicle lookups (FuelEconomy.gov, NHTSA) | Never (normal permission) |
+| `RECORD_AUDIO` | Push-to-talk with Penelope | First mic tap |
+| `BLUETOOTH_CONNECT` ("Nearby devices") | Connect to your **paired** OBD-II adapter | On the Adapter tab |
+
+No location, Bluetooth scanning or background-microphone access is requested.

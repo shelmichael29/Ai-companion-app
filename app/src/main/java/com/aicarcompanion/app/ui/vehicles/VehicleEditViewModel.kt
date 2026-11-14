@@ -1,6 +1,7 @@
 package com.aicarcompanion.app.ui.vehicles
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
@@ -54,7 +55,7 @@ class VehicleEditViewModel(
         private set
 
     /** Bumped whenever looked-up details are applied, so the UI can bring the review form into view. */
-    var detailsAppliedCount by mutableStateOf(0)
+    var detailsAppliedCount by mutableIntStateOf(0)
         private set
 
     private var appliedCatalogId: String? = null

@@ -1,39 +1,26 @@
 # Roadmap
 
-Milestones are ordered so each one ships something usable and testable.
+## Done
+- **M1 Foundation** — Compose app, profiles, dashboard, DTC/PID decoding.
+- **M2 (Phase 2)** — Vehicle database selection + VIN decode, Room persistence, Penelope
+  push-to-talk voice, read-only Bluetooth Classic OBD-II, per-vehicle history.
 
-## M1 — Foundation ✅ (this change)
-Compose app shell, vehicle profiles (in-memory), dashboard with clearly labeled sample data,
-OBD-II/DTC decoding library with unit tests, CI.
-
-## M2 — Persistence & maintenance log
-- Room database for vehicles and maintenance records (with migrations + tests).
-- Add/edit/delete maintenance records (`USER_ENTERED`), service reminders by date/mileage.
-- Remove sample maintenance data once real records can be entered; keep a "demo mode" toggle.
-
-## M3 — Bluetooth OBD-II (ELM327)
-- Runtime permission flow, device picker, Bluetooth classic SPP transport.
-- ELM327 init sequence, protocol auto-detect, timeouts, reconnect.
-- Read/clear DTCs (modes 03/07/0A/04 — clearing behind an explicit confirmation).
-- Live data screen for supported PIDs (query mode 01 PID 00/20/40 support bitmaps).
-- Test against a real adapter and an ELM327 emulator; record raw transcripts as test fixtures.
-
-## M4 — Wi-Fi OBD-II & BLE adapters
-- TCP socket transport; BLE GATT transport for common BLE dongles.
-
-## M5 — Mechanic handoff
-- Report with vehicle profile, DTCs (with origin/time captured), freeze-frame data,
-  maintenance history; export as PDF/plain text via the share sheet. No server required.
-
-## M6 — AI-assisted troubleshooting (optional)
-- Decide provider strategy (on-device vs. user-supplied cloud key); opt-in only.
-- Ground answers in origin-tagged vehicle facts; clearly mark AI suggestions as non-authoritative.
-
-## M7 — Vehicle-specific knowledge base (optional)
-- Pluggable `DtcKnowledgeSource` backed by a local, licensable dataset (TSBs, manufacturer codes).
+## Next (recommended order)
+1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
+   ELM327 transcripts (add a debug log export) and turn them into parser test fixtures.
+2. **OBD-II hardening** — foreground service for long sessions, read VIN via mode 09 PID 02
+   and compare with the profile, freeze-frame (mode 02) with codes, adaptive polling.
+3. **Mechanic handoff report** — PDF/text via the share sheet: profile, codes with
+   origin/time, freeze frame, history, observations (facts vs. hypotheses clearly separated).
+4. **AI reasoning provider (opt-in)** — behind `ReasoningProvider`; grounded in
+   `VehicleContext`; key handling without bundling secrets.
+5. **Voice upgrades** — ElevenLabs `SpeechOutput`, Android Auto / steering-wheel button
+   activation, opt-in hands-free mode with a visible foreground service.
+6. **BLE and Wi-Fi adapters** — `ElmLink` implementations.
+7. **Knowledge packs** — vehicle-specific `DtcKnowledgeSource` (e.g. BMW/N52 notes), offline.
+8. Predictive maintenance, health trends, trip summaries, proactive spoken warnings.
 
 ## Housekeeping
-- Upgrade AGP/Kotlin/AndroidX to current versions (lint reports newer releases; AGP 9 is a
-  major migration and deserves its own change).
-- Add Compose UI tests and screenshot tests once screens stabilize.
-- Units preference (miles/km, °F/°C).
+- AGP/Kotlin/AndroidX upgrades (AGP 9 is a larger migration; do separately).
+- Compose UI tests and Room DAO instrumented tests (need an emulator/device in CI).
+- Units preference (miles/km, °F/°C); currently U.S. units with metric in parentheses.
