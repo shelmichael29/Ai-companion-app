@@ -32,4 +32,6 @@ data class SensorReading(
     val unit: String,
     val timestamp: Instant,
     val origin: DataOrigin,
+    /** Standard OBD-II PID key (e.g. "010C") when read from a vehicle. */
+    val pid: String? = null,
 )

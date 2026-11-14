@@ -91,7 +91,10 @@ private fun VehicleCard(vehicle: Vehicle, onEdit: () -> Unit) {
     SectionCard(title = vehicle.title) {
         if (vehicle.nickname != null) Text(vehicle.displayName, style = MaterialTheme.typography.bodyLarge)
         LabeledValue("Engine", vehicle.engine.description)
+        vehicle.engine.engineCode?.let { LabeledValue("Engine code", it) }
         LabeledValue("Trim", vehicle.trim ?: "—")
+        vehicle.transmission?.let { LabeledValue("Transmission", it) }
+        vehicle.drivetrain?.let { LabeledValue("Drive", it) }
         LabeledValue("Odometer", vehicle.odometerMiles?.let { "${NumberFormat.getIntegerInstance().format(it)} mi" } ?: "—")
         LabeledValue("VIN", vehicle.vin ?: "Not entered")
         Button(onClick = onEdit, modifier = Modifier.padding(top = 4.dp)) { Text("Edit profile") }

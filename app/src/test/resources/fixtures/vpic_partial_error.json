@@ -1,0 +1,39 @@
+{
+ "Count": 1,
+ "Message": "Results returned successfully. NOTE: Any missing decoded values should be interpreted as NHTSA does not have data on the specific variable. Missing value should NOT be interpreted as an indication that a feature or technology is unavailable for a vehicle.",
+ "SearchCriteria": "VIN(s): WBAXG5C51BD000001",
+ "Results": [
+  {
+   "AdditionalErrorText": "Unused position(s): 4,5,6,7,8.",
+   "BedType": "Not Applicable",
+   "BodyCabType": "Not Applicable",
+   "BusFloorConfigType": "Not Applicable",
+   "BusType": "Not Applicable",
+   "CustomMotorcycleType": "Not Applicable",
+   "DriveType": "",
+   "EngineConfiguration": "",
+   "EngineModel": "",
+   "ErrorCode": "3,14",
+   "ErrorText": "3 - VIN corrected, error in one position (assuming Check Digit is correct); 14 - Unable to provide information for some of the characters in the VIN, based on the manufacturer submission.",
+   "Make": "BMW",
+   "MakeID": "452",
+   "Manufacturer": "BMW AG",
+   "ManufacturerId": "966",
+   "ModelYear": "2011",
+   "MotorcycleChassisType": "Not Applicable",
+   "MotorcycleSuspensionType": "Not Applicable",
+   "PlantCity": "DINGOLFING",
+   "PlantCountry": "GERMANY",
+   "PossibleValues": "(4:P)",
+   "SuggestedVIN": "WBAPG5C51BD000001",
+   "TrailerBodyType": "Not Applicable",
+   "TrailerType": "Not Applicable",
+   "TransmissionStyle": "",
+   "Trim": "",
+   "Turbo": "",
+   "VIN": "WBAXG5C51BD000001",
+   "VehicleDescriptor": "WBAXG5C5*BD",
+   "VehicleType": "PASSENGER CAR"
+  }
+ ]
+}

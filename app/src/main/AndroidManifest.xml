@@ -1,11 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-        No permissions are requested yet. Bluetooth (BLUETOOTH_CONNECT / BLUETOOTH_SCAN)
-        and network permissions will be added together with the real OBD-II transports,
-        so users are only asked for access when a feature actually needs it.
-    -->
+    <!-- Vehicle lookups (FuelEconomy.gov, NHTSA vPIC). Normal permission; no prompt. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".CarCompanionApplication"
