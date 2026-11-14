@@ -53,6 +53,28 @@ data class EngineSpec(
             return parts.joinToString(" ")
         }
 
+    /** Beginner-friendly description without jargon, e.g. "3.0-liter six-cylinder gas engine". */
+    val plainDescription: String
+        get() {
+            if (fuelType == FuelType.ELECTRIC) return "electric motor"
+            val size = displacementLiters?.let { "%.1f-liter ".format(java.util.Locale.US, it) }.orEmpty()
+            val cyl = cylinders?.let { "${cylinderWord(it)}-cylinder " }.orEmpty()
+            val fuel = when (fuelType) {
+                FuelType.GASOLINE -> "gas"
+                FuelType.DIESEL -> "diesel"
+                FuelType.HYBRID -> "hybrid"
+                FuelType.PLUG_IN_HYBRID -> "plug-in hybrid"
+                FuelType.FLEX_FUEL -> "flex-fuel"
+                FuelType.ELECTRIC -> "electric"
+            }
+            return "$size$cyl$fuel engine"
+        }
+
+    private fun cylinderWord(n: Int) = when (n) {
+        2 -> "two"; 3 -> "three"; 4 -> "four"; 5 -> "five"; 6 -> "six"; 8 -> "eight"; 10 -> "ten"; 12 -> "twelve"
+        else -> n.toString()
+    }
+
     /** A sentence-friendly description used by Penelope, e.g. "3.0 liter inline six-cylinder". */
     val spokenDescription: String
         get() {

@@ -164,21 +164,7 @@ class RuleBasedReasoningProvider(
     }
 
     /** "3.0-liter six-cylinder gas engine" — no layout or engine codes. */
-    private fun simpleEngine(v: Vehicle): String {
-        val e = v.engine
-        if (e.fuelType == FuelType.ELECTRIC) return "electric motor"
-        val size = e.displacementLiters?.let { "${"%.1f".format(Locale.US, it)}-liter " }.orEmpty()
-        val cyl = e.cylinders?.let { "${cylinderWord(it)}-cylinder " }.orEmpty()
-        val fuel = when (e.fuelType) {
-            FuelType.GASOLINE -> "gas"
-            FuelType.DIESEL -> "diesel"
-            FuelType.HYBRID -> "hybrid"
-            FuelType.PLUG_IN_HYBRID -> "plug-in hybrid"
-            FuelType.FLEX_FUEL -> "flex-fuel"
-            FuelType.ELECTRIC -> "electric"
-        }
-        return "$size$cyl$fuel engine"
-    }
+    private fun simpleEngine(v: Vehicle): String = v.engine.plainDescription
 
     private fun engineInfo(ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
         val v = ctx.vehicle ?: return reply(noVehicleHint(ctx)!!, ReplyBasis.NOT_AVAILABLE)
@@ -441,11 +427,6 @@ class RuleBasedReasoningProvider(
     }
 
     private fun Vehicle.shortName() = nickname ?: "$make $model"
-
-    private fun cylinderWord(n: Int) = when (n) {
-        2 -> "two"; 3 -> "three"; 4 -> "four"; 5 -> "five"; 6 -> "six"; 8 -> "eight"; 10 -> "ten"; 12 -> "twelve"
-        else -> n.toString()
-    }
 
     private companion object {
         val SENSOR_ORDER = listOf(

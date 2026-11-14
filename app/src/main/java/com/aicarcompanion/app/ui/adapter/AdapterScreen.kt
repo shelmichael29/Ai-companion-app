@@ -47,6 +47,7 @@ import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.ui.AppViewModelProvider
+import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SectionCard
 
@@ -150,8 +151,10 @@ private fun StatusCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
         }
         Text(detail, style = MaterialTheme.typography.bodyMedium)
         if (state is ObdConnectionState.Connected) {
-            state.adapterVersion?.let { LabeledValue("Adapter", it) }
-            state.vehicleProtocol?.let { LabeledValue("Protocol", it) }
+            if (viewModel.level == ExplanationLevel.ADVANCED) {
+                state.adapterVersion?.let { LabeledValue("Adapter", it) }
+                state.vehicleProtocol?.let { LabeledValue("Protocol", it) }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.vehicleProtocol == null) {
                     Button(onClick = viewModel::retryVehicle, modifier = Modifier.heightIn(min = 48.dp)) { Text("Check vehicle again") }
@@ -170,8 +173,8 @@ fun describe(state: ObdConnectionState): Pair<String, String> = when (state) {
     ObdConnectionState.Disconnected -> "Not connected" to "Choose your paired adapter below."
     is ObdConnectionState.Connecting -> "Connecting…" to "Connecting to ${state.adapterName ?: "adapter"} and initializing."
     is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to
-        if (state.vehicleProtocol != null) "Vehicle is responding." else
-            "The adapter is connected, but the vehicle isn't responding. Turn the ignition on, then check again."
+        if (state.vehicleProtocol != null) "Your car is responding." else
+            "The adapter is connected, but your car isn't responding. Turn the ignition on, then tap \"Check vehicle again\"."
     is ObdConnectionState.Reconnecting -> "Reconnecting (${state.attempt} of ${state.maxAttempts})…" to "Lost connection to ${state.adapterName}."
     is ObdConnectionState.Unavailable -> "Unavailable" to state.reason
     is ObdConnectionState.Failed -> "Not connected" to state.message
@@ -180,9 +183,13 @@ fun describe(state: ObdConnectionState): Pair<String, String> = when (state) {
 @Composable
 private fun LiveDataCard(viewModel: AdapterViewModel) {
     val readings by viewModel.obd.liveReadings.collectAsStateWithLifecycle(initialValue = emptyList())
-    SectionCard("Live data (from your vehicle)") {
+    SectionCard("Live readings from your car") {
         if (readings.isEmpty()) Text("Waiting for values…")
-        readings.forEach { r -> LabeledValue(r.name, formatReading(r)) }
+        val everyday = viewModel.level == ExplanationLevel.EVERYDAY
+        readings.forEach { r ->
+            val pid = ObdPid.fromCommand(r.pid)
+            LabeledValue(if (everyday && pid != null) pid.friendlyName else r.name, formatReading(r))
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = viewModel::readCodes, enabled = !viewModel.busy, modifier = Modifier.heightIn(min = 48.dp)) {
                 Text(if (viewModel.busy) "Reading…" else "Read trouble codes")

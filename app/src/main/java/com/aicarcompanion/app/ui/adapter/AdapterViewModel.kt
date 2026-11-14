@@ -38,6 +38,7 @@ class AdapterViewModel(
         private set
 
     val requiredPermission: String? get() = gateway.requiredPermission
+    val level get() = settings.settings.value.explanationLevel
     val lastAdapterAddress: String? get() = settings.settings.value.lastAdapterAddress
 
     fun refresh() {

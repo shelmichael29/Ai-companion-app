@@ -14,6 +14,8 @@ import com.aicarcompanion.app.domain.repository.MaintenanceRepository
 import com.aicarcompanion.app.domain.repository.VehicleRepository
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
 import com.aicarcompanion.app.domain.model.TroubleCodeRead
+import com.aicarcompanion.app.data.local.ExplanationLevel
+import com.aicarcompanion.app.data.local.SettingsStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +35,7 @@ sealed interface DashboardUiState {
         val obdState: ObdConnectionState,
         /** Most recent saved code read (null if codes were never read for this vehicle). */
         val lastCodeRead: TroubleCodeRead? = null,
+        val level: ExplanationLevel = ExplanationLevel.EVERYDAY,
     ) : DashboardUiState {
         /** True if anything shown is demonstration data rather than real data. */
         val containsSampleData: Boolean
@@ -49,6 +52,7 @@ class DashboardViewModel(
     maintenanceRepository: MaintenanceRepository,
     historyRepository: VehicleHistoryRepository,
     obdConnection: ObdConnection,
+    settings: SettingsStore,
 ) : ViewModel() {
 
     val uiState: StateFlow<DashboardUiState> = vehicleRepository.activeVehicleId
@@ -61,13 +65,13 @@ class DashboardViewModel(
                     diagnosticsRepository.troubleCodes(id),
                     diagnosticsRepository.sensorReadings(id),
                     maintenanceRepository.history(id),
-                    combine(obdConnection.state, historyRepository.latestTroubleCodeRead(id)) { o, r -> o to r },
-                ) { vehicle, codes, readings, history, (obd, lastRead) ->
+                    combine(obdConnection.state, historyRepository.latestTroubleCodeRead(id), settings.settings) { o, r, s -> Triple(o, r, s.explanationLevel) },
+                ) { vehicle, codes, readings, history, (obd, lastRead, level) ->
                     if (vehicle == null) {
                         DashboardUiState.NoVehicle
                     } else {
                         DashboardUiState.Ready(
-                            vehicle, codes, readings, history.sortedByDescending { it.date }, obd, lastRead,
+                            vehicle, codes, readings, history.sortedByDescending { it.date }, obd, lastRead, level,
                         )
                     }
                 }
