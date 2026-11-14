@@ -23,9 +23,12 @@ jobs:
       - name: Name the APK artifact
         if: success()
         id: apk
+        env:
+          # On pull requests GITHUB_SHA is GitHub's temporary merge commit; use the branch commit instead.
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          echo "name=ai-car-companion-${version}-debug-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "name=ai-car-companion-${version}-debug-${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
