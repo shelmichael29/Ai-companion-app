@@ -60,7 +60,9 @@ private enum class AddDialog { SERVICE, OBSERVATION, MILEAGE }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = androidx.compose.foundation.layout.PaddingValues(),
+    onOpenResults: () -> Unit = {},
     viewModel: HistoryViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -70,15 +72,15 @@ fun HistoryScreen(
     val miles = NumberFormat.getIntegerInstance()
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = { Text(state.vehicle?.let { "History · ${it.title}" } ?: "History") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-            )
+            com.aicarcompanion.app.ui.design.PenelopeTopBar(state.vehicle?.let { "History · ${it.title}" } ?: "History", onBack)
         },
-    ) { padding ->
+    ) { innerPadding ->
+        val padding = androidx.compose.foundation.layout.PaddingValues(
+            top = innerPadding.calculateTopPadding(),
+            bottom = contentPadding.calculateBottomPadding(),
+        )
         if (state.loaded && state.vehicle == null) {
             Text("Add a vehicle to start its history.", Modifier.padding(padding).padding(16.dp))
             return@Scaffold
@@ -88,6 +90,9 @@ fun HistoryScreen(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item {
+                com.aicarcompanion.app.ui.design.SuggestionPill("See car health results", onOpenResults, leading = com.aicarcompanion.app.ui.design.PenelopeIcons.Shield)
+            }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { dialog = AddDialog.SERVICE }, modifier = Modifier.heightIn(min = 48.dp)) { Text("+ Service") }

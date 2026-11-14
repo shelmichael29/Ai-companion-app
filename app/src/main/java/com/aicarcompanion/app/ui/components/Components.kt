@@ -30,8 +30,8 @@ fun SectionCard(
     origin: DataOrigin? = null,
     content: @Composable () -> Unit,
 ) {
-    Card(modifier = modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    com.aicarcompanion.app.ui.design.GlassPanel(modifier.fillMaxWidth(), contentPadding = 18.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,

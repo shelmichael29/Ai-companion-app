@@ -7,6 +7,7 @@ import com.aicarcompanion.app.diagnostics.dtc.DtcKnowledgeSource
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.diagnostics.smart.FollowUpQuestion
+import com.aicarcompanion.app.diagnostics.smart.RepairGlossary
 import com.aicarcompanion.app.diagnostics.smart.SymptomCategory
 import com.aicarcompanion.app.diagnostics.smart.SymptomGuide
 import com.aicarcompanion.app.domain.model.DataOrigin
@@ -60,12 +61,14 @@ class RuleBasedReasoningProvider(
     private var lastReply: AssistantReply? = null
     private var pendingFollowUp: FollowUpQuestion? = null
     private var pendingObservation: DiagnosticObservation? = null
+    private var awaitingRepairItem = false
 
     override fun resetContext() {
         lastTopic = null
         lastReply = null
         pendingFollowUp = null
         pendingObservation = null
+        awaitingRepairItem = false
     }
 
     override suspend fun respond(request: AssistantRequest): AssistantReply {
@@ -88,7 +91,22 @@ class RuleBasedReasoningProvider(
             if (isAnswer) return followUpAnswer(question, request.utterance)
         }
 
+        // The user is reading out an estimate item after "help me understand a repair".
+        if (awaitingRepairItem) {
+            awaitingRepairItem = false
+            RepairGlossary.find(request.utterance)?.let { return explainRepair(it) }
+        }
+
         return when (intent) {
+            AssistantIntent.CanIDrive -> canIDrive(ctx)
+            is AssistantIntent.RepairHelp -> intent.term?.let { name -> RepairGlossary.entries.first { it.name == name } }
+                ?.let(::explainRepair) ?: run {
+                awaitingRepairItem = true
+                reply(
+                    "Happy to help. Read me one item from the estimate, like \"front brake pads and rotors\" or \"valve cover gasket\", " +
+                        "and I'll explain what it is and why it matters. I can't judge prices or confirm whether your car needs it.",
+                )
+            }
             AssistantIntent.EndConversation -> AssistantReply("Okay. Talk to you later.", ReplyBasis.CONVERSATION, action = ConversationAction.END)
             AssistantIntent.PauseConversation -> AssistantReply(
                 "Okay, I'll pause. Tap the microphone when you're ready.", ReplyBasis.CONVERSATION, action = ConversationAction.PAUSE,
@@ -371,6 +389,38 @@ class RuleBasedReasoningProvider(
         pendingFollowUp = question
         val body = listOfNotNull(opening + noted, question?.question).joinToString(" ")
         return reply(body, ReplyBasis.GENERAL_KNOWLEDGE)
+    }
+
+    private fun explainRepair(entry: RepairGlossary.Entry) = reply(
+        "${entry.explanation} If you're unsure whether you need it, it's reasonable to ask the shop to show you the worn part " +
+            "or the test result, or to get a second opinion.",
+        ReplyBasis.GENERAL_KNOWLEDGE,
+    )
+
+    /** Answers from saved codes when available; otherwise gives general safety rules and asks. Never guesses. */
+    private fun canIDrive(ctx: VehicleContext): AssistantReply {
+        val read = ctx.latestCodeRead
+        val codes = ctx.demoCodes.map { it.code }.ifEmpty { read?.codes?.map { it.code }.orEmpty() }
+        val general = "If a red warning light is on, the temperature gauge is high, you smell burning or fuel, or the brakes " +
+            "feel wrong, don't keep driving: pull over safely and get help."
+        if (codes.isEmpty()) {
+            pendingFollowUp = SymptomGuide.followUp(SymptomCategory.WARNING_LIGHT)
+            return reply(
+                "I can't tell for sure without knowing more. $general If it's a steady yellow light and the car drives normally, " +
+                    "it's usually OK to drive gently to a mechanic. What's going on with your car? For example, which light is on?",
+                ReplyBasis.GENERAL_KNOWLEDGE,
+            )
+        }
+        val worst = codes.mapNotNull { knowledge.lookup(it)?.severity }
+            .minByOrNull { listOf(DtcSeverity.SEVERE, DtcSeverity.MODERATE, DtcSeverity.INFO, DtcSeverity.UNKNOWN).indexOf(it) }
+            ?: DtcSeverity.UNKNOWN
+        val demo = ctx.demoCodes.isNotEmpty()
+        val source = if (demo) "Based on the sample codes in demo mode (not your car)" else
+            "Based on the codes I last read${read?.let { " on ${SpokenFormat.dateTime(it.readAt)}" } ?: ""}"
+        return reply(
+            "$source: ${worst.advice} Things can change, so remember: $general",
+            if (demo) ReplyBasis.SAMPLE_DATA else ReplyBasis.RECORDED_DATA,
+        )
     }
 
     private suspend fun followUpAnswer(question: FollowUpQuestion, answer: String): AssistantReply {

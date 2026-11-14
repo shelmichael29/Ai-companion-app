@@ -25,6 +25,7 @@ object SampleData {
                 explanation = info.simple,
                 diyChecks = info.diyChecks,
                 technicalDetail = info.technical,
+                headline = info.headline,
                 status = if (code == "P0442") DtcStatus.PENDING else DtcStatus.STORED,
                 severity = info.severity,
                 origin = DataOrigin.SAMPLE,

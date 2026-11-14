@@ -13,6 +13,8 @@ data class DiagnosticTroubleCode(
     val diyChecks: String? = null,
     /** Technical detail for advanced users. */
     val technicalDetail: String? = null,
+    /** Short plain-language title. */
+    val headline: String? = null,
     val status: DtcStatus = DtcStatus.STORED,
     val severity: DtcSeverity = DtcSeverity.UNKNOWN,
     val origin: DataOrigin,

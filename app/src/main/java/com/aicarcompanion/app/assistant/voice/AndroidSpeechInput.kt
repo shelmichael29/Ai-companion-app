@@ -52,7 +52,7 @@ class AndroidSpeechInput(private val context: Context) : SpeechInput {
             r.setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) { trySend(SpeechInputEvent.Ready) }
                 override fun onBeginningOfSpeech() = Unit
-                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onRmsChanged(rmsdB: Float) { trySend(SpeechInputEvent.Level(normalizeRms(rmsdB))) }
                 override fun onBufferReceived(buffer: ByteArray?) = Unit
                 override fun onEndOfSpeech() = Unit
                 override fun onEvent(eventType: Int, params: Bundle?) = Unit

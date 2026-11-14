@@ -79,15 +79,9 @@ fun VehicleEditScreen(
     }
 
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
         topBar = {
-            TopAppBar(
-                title = { Text(if (viewModel.isEditing) "Edit vehicle" else "Add vehicle") },
-                navigationIcon = {
-                    IconButton(onClick = onDone) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
+            com.aicarcompanion.app.ui.design.PenelopeTopBar(if (viewModel.isEditing) "Edit car" else "Add a car", onBack = onDone)
         },
     ) { padding ->
         Column(
@@ -125,10 +119,7 @@ fun VehicleEditScreen(
             }
             DetailsForm(viewModel)
 
-            Button(
-                onClick = { viewModel.save(onDone) },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-            ) { Text("Confirm and save") }
+            com.aicarcompanion.app.ui.design.GradientButton("Confirm and save", { viewModel.save(onDone) }, Modifier.fillMaxWidth())
             if (viewModel.isEditing) {
                 OutlinedButton(
                     onClick = { confirmDelete = true },

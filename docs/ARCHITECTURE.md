@@ -51,6 +51,43 @@ Offline: responses are cached in Room (cache-first, 30-day freshness, stale copy
 network fails). Manual entry always works. Another provider (proprietary backend, offline
 knowledge pack) implements `VehicleCatalogProvider` / `VinDecoder`.
 
+## Visual design system (Phase 4, "Penelope UI 2.0")
+
+All UI is Jetpack Compose. `ui/theme/Theme.kt` defines a fixed brand theme (the earlier
+wallpaper-based dynamic color is gone) with separate light ("pearl") and dark ("night") palettes
+built from #397EBC blue, #35C9F4 cyan, #8655F5 violet, #E9DEFF lavender, #F6F7FF pearl and
+#1C254A ink. Extra tokens (gradients, glass fill/border, glow colors, semantic success/warning/danger,
+`reducedMotion`) live in `LocalPenelope`. Typography uses the system sans-serif (One UI Sans on
+Galaxy, Roboto elsewhere) in sp units, so it follows the user's font size.
+
+Reusable components (`ui/design/`): `PenelopeBackground` (gradient, glows, optional flowing waves),
+`GlassPanel`, `GradientButton`, `GlassIconButton`, `SuggestionPill`, `StatusBadge`,
+`ExpandableSection`, `PenelopeTopBar`, `BrandWordmark`, `LogoMark`, `PenelopeIcons` (line icons
+from path data), and `VoiceOrb`.
+
+**Voice orb.** Canvas-drawn; `OrbMode.from(VoiceState)` maps only real session states. While
+listening, ripples follow the recognizer's real `onRmsChanged` level (`VoiceSession.inputLevel`).
+Android TTS doesn't expose output amplitude, so the speaking waveform animates while the state is
+`Speaking` rather than tracking loudness. Infinite animations exist only while the orb is
+composed, pause with the frame clock in the background, and are replaced by static per-state
+visuals when "Reduce motion" (in-app) or Android's "Remove animations" is on.
+
+**Glass.** Compose has no backdrop-blur for content behind a surface (`Modifier.blur` blurs the
+element itself; `RenderEffect` applies to its own layer), so glass is a translucent fill plus a
+luminous gradient border and tinted shadow. That's the closest performant native alternative.
+
+**Navigation.** A floating translucent pill with four tabs (Home, Garage, Chat, History).
+Settings, OBD-II adapter, car editing and Car health are pushed routes reachable from those tabs.
+Screens fade/slide (disabled under reduced motion). Gesture-navigation insets are respected.
+
+**Vehicle images.** No stock car images are bundled (licensing). Users can add their own photo
+via the system photo picker (no storage permission); it's downscaled and stored in private app
+storage. Otherwise an illustrated placeholder is drawn.
+
+**Diagnostic results.** `DiagnosticPresentation` (pure, tested) turns a trouble code into: a short
+headline, what's happening, urgency (icon + words + color), next steps, and expandable technical
+details. Sample data is badged.
+
 ## Penelope (voice) — hands-free conversation
 
 ```

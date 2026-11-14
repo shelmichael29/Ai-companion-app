@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.transformWhile
@@ -61,6 +62,10 @@ class VoiceSession(
     private val _conversationActive = MutableStateFlow(false)
     /** True while a hands-free conversation is running (listening resumes automatically). */
     val conversationActive: StateFlow<Boolean> = _conversationActive.asStateFlow()
+
+    private val _inputLevel = MutableStateFlow(0f)
+    /** Live microphone level (0..1) while listening; 0 otherwise. Drives the voice orb only. */
+    val inputLevel: StateFlow<Float> = _inputLevel.asStateFlow()
 
     private var job: Job? = null
     private var silentTurns = 0
@@ -114,6 +119,7 @@ class VoiceSession(
     /** Ends the conversation and turns the microphone off. */
     fun end() {
         job?.cancel()
+        _inputLevel.value = 0f
         output.stop()
         _conversationActive.value = false
         releaseFocus()
@@ -124,6 +130,7 @@ class VoiceSession(
     fun pause(reason: String = "Paused. Tap the microphone to continue.") {
         if (_state.value == VoiceState.Idle && !_conversationActive.value) return
         job?.cancel()
+        _inputLevel.value = 0f
         output.stop()
         _conversationActive.value = false
         releaseFocus()
@@ -170,8 +177,16 @@ class VoiceSession(
                     emit(event)
                     event !is SpeechInputEvent.Final && event !is SpeechInputEvent.Error
                 }
-                .onEach { if (it is SpeechInputEvent.Partial) _state.value = VoiceState.Listening(it.text) }
+                .onEach {
+                    when (it) {
+                        is SpeechInputEvent.Partial -> _state.value = VoiceState.Listening(it.text)
+                        is SpeechInputEvent.Level -> _inputLevel.value = it.level
+                        else -> Unit
+                    }
+                }
+                .filter { it !is SpeechInputEvent.Level }
                 .lastOrNull()
+            _inputLevel.value = 0f
             when (outcome) {
                 is SpeechInputEvent.Final -> onHeard(outcome.text)
                 is SpeechInputEvent.Error -> onRecognitionError(outcome.error)

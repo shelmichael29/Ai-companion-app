@@ -60,6 +60,7 @@ import com.aicarcompanion.app.assistant.voice.VoiceOption
 import com.aicarcompanion.app.data.local.AppSettings
 import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.data.local.SettingsStore
+import com.aicarcompanion.app.data.local.ThemeMode
 import com.aicarcompanion.app.ui.AppViewModelProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,6 +96,8 @@ class SettingsViewModel(
     fun setContinuous(enabled: Boolean) = store.update { it.copy(continuousConversation = enabled) }
     fun setLevel(level: ExplanationLevel) = store.update { it.copy(explanationLevel = level) }
     fun setVoice(id: String?) = store.update { it.copy(ttsVoice = id) }
+    fun setTheme(mode: ThemeMode) = store.update { it.copy(themeMode = mode) }
+    fun setReduceMotion(enabled: Boolean) = store.update { it.copy(reduceMotion = enabled) }
 
     fun setEngine(id: String?) {
         store.update { it.copy(ttsEngine = id, ttsVoice = null) } // Voices differ per engine.
@@ -127,14 +130,8 @@ fun SettingsScreen(
     LaunchedEffect(Unit) { viewModel.loadVoices() }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                },
-            )
-        },
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        topBar = { com.aicarcompanion.app.ui.design.PenelopeTopBar("Settings", onBack) },
     ) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
@@ -170,9 +167,27 @@ fun SettingsScreen(
                 emptyHint = if (voices.isEmpty()) "This speech engine didn't list any voices; the default will be used." else null,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = viewModel::preview, modifier = Modifier.heightIn(min = 48.dp)) { Text("Hear a sample") }
+                com.aicarcompanion.app.ui.design.GradientButton("Hear a sample", viewModel::preview)
                 OutlinedButton(onClick = viewModel::resetVoice, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reset to natural voice") }
             }
+
+            Heading("Appearance")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ThemeMode.entries.forEach { mode ->
+                    androidx.compose.material3.FilterChip(
+                        selected = settings.themeMode == mode,
+                        onClick = { viewModel.setTheme(mode) },
+                        label = { Text(mode.label) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    )
+                }
+            }
+            SwitchRow(
+                "Reduce motion",
+                "Keeps the voice orb and background still. Android's \"Remove animations\" setting does this too.",
+                settings.reduceMotion,
+                viewModel::setReduceMotion,
+            )
 
             Heading("Conversation")
             SwitchRow(
