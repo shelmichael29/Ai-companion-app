@@ -1,7 +1,10 @@
 package com.aicarcompanion.app.assistant
 
 import com.aicarcompanion.app.assistant.conversation.AssistantReply
+import com.aicarcompanion.app.assistant.conversation.ConversationAction
 import com.aicarcompanion.app.assistant.conversation.ConversationManager
+import com.aicarcompanion.app.assistant.voice.AudioFocusController
+import com.aicarcompanion.app.assistant.voice.NoAudioFocus
 import com.aicarcompanion.app.assistant.voice.SpeakResult
 import com.aicarcompanion.app.assistant.voice.SpeechInput
 import com.aicarcompanion.app.assistant.voice.SpeechInputError
@@ -9,84 +12,144 @@ import com.aicarcompanion.app.assistant.voice.SpeechInputEvent
 import com.aicarcompanion.app.assistant.voice.SpeechOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.lastOrNull
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 
 sealed interface VoiceState {
+    /** No conversation. The microphone is off. */
     data object Idle : VoiceState
     data class Listening(val partialText: String = "") : VoiceState
     data class Processing(val heard: String) : VoiceState
     data class Speaking(val reply: AssistantReply) : VoiceState
+    /** Conversation paused (by the user, silence, the app going to background, or a call). Mic is off. */
+    data class Paused(val reason: String) : VoiceState
+    /** Something failed. The microphone is off. */
     data class Error(val message: String, val needsPermission: Boolean = false) : VoiceState
 }
 
 /**
- * Push-to-talk conversation loop: listen → process → speak. Tapping the microphone while the
- * assistant is speaking interrupts it and starts listening (barge-in by tap). App-scoped so
- * a conversation continues while the user moves between screens.
+ * Hands-free conversation: listen → think → speak → listen again, until the user ends or
+ * pauses it. Design rules:
+ * - Half-duplex: the microphone is never open while Penelope speaks, and listening resumes
+ *   only after speech has finished plus [resumeDelayMillis], so she can't hear herself.
+ *   As a second guard, a transcript that matches what she just said is discarded.
+ * - No runaway loops: after [maxSilentTurns] consecutive turns with no speech, or repeated
+ *   recognizer errors, the conversation pauses instead of restarting forever.
+ * - The microphone is off whenever the state isn't [VoiceState.Listening].
+ * Barge-in today is "tap to interrupt"; see docs/ARCHITECTURE.md for the path to voice barge-in.
  */
 class VoiceSession(
     private val scope: CoroutineScope,
     private val input: SpeechInput,
     private val output: SpeechOutput,
     val conversation: ConversationManager,
+    private val focus: AudioFocusController = NoAudioFocus(),
+    private val continuousEnabled: () -> Boolean = { true },
+    private val resumeDelayMillis: Long = 450,
+    private val maxSilentTurns: Int = 2,
+    private val maxBusyRetries: Int = 2,
 ) {
     private val _state = MutableStateFlow<VoiceState>(VoiceState.Idle)
     val state: StateFlow<VoiceState> = _state.asStateFlow()
 
+    private val _conversationActive = MutableStateFlow(false)
+    /** True while a hands-free conversation is running (listening resumes automatically). */
+    val conversationActive: StateFlow<Boolean> = _conversationActive.asStateFlow()
+
     private var job: Job? = null
+    private var silentTurns = 0
+    private var busyRetries = 0
+    private var lastSpoken: String = ""
+    private var holdsFocus = false
 
     val isSpeechInputAvailable: Boolean get() = input.isAvailable
+
+    init {
+        focus.onFocusLost = {
+            // A recognizer may briefly take focus itself while listening; only react otherwise.
+            if (_state.value !is VoiceState.Listening && (_conversationActive.value || _state.value is VoiceState.Speaking)) {
+                pause("Paused because another app needed the audio (for example, a phone call).")
+            }
+        }
+    }
 
     /** The single primary action for the microphone button. */
     fun onMicPressed() {
         when (_state.value) {
-            is VoiceState.Listening -> input.finishListening()
-            is VoiceState.Processing -> Unit // Ignore taps while working; the reply comes shortly.
-            is VoiceState.Speaking, VoiceState.Idle, is VoiceState.Error -> startListening()
+            is VoiceState.Listening -> input.finishListening() // "I'm done talking"
+            is VoiceState.Processing -> Unit
+            is VoiceState.Speaking -> interrupt()
+            VoiceState.Idle, is VoiceState.Paused, is VoiceState.Error -> start()
         }
     }
 
-    fun startListening() {
+    /** Starts a conversation (hands-free if enabled in Settings, otherwise a single turn). */
+    fun start() {
+        silentTurns = 0
+        busyRetries = 0
+        _conversationActive.value = continuousEnabled()
+        if (_conversationActive.value) acquireFocus()
+        listen()
+    }
+
+    /** Stops Penelope talking and listens right away (tap-to-interrupt barge-in). */
+    fun interrupt() {
         output.stop()
         job?.cancel()
-        _state.value = VoiceState.Listening()
-        job = scope.launch {
-            var finished = false
-            input.listen().collect { event ->
-                when (event) {
-                    SpeechInputEvent.Ready -> Unit
-                    is SpeechInputEvent.Partial -> _state.value = VoiceState.Listening(event.text)
-                    is SpeechInputEvent.Final -> { finished = true; process(event.text) }
-                    is SpeechInputEvent.Error -> { finished = true; fail(event.error) }
-                }
-            }
-            if (!finished && _state.value is VoiceState.Listening) _state.value = VoiceState.Idle
+        silentTurns = 0
+        listen()
+    }
+
+    /** Stops speech; in a conversation, listening resumes as after a normal reply. */
+    fun stopSpeaking() {
+        if (_state.value is VoiceState.Speaking && _conversationActive.value) interrupt() else output.stop()
+    }
+
+    /** Ends the conversation and turns the microphone off. */
+    fun end() {
+        job?.cancel()
+        output.stop()
+        _conversationActive.value = false
+        releaseFocus()
+        _state.value = VoiceState.Idle
+    }
+
+    /** Pauses the conversation; tapping the mic resumes it. Microphone and speech stop. */
+    fun pause(reason: String = "Paused. Tap the microphone to continue.") {
+        if (_state.value == VoiceState.Idle && !_conversationActive.value) return
+        job?.cancel()
+        output.stop()
+        _conversationActive.value = false
+        releaseFocus()
+        _state.value = VoiceState.Paused(reason)
+    }
+
+    /** The app left the foreground: never keep listening or talking in the background. */
+    fun onAppBackgrounded() {
+        when (_state.value) {
+            is VoiceState.Listening, is VoiceState.Processing, is VoiceState.Speaking ->
+                pause("Paused while the app was in the background. Tap the microphone to continue.")
+            else -> if (_conversationActive.value) pause("Paused while the app was in the background.")
         }
     }
 
-    /** Typed input: same pipeline, without the microphone. */
+    /** Typed input: same pipeline, without the microphone. Continues the conversation if one is active. */
     fun submitText(text: String) {
         if (text.isBlank()) return
         output.stop()
         job?.cancel()
-        job = scope.launch { process(text) }
-    }
-
-    fun stopSpeaking() {
-        output.stop()
-    }
-
-    /** Cancels whatever is happening and returns to idle. */
-    fun cancel() {
-        job?.cancel()
-        output.stop()
-        _state.value = VoiceState.Idle
+        job = scope.launch { respondTo(text) }
     }
 
     fun onPermissionDenied(permanently: Boolean) {
+        _conversationActive.value = false
+        releaseFocus()
         val message = if (permanently) {
             "Microphone access is turned off for this app. Turn it on in Android Settings to talk to me, or type below."
         } else {
@@ -96,27 +159,129 @@ class VoiceSession(
         conversation.addNotice(message)
     }
 
-    private suspend fun process(text: String) {
+    private fun listen() {
+        job?.cancel()
+        _state.value = VoiceState.Listening()
+        job = scope.launch {
+            // Collect only until a final result or error. Stopping collection closes the
+            // recognizer, so the microphone is guaranteed off before Penelope thinks or speaks.
+            val outcome = input.listen()
+                .transformWhile { event ->
+                    emit(event)
+                    event !is SpeechInputEvent.Final && event !is SpeechInputEvent.Error
+                }
+                .onEach { if (it is SpeechInputEvent.Partial) _state.value = VoiceState.Listening(it.text) }
+                .lastOrNull()
+            when (outcome) {
+                is SpeechInputEvent.Final -> onHeard(outcome.text)
+                is SpeechInputEvent.Error -> onRecognitionError(outcome.error)
+                else -> if (_state.value is VoiceState.Listening) afterTurn()
+            }
+        }
+    }
+
+    private suspend fun onHeard(text: String) {
+        if (EchoGuard.isEcho(text, lastSpoken)) {
+            // Picked up Penelope's own voice; ignore it and listen again.
+            afterTurn()
+            return
+        }
+        silentTurns = 0
+        busyRetries = 0
+        respondTo(text)
+    }
+
+    private suspend fun respondTo(text: String) {
         _state.value = VoiceState.Processing(text)
         val reply = conversation.handle(text)
-        speak(reply)
-    }
-
-    private suspend fun speak(reply: AssistantReply) {
+        lastSpoken = reply.spokenText
         _state.value = VoiceState.Speaking(reply)
         when (val result = output.speak(reply.spokenText)) {
-            SpeakResult.Completed, SpeakResult.Interrupted -> if (_state.value is VoiceState.Speaking) _state.value = VoiceState.Idle
-            is SpeakResult.Failed -> _state.value = VoiceState.Error(
-                "I couldn't speak my answer (${result.reason}). It's shown on screen.",
-            )
+            SpeakResult.Completed -> when (reply.action) {
+                ConversationAction.END -> end()
+                ConversationAction.PAUSE -> pause()
+                null -> afterTurn()
+            }
+            // Interruptions (tap, Stop, focus loss) already moved the state on.
+            SpeakResult.Interrupted -> if (_state.value is VoiceState.Speaking) afterTurn()
+            is SpeakResult.Failed -> {
+                _conversationActive.value = false
+                releaseFocus()
+                _state.value = VoiceState.Error("I couldn't speak my answer (${result.reason}). It's shown on screen.")
+            }
         }
     }
 
-    private suspend fun fail(error: SpeechInputError) {
-        _state.value = VoiceState.Error(error.userMessage, needsPermission = error == SpeechInputError.PERMISSION)
-        // Speak short recognition problems aloud so the driver doesn't need to look at the screen.
-        if (error == SpeechInputError.NO_MATCH || error == SpeechInputError.NO_SPEECH) {
-            output.speak(error.userMessage)
+    /** Either listen again (conversation) or go idle (single turn). */
+    private suspend fun afterTurn() {
+        if (_conversationActive.value) {
+            delay(resumeDelayMillis) // Let speaker audio die away before opening the mic.
+            if (_conversationActive.value) listen()
+        } else {
+            _state.value = VoiceState.Idle
         }
+    }
+
+    private suspend fun onRecognitionError(error: SpeechInputError) {
+        val inConversation = _conversationActive.value
+        when (error) {
+            SpeechInputError.NO_SPEECH, SpeechInputError.NO_MATCH -> {
+                silentTurns++
+                if (!inConversation) {
+                    _state.value = VoiceState.Error(error.userMessage)
+                    speakNotice(error.userMessage)
+                } else if (silentTurns >= maxSilentTurns) {
+                    val msg = "I'll pause for now. Tap the microphone when you need me."
+                    _state.value = VoiceState.Paused(msg)
+                    speakNotice(msg)
+                    _conversationActive.value = false
+                    releaseFocus()
+                } else {
+                    if (error == SpeechInputError.NO_MATCH) speakNotice(error.userMessage)
+                    afterTurn()
+                }
+            }
+            SpeechInputError.BUSY -> {
+                if (inConversation && busyRetries++ < maxBusyRetries) {
+                    delay(800)
+                    if (_conversationActive.value) listen()
+                } else {
+                    stopWithError(error)
+                }
+            }
+            else -> stopWithError(error)
+        }
+    }
+
+    private suspend fun stopWithError(error: SpeechInputError) {
+        _conversationActive.value = false
+        releaseFocus()
+        _state.value = VoiceState.Error(error.userMessage, needsPermission = error == SpeechInputError.PERMISSION)
+        if (error != SpeechInputError.PERMISSION) speakNotice(error.userMessage)
+    }
+
+    private suspend fun speakNotice(text: String) {
+        lastSpoken = text
+        output.speak(text)
+    }
+
+    private fun acquireFocus() {
+        if (!holdsFocus) { focus.acquire(); holdsFocus = true }
+    }
+
+    private fun releaseFocus() {
+        if (holdsFocus) { focus.release(); holdsFocus = false }
+    }
+}
+
+/** Detects when the recognizer transcribed Penelope's own speech (e.g. from car speakers). */
+object EchoGuard {
+    private fun words(s: String) = s.lowercase().replace(Regex("[^a-z0-9 ]"), " ").split(" ").filter { it.isNotBlank() }
+
+    fun isEcho(heard: String, lastSpoken: String): Boolean {
+        val h = words(heard)
+        if (h.size < 3 || lastSpoken.isBlank()) return false
+        val spoken = words(lastSpoken).joinToString(" ")
+        return spoken.contains(h.joinToString(" "))
     }
 }

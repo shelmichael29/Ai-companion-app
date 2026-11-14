@@ -30,7 +30,7 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            SettingsViewModel(c.settings)
+            SettingsViewModel(c.settings, c.speechOutput, c.voiceSession)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

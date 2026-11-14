@@ -17,6 +17,10 @@ object SpokenFormat {
         ObdPid.ENGINE_RPM -> "${value.roundToInt()} RPM"
         ObdPid.CONTROL_MODULE_VOLTAGE -> String.format(Locale.US, "%.1f volts", value)
         ObdPid.ENGINE_LOAD, ObdPid.THROTTLE_POSITION, ObdPid.FUEL_LEVEL -> "${value.roundToInt()} percent"
+        ObdPid.SHORT_TERM_FUEL_TRIM_B1, ObdPid.LONG_TERM_FUEL_TRIM_B1,
+        ObdPid.SHORT_TERM_FUEL_TRIM_B2, ObdPid.LONG_TERM_FUEL_TRIM_B2 -> String.format(Locale.US, "%+.1f percent", value)
+        ObdPid.MAF_RATE -> String.format(Locale.US, "%.1f grams per second", value)
+        ObdPid.INTAKE_MAP -> "${value.roundToInt()} kPa"
     }
 
     fun celsiusToF(c: Double) = c * 9 / 5 + 32

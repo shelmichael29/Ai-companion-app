@@ -9,7 +9,10 @@ import com.aicarcompanion.app.assistant.conversation.RuleBasedReasoningProvider
 import com.aicarcompanion.app.assistant.conversation.VehicleContext
 import com.aicarcompanion.app.assistant.conversation.VehicleContextProvider
 import com.aicarcompanion.app.assistant.voice.AndroidSpeechInput
+import com.aicarcompanion.app.assistant.voice.AndroidAudioFocus
 import com.aicarcompanion.app.assistant.voice.AndroidSpeechOutput
+import com.aicarcompanion.app.assistant.voice.SpeechOutput
+import com.aicarcompanion.app.assistant.voice.VoiceConfig
 import com.aicarcompanion.app.data.DefaultDiagnosticsRepository
 import com.aicarcompanion.app.data.local.AppDatabase
 import com.aicarcompanion.app.data.local.RoomHistoryRepository
@@ -57,6 +60,10 @@ interface AppContainer {
     val diagnosticCommands: DiagnosticCommandHandler
     val bluetooth: BluetoothGateway
     val voiceSession: VoiceSession
+    val speechOutput: SpeechOutput
+
+    /** Called when the app leaves the foreground: the microphone must never stay on in the background. */
+    fun onAppBackgrounded()
 
     /** Reconnects to the last-used adapter if Bluetooth is ready. Never prompts the user. */
     fun autoConnectAdapter()
@@ -105,15 +112,44 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
 
-    override val voiceSession: VoiceSession by lazy {
+    private val audioFocus by lazy { AndroidAudioFocus(appContext) }
+
+    override val speechOutput: SpeechOutput by lazy {
+        AndroidSpeechOutput(appContext, audioFocus, audioFocus.attributes).also { output ->
+            appScope.launch {
+                settings.settings
+                    .map { VoiceConfig(it.speechRate, it.speechPitch, it.ttsEngine, it.ttsVoice) }
+                    .distinctUntilChanged()
+                    .collect(output::configure)
+            }
+        }
+    }
+
+    private val voiceSessionLazy = lazy {
         val assistantName = { settings.settings.value.assistantName }
         val reasoning = RuleBasedReasoningProvider(
             CommandParser(assistantName), vehicleContext, diagnosticCommands, GenericDtcCatalog,
+            recorder = { historyRepository.saveObservation(it) },
         )
-        val output = AndroidSpeechOutput(appContext)
+        VoiceSession(
+            scope = appScope,
+            input = AndroidSpeechInput(appContext),
+            output = speechOutput,
+            conversation = ConversationManager(reasoning, assistantName, { settings.settings.value.explanationLevel }),
+            focus = audioFocus,
+            continuousEnabled = { settings.settings.value.continuousConversation },
+        )
+    }
+    override val voiceSession: VoiceSession by voiceSessionLazy
+
+    override fun onAppBackgrounded() {
+        if (voiceSessionLazy.isInitialized()) voiceSession.onAppBackgrounded()
+    }
+
+    init {
+        // Live polling covers only the readings the user's detail level shows.
         appScope.launch {
-            settings.settings.map { it.speechRate }.distinctUntilChanged().collect(output::setRate)
+            settings.settings.map { it.explanationLevel }.distinctUntilChanged().collect { obdConnection.setLiveDetail(it) }
         }
-        VoiceSession(appScope, AndroidSpeechInput(appContext), output, ConversationManager(reasoning, assistantName))
     }
 }

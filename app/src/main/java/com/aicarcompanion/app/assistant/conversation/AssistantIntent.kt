@@ -2,6 +2,8 @@ package com.aicarcompanion.app.assistant.conversation
 
 import com.aicarcompanion.app.diagnostics.dtc.DtcCodeFormat
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
+import com.aicarcompanion.app.diagnostics.smart.SymptomCategory
+import com.aicarcompanion.app.diagnostics.smart.SymptomClassifier
 
 /** Live values Penelope can be asked about, each backed by a standard OBD-II PID. */
 enum class LiveMetric(val spokenName: String, val pid: ObdPid) {
@@ -27,6 +29,19 @@ sealed interface AssistantIntent {
     data class ExplainCode(val code: String?) : AssistantIntent
     data class LiveValue(val metric: LiveMetric) : AssistantIntent
     data object ConnectionStatus : AssistantIntent
+    data object EndConversation : AssistantIntent
+    data object PauseConversation : AssistantIntent
+    /** "Explain that more simply." */
+    data object Simpler : AssistantIntent
+    /** "Give me the technical explanation." */
+    data object MoreTechnical : AssistantIntent
+    /** "Tell me more." */
+    data object MoreDetail : AssistantIntent
+    data object Repeat : AssistantIntent
+    /** "Show me the sensor readings." */
+    data object SensorReadings : AssistantIntent
+    /** An everyday problem description ("why is my car shaking?"). */
+    data class Symptom(val category: SymptomCategory, val text: String) : AssistantIntent
     data object LastService : AssistantIntent
     data object Mileage : AssistantIntent
     data class Unknown(val text: String) : AssistantIntent
@@ -43,14 +58,27 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
         if (text.isEmpty()) return AssistantIntent.Greeting
         fun has(vararg phrases: String) = phrases.any { Regex("""\b${Regex.escape(it)}\b""").containsMatchIn(text) }
 
+        if (text in END_PHRASES) return AssistantIntent.EndConversation
+        if (text in PAUSE_PHRASES) return AssistantIntent.PauseConversation
+
         extractTroubleCode(text)?.let { return AssistantIntent.ExplainCode(it) }
+
+        // Safety-critical symptoms take priority over everything below.
+        val symptom = SymptomClassifier.classify(text)
+        if (symptom != null && symptom.isUrgent) return AssistantIntent.Symptom(symptom, utterance.trim())
 
         return when {
             has("what can you do", "help", "what do you do", "what are your commands", "what can i ask") -> AssistantIntent.Help
+            has("more simply", "simpler", "simple terms", "plain english", "plain language", "dumb it down", "i don't understand", "i dont understand", "like i'm five", "like im five") -> AssistantIntent.Simpler
+            has("technical", "for a mechanic", "mechanic's explanation", "in depth", "nerd") -> AssistantIntent.MoreTechnical
+            has("tell me more", "more detail", "more details", "go on", "elaborate", "what else") -> AssistantIntent.MoreDetail
+            has("say that again", "repeat that", "repeat", "what did you say", "come again") -> AssistantIntent.Repeat
+            has("sensor readings", "sensor data", "live data", "all the readings", "the readings", "all readings", "all sensors") -> AssistantIntent.SensorReadings
             has("explain", "what does", "what is", "what's", "meaning", "mean") && has("code", "codes", "dtc") ->
                 AssistantIntent.ExplainCode(null)
             has("trouble code", "trouble codes", "error code", "error codes", "check engine", "dtc", "dtcs",
                 "diagnostic code", "diagnostic codes", "fault code", "fault codes", "codes") -> AssistantIntent.ReadTroubleCodes
+            symptom != null && symptom != SymptomCategory.WARNING_LIGHT -> AssistantIntent.Symptom(symptom, utterance.trim())
             has("coolant", "engine temperature", "engine temp", "running hot", "overheating", "water temperature") ->
                 AssistantIntent.LiveValue(LiveMetric.COOLANT_TEMP)
             has("intake air", "intake temperature") -> AssistantIntent.LiveValue(LiveMetric.INTAKE_AIR_TEMP)
@@ -126,6 +154,12 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
     }
 
     private companion object {
+        val END_PHRASES = setOf(
+            "stop", "stop listening", "goodbye", "bye", "bye bye", "good bye", "that's all", "thats all", "that's it",
+            "thats it", "end conversation", "end the conversation", "we're done", "were done", "i'm done", "im done",
+            "thank you that's all", "thanks that's all", "no thanks", "never mind", "nevermind", "stop talking",
+        )
+        val PAUSE_PHRASES = setOf("pause", "pause conversation", "pause the conversation", "hold on", "wait a minute", "give me a minute")
         val LETTER_WORDS = setOf("p", "c", "b", "u", "pee", "see", "bee", "you")
         val DIGIT_WORDS = mapOf(
             "zero" to "0", "oh" to "0", "o" to "0", "one" to "1", "two" to "2", "to" to "2", "too" to "2",

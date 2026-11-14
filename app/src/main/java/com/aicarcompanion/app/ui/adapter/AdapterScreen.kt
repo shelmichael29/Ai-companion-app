@@ -197,9 +197,9 @@ private fun LiveDataCard(viewModel: AdapterViewModel) {
 }
 
 fun formatReading(r: SensorReading): String {
-    val pid = ObdPid.entries.firstOrNull { it.command == r.pid }
+    val pid = ObdPid.fromCommand(r.pid)
     return if (pid != null) SpokenFormat.liveValue(pid, r.value).replace(" degrees Fahrenheit", " °F")
-        .replace(" miles per hour", " mph").replace(" percent", "%")
+        .replace(" miles per hour", " mph").replace(" percent", "%").replace(" grams per second", " g/s")
     else "%.1f %s".format(java.util.Locale.US, r.value, r.unit)
 }
 

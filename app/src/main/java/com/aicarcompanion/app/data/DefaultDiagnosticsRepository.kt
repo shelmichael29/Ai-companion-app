@@ -37,7 +37,9 @@ class DefaultDiagnosticsRepository(
                 DiagnosticTroubleCode(
                     code = recorded.code,
                     description = info?.description ?: describeUnknown(recorded.code),
-                    explanation = info?.explanation,
+                    explanation = info?.simple,
+                    diyChecks = info?.diyChecks,
+                    technicalDetail = info?.technical,
                     status = recorded.status,
                     severity = info?.severity ?: DtcSeverity.UNKNOWN,
                     origin = recorded.origin,

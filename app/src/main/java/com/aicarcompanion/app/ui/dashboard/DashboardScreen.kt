@@ -17,7 +17,8 @@ import androidx.compose.foundation.layout.Row
 import com.aicarcompanion.app.assistant.conversation.Speaker
 import com.aicarcompanion.app.ui.assistant.AssistantViewModel
 import com.aicarcompanion.app.ui.assistant.MicButton
-import com.aicarcompanion.app.ui.assistant.VoiceStatusText
+import com.aicarcompanion.app.ui.assistant.VoiceStatusRow
+import com.aicarcompanion.app.ui.assistant.EndConversationButton
 import com.aicarcompanion.app.ui.assistant.rememberMicAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -116,18 +117,23 @@ private fun AssistantCard(
 ) {
     val voice by viewModel.state.collectAsStateWithLifecycle()
     val turns by viewModel.turns.collectAsStateWithLifecycle()
-    val name by viewModel.assistantName.collectAsStateWithLifecycle()
+    val settings by viewModel.settings.collectAsStateWithLifecycle()
+    val active by viewModel.conversationActive.collectAsStateWithLifecycle()
+    val name = settings.assistantName
     val micAction = rememberMicAction(viewModel.session)
     val lastReply = turns.lastOrNull { it.speaker == Speaker.ASSISTANT }
     SectionCard(title = name) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             MicButton(voice, name, micAction, size = 72.dp)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                VoiceStatusText(voice, name)
+                VoiceStatusRow(voice, name)
                 lastReply?.let { Text(it.text, style = MaterialTheme.typography.bodyMedium, maxLines = 4) }
             }
         }
-        TextButton(onClick = onOpenAssistant) { Text("Open conversation") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            EndConversationButton(voice, active, viewModel.session)
+            TextButton(onClick = onOpenAssistant) { Text("Open conversation") }
+        }
     }
 }
 

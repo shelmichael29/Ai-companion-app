@@ -22,7 +22,9 @@ object SampleData {
             DiagnosticTroubleCode(
                 code = info.code,
                 description = info.description,
-                explanation = info.explanation,
+                explanation = info.simple,
+                diyChecks = info.diyChecks,
+                technicalDetail = info.technical,
                 status = if (code == "P0442") DtcStatus.PENDING else DtcStatus.STORED,
                 severity = info.severity,
                 origin = DataOrigin.SAMPLE,

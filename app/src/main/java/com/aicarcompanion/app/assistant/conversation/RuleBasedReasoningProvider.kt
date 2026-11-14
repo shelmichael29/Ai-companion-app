@@ -1,51 +1,122 @@
 package com.aicarcompanion.app.assistant.conversation
 
+import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.diagnostics.dtc.CodeScope
 import com.aicarcompanion.app.diagnostics.dtc.DtcCodeFormat
 import com.aicarcompanion.app.diagnostics.dtc.DtcKnowledgeSource
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
+import com.aicarcompanion.app.diagnostics.obd.ObdPid
+import com.aicarcompanion.app.diagnostics.smart.FollowUpQuestion
+import com.aicarcompanion.app.diagnostics.smart.SymptomCategory
+import com.aicarcompanion.app.diagnostics.smart.SymptomGuide
 import com.aicarcompanion.app.domain.model.DataOrigin
+import com.aicarcompanion.app.domain.model.DiagnosticObservation
 import com.aicarcompanion.app.domain.model.DtcSeverity
 import com.aicarcompanion.app.domain.model.EngineLayout
 import com.aicarcompanion.app.domain.model.FuelType
+import com.aicarcompanion.app.domain.model.ObservationKind
+import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.model.TroubleCodeRead
 import com.aicarcompanion.app.domain.model.Vehicle
+import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
+import kotlin.math.roundToInt
+
+/** Saves things the user tells Penelope (symptoms) into the vehicle's history. */
+fun interface ObservationRecorder {
+    suspend fun save(observation: DiagnosticObservation)
+}
 
 /**
- * Answers the supported commands using only facts from [VehicleContext], the code knowledge
- * source, and live reads via [DiagnosticCommandHandler]. It states when something is unknown
- * and never invents sensor readings or adapter status.
+ * Answers supported requests using only facts from [VehicleContext], the code knowledge source,
+ * and live reads via [DiagnosticCommandHandler]. It never invents sensor readings or adapter
+ * status, and frames causes as possibilities.
+ *
+ * Every answer is produced at an [ExplanationLevel]; the facts are identical across levels,
+ * only wording and depth change. The provider remembers the last topic so follow-ups like
+ * "explain that more simply" or "give me the technical explanation" work.
  */
 class RuleBasedReasoningProvider(
     private val parser: CommandParser,
     private val context: VehicleContextProvider,
     private val diagnostics: DiagnosticCommandHandler,
     private val knowledge: DtcKnowledgeSource,
+    private val recorder: ObservationRecorder? = null,
+    private val now: () -> Instant = Instant::now,
 ) : ReasoningProvider {
 
-    override suspend fun respond(utterance: String, assistantName: String): AssistantReply {
-        val intent = parser.parse(utterance)
+    /** What the last answer was about, so it can be re-explained at another level. */
+    private sealed interface Topic {
+        data object Engine : Topic
+        data object Codes : Topic
+        data class Code(val code: String) : Topic
+        data class Live(val pid: ObdPid, val reading: SensorReading) : Topic
+        data class Symptom(val category: SymptomCategory) : Topic
+    }
+
+    private var lastTopic: Topic? = null
+    private var lastReply: AssistantReply? = null
+    private var pendingFollowUp: FollowUpQuestion? = null
+    private var pendingObservation: DiagnosticObservation? = null
+
+    override fun resetContext() {
+        lastTopic = null
+        lastReply = null
+        pendingFollowUp = null
+        pendingObservation = null
+    }
+
+    override suspend fun respond(request: AssistantRequest): AssistantReply {
+        val reply = answer(request)
+        if (reply.action == null) lastReply = reply
+        return reply
+    }
+
+    private suspend fun answer(request: AssistantRequest): AssistantReply {
+        val intent = parser.parse(request.utterance)
         val ctx = context.current()
+        val level = request.level
+        val name = request.assistantName
+
+        // A reply to Penelope's follow-up question ("when I'm stopped at a light").
+        pendingFollowUp?.let { question ->
+            val isAnswer = intent is AssistantIntent.Unknown || intent == AssistantIntent.Greeting ||
+                (intent is AssistantIntent.Symptom && intent.category == question.category)
+            pendingFollowUp = null
+            if (isAnswer) return followUpAnswer(question, request.utterance)
+        }
+
         return when (intent) {
-            AssistantIntent.Help -> help(assistantName)
-            AssistantIntent.Greeting -> reply("Hi, I'm $assistantName. ${noVehicleHint(ctx) ?: "How can I help with your ${ctx.vehicle?.shortName()}?"}")
+            AssistantIntent.EndConversation -> AssistantReply("Okay. Talk to you later.", ReplyBasis.CONVERSATION, action = ConversationAction.END)
+            AssistantIntent.PauseConversation -> AssistantReply(
+                "Okay, I'll pause. Tap the microphone when you're ready.", ReplyBasis.CONVERSATION, action = ConversationAction.PAUSE,
+            )
+            AssistantIntent.Help -> help(name)
+            AssistantIntent.Greeting -> reply("Hi, I'm $name. ${noVehicleHint(ctx) ?: "What can I help you with?"}")
             AssistantIntent.Thanks -> reply("You're welcome.")
             AssistantIntent.WhoAreYou -> reply(
-                "I'm $assistantName, your car companion. I can describe your vehicle, read and explain trouble codes, " +
-                    "and report live data when an OBD-II adapter is connected.",
+                "I'm $name, your car companion. You don't need to know anything about cars: tell me what's going on and " +
+                    "I'll explain it in plain language.",
             )
-            AssistantIntent.WhatVehicle -> whatVehicle(ctx)
-            AssistantIntent.EngineInfo -> engineInfo(ctx)
-            AssistantIntent.ReadTroubleCodes -> readCodes(ctx)
-            is AssistantIntent.ExplainCode -> explainCode(intent.code, ctx)
-            is AssistantIntent.LiveValue -> liveValue(intent.metric, ctx)
-            AssistantIntent.ConnectionStatus -> connection(ctx)
+            AssistantIntent.Repeat -> lastReply ?: reply("I haven't said anything yet. What can I help with?")
+            AssistantIntent.Simpler -> reExplain(ctx, ExplanationLevel.EVERYDAY)
+            AssistantIntent.MoreTechnical -> reExplain(ctx, ExplanationLevel.ADVANCED)
+            AssistantIntent.MoreDetail -> reExplain(ctx, ExplanationLevel.entries[minOf(level.ordinal + 1, ExplanationLevel.entries.lastIndex)])
+            AssistantIntent.WhatVehicle -> whatVehicle(ctx, level)
+            AssistantIntent.EngineInfo -> { lastTopic = Topic.Engine; engineInfo(ctx, level) }
+            AssistantIntent.ReadTroubleCodes -> { lastTopic = Topic.Codes; readCodes(ctx, level) }
+            is AssistantIntent.ExplainCode -> explainCode(intent.code, ctx, level)
+            is AssistantIntent.LiveValue -> liveValue(intent.metric.pid, ctx, level)
+            AssistantIntent.SensorReadings -> sensorReadings(ctx, level)
+            is AssistantIntent.Symptom -> symptom(intent.category, intent.text, ctx)
+            AssistantIntent.ConnectionStatus -> connection(ctx, level)
             AssistantIntent.LastService -> lastService(ctx)
             AssistantIntent.Mileage -> mileage(ctx)
             is AssistantIntent.Unknown -> reply(
-                "I'm not able to help with that yet. Say \"what can you do\" to hear what I can help with.",
+                "I'm not sure I can help with that yet. You can describe what your car is doing, ask about warning " +
+                    "codes, or say \"what can you do\".",
             )
         }
     }
@@ -54,46 +125,86 @@ class RuleBasedReasoningProvider(
         AssistantReply(text, basis, spoken)
 
     private fun help(name: String) = reply(
-        "Here's what I can do right now: tell you which vehicle profile is active and describe its engine; " +
-            "read your trouble codes and explain what a code means; report live values like coolant temperature, " +
-            "RPM, speed and battery voltage when your OBD-II adapter is connected; and tell you your last recorded " +
-            "service and mileage. Just tap the microphone and ask $name.",
+        "You can talk to me like you'd talk to a friend who knows cars. Tell me what your car is doing, like " +
+            "\"it's shaking\" or \"it makes a noise when I turn\", and I'll ask a couple of simple questions. I can " +
+            "explain warning codes, describe your car, and when your OBD-II adapter is connected, check things like " +
+            "engine temperature and battery voltage. Say \"explain that more simply\" or \"give me the technical " +
+            "explanation\" anytime, and say \"goodbye\" to end our conversation.",
     )
 
     private fun noVehicleHint(ctx: VehicleContext): String? =
         if (ctx.vehicle == null) "You haven't added a vehicle yet. Add one on the Vehicles tab so I can help with it." else null
 
-    private fun whatVehicle(ctx: VehicleContext): AssistantReply {
+    private suspend fun reExplain(ctx: VehicleContext, level: ExplanationLevel): AssistantReply = when (val t = lastTopic) {
+        null -> reply("Sure. What would you like me to explain?")
+        Topic.Engine -> engineInfo(ctx, level)
+        Topic.Codes -> readCodes(ctx, level, readAgain = false)
+        is Topic.Code -> explainCode(t.code, ctx, level)
+        is Topic.Live -> describeLive(t.pid, t.reading, level)
+        is Topic.Symptom -> reply(
+            if (level == ExplanationLevel.EVERYDAY) {
+                "In short: I'm still figuring out what's causing ${t.category.plainName}. Answering my question helps me narrow it down."
+            } else {
+                "For ${t.category.plainName}, the readings worth checking are: " +
+                    com.aicarcompanion.app.diagnostics.smart.DiagnosticDataPlan.forCategory(t.category).joinToString("; ") { it.description } +
+                    ". Step-by-step analysis of those readings is coming in a future update."
+            },
+        )
+    }
+
+    private fun whatVehicle(ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
         val v = ctx.vehicle ?: return reply(noVehicleHint(ctx)!!, ReplyBasis.NOT_AVAILABLE)
-        val name = v.nickname?.let { " (\"$it\")" }.orEmpty()
+        val nick = v.nickname?.let { " (\"$it\")" }.orEmpty()
+        val engine = if (level == ExplanationLevel.EVERYDAY) simpleEngine(v) else v.engine.spokenDescription
         return reply(
-            "Your active vehicle profile is a ${v.displayName}$name with a ${v.engine.spokenDescription}. " +
-                "I'm going by the profile you selected; I can't confirm which car the phone is in.",
+            "Your selected vehicle is a ${v.displayName}$nick with a $engine. " +
+                "I'm going by the profile you chose; I can't confirm which car the phone is in.",
             ReplyBasis.VEHICLE_PROFILE,
         )
     }
 
-    private fun engineInfo(ctx: VehicleContext): AssistantReply {
+    /** "3.0-liter six-cylinder gas engine" — no layout or engine codes. */
+    private fun simpleEngine(v: Vehicle): String {
+        val e = v.engine
+        if (e.fuelType == FuelType.ELECTRIC) return "electric motor"
+        val size = e.displacementLiters?.let { "${"%.1f".format(Locale.US, it)}-liter " }.orEmpty()
+        val cyl = e.cylinders?.let { "${cylinderWord(it)}-cylinder " }.orEmpty()
+        val fuel = when (e.fuelType) {
+            FuelType.GASOLINE -> "gas"
+            FuelType.DIESEL -> "diesel"
+            FuelType.HYBRID -> "hybrid"
+            FuelType.PLUG_IN_HYBRID -> "plug-in hybrid"
+            FuelType.FLEX_FUEL -> "flex-fuel"
+            FuelType.ELECTRIC -> "electric"
+        }
+        return "$size$cyl$fuel engine"
+    }
+
+    private fun engineInfo(ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
         val v = ctx.vehicle ?: return reply(noVehicleHint(ctx)!!, ReplyBasis.NOT_AVAILABLE)
         val e = v.engine
         if (e.fuelType == FuelType.ELECTRIC) {
-            return reply("Your ${v.shortName()} is electric, so it doesn't have a combustion engine.", ReplyBasis.VEHICLE_PROFILE)
+            return reply("Your ${v.shortName()} is electric, so it doesn't have a gas engine.", ReplyBasis.VEHICLE_PROFILE)
         }
         if (e.displacementLiters == null && e.cylinders == null) {
             return reply(
-                "Your profile doesn't include engine details yet. Edit the vehicle to add them, or look it up by VIN.",
+                "Your profile doesn't include engine details yet. You can add them by editing the vehicle or looking it up by VIN.",
                 ReplyBasis.NOT_AVAILABLE,
             )
+        }
+        if (level == ExplanationLevel.EVERYDAY) {
+            val premium = if (e.fuelGrade.equals("Premium", true)) " It's listed as needing premium fuel." else ""
+            return reply("Your ${v.shortName()} has a ${simpleEngine(v)}.$premium", ReplyBasis.VEHICLE_PROFILE)
         }
         fun build(code: String?): String {
             val sentences = mutableListOf(
                 "Your ${v.shortName()} has a ${e.spokenDescription}" + (code?.let { ", engine code $it" } ?: "") + ".",
             )
             if (e.fuelType != FuelType.GASOLINE || e.fuelGrade != null) {
-                val fuel = listOfNotNull(e.fuelGrade?.lowercase(), e.fuelType.label.lowercase()).joinToString(" ")
-                sentences += "It's listed as using $fuel."
+                sentences += "It's listed as using ${listOfNotNull(e.fuelGrade?.lowercase(), e.fuelType.label.lowercase()).joinToString(" ")}."
             }
             v.transmission?.let { sentences += "Transmission: $it." }
+            if (level == ExplanationLevel.ADVANCED) v.drivetrain?.let { sentences += "Drive: $it." }
             if (e.layout == EngineLayout.UNKNOWN && (e.cylinders ?: 0) >= 5) {
                 sentences += "The cylinder layout, inline or V, hasn't been confirmed in your profile."
             }
@@ -102,67 +213,72 @@ class RuleBasedReasoningProvider(
         return reply(build(e.engineCode), ReplyBasis.VEHICLE_PROFILE, build(e.engineCode?.let(SpokenFormat::code)))
     }
 
-    private suspend fun readCodes(ctx: VehicleContext): AssistantReply {
+    private suspend fun readCodes(ctx: VehicleContext, level: ExplanationLevel, readAgain: Boolean = true): AssistantReply {
         if (ctx.demoCodes.isNotEmpty()) {
-            val list = SpokenFormat.list(ctx.demoCodes.map { "${it.code}, ${it.description}" })
+            val body = describeCodeList(ctx.demoCodes.map { it.code to it.status.label.lowercase() }, level)
             return reply(
-                "Demo data is turned on, so these are sample codes, not from your car: $list.",
+                "Demo data is turned on, so these are sample codes, not from your car. ${body.first}",
                 ReplyBasis.SAMPLE_DATA,
-                "Demo data is turned on, so these are sample codes, not from your car: " +
-                    SpokenFormat.list(ctx.demoCodes.map { "${SpokenFormat.code(it.code)}, ${it.description}" }) + ".",
+                "Demo data is turned on, so these are sample codes, not from your car. ${body.second}",
             )
         }
         val vehicle = ctx.vehicle ?: return reply(noVehicleHint(ctx)!!, ReplyBasis.NOT_AVAILABLE)
-        if (ctx.obdState is ObdConnectionState.Connected) {
+        if (readAgain && ctx.obdState is ObdConnectionState.Connected) {
             return when (val r = diagnostics.readTroubleCodes(vehicle.id)) {
-                is CodeReadResult.Read -> describeRead(r.read, live = true)
-                CodeReadResult.NotConnected -> notConnectedCodes(ctx)
-                is CodeReadResult.NoResponse -> reply(
-                    "The adapter is connected, but I couldn't read codes: ${r.reason}",
-                    ReplyBasis.NOT_AVAILABLE,
-                )
+                is CodeReadResult.Read -> describeRead(r.read, live = true, level)
+                CodeReadResult.NotConnected -> notConnectedCodes(ctx, level)
+                is CodeReadResult.NoResponse -> reply("Your adapter is connected, but I couldn't read the codes: ${r.reason}", ReplyBasis.NOT_AVAILABLE)
             }
         }
-        return notConnectedCodes(ctx)
+        return notConnectedCodes(ctx, level)
     }
 
-    private fun notConnectedCodes(ctx: VehicleContext): AssistantReply {
-        val last = ctx.latestCodeRead
-            ?: return reply(
-                "No OBD-II adapter is connected, and I don't have any saved trouble-code reads for your " +
-                    "${ctx.vehicle?.shortName() ?: "vehicle"}. Connect your adapter on the Adapter tab and ask me again.",
-                ReplyBasis.NOT_AVAILABLE,
-            )
-        val prefix = "No adapter is connected right now, so I can't check current codes. "
-        val described = describeRead(last, live = false)
+    private fun notConnectedCodes(ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
+        val last = ctx.latestCodeRead ?: return reply(
+            "No OBD-II adapter is connected, and I haven't read any codes for your ${ctx.vehicle?.shortName() ?: "vehicle"} yet. " +
+                "Plug in your adapter, connect it on the Adapter tab, and ask me again.",
+            ReplyBasis.NOT_AVAILABLE,
+        )
+        val prefix = "No adapter is connected right now, so I can't check for new codes. "
+        val described = describeRead(last, live = false, level)
         return reply(prefix + described.text, ReplyBasis.RECORDED_DATA, prefix + described.spokenText)
     }
 
-    private fun describeRead(read: TroubleCodeRead, live: Boolean): AssistantReply {
-        val whenText = if (live) "I just read your codes." else "The last saved read, on ${SpokenFormat.dateTime(read.readAt)},"
+    private fun describeRead(read: TroubleCodeRead, live: Boolean, level: ExplanationLevel): AssistantReply {
+        val basis = if (live) ReplyBasis.LIVE_VEHICLE_DATA else ReplyBasis.RECORDED_DATA
+        val lead = if (live) "I just checked your car." else "When I last checked, on ${SpokenFormat.dateTime(read.readAt)},"
         if (read.codes.isEmpty()) {
-            val text = if (live) "$whenText No trouble codes were reported." else "$whenText found no trouble codes."
-            return reply(text, if (live) ReplyBasis.LIVE_VEHICLE_DATA else ReplyBasis.RECORDED_DATA)
+            return reply(if (live) "$lead No trouble codes were reported. That's good news." else "$lead there were no trouble codes.", basis)
         }
-        val described = read.codes.map { c ->
-            val info = knowledge.lookup(c.code)
-            Triple(c.code, c.status.label.lowercase(), info?.description)
-        }
-        fun render(codeText: (String) -> String) = described.joinToString("; ") { (code, status, desc) ->
-            "${codeText(code)} ($status)" + (desc?.let { ", $it" } ?: "")
-        }
-        val count = read.codes.size
-        val head = if (live) "$whenText There ${if (count == 1) "is 1 code" else "are $count codes"}:" else
-            "$whenText found ${if (count == 1) "1 code" else "$count codes"}:"
-        val tail = " Ask me to explain a code for more detail."
-        return reply(
-            "$head ${render { it }}.$tail",
-            if (live) ReplyBasis.LIVE_VEHICLE_DATA else ReplyBasis.RECORDED_DATA,
-            "$head ${render(SpokenFormat::code)}.$tail",
-        )
+        val (text, spoken) = describeCodeList(read.codes.map { it.code to it.status.label.lowercase() }, level)
+        val joiner = if (live) " " else " "
+        return reply("$lead$joiner$text", basis, "$lead$joiner$spoken")
     }
 
-    private fun explainCode(code: String?, ctx: VehicleContext): AssistantReply {
+    /** Returns (display text, spoken text) for a list of codes at the given level. */
+    private fun describeCodeList(codes: List<Pair<String, String>>, level: ExplanationLevel): Pair<String, String> {
+        val infos = codes.map { (code, status) -> Triple(code, status, knowledge.lookup(code)) }
+        val count = codes.size
+        return if (level == ExplanationLevel.EVERYDAY) {
+            fun render(codeText: (String) -> String) = infos.joinToString(" ") { (code, _, info) ->
+                val plain = info?.simple?.substringBefore(". ")?.trimEnd('.') ?: "Something in the ${DtcCodeFormat.system(code)?.plainLabel ?: "car"} was flagged"
+                "$plain (code ${codeText(code)})."
+            }
+            val worst = infos.mapNotNull { it.third?.severity }.minByOrNull { it.ordinal.let { o -> listOf(2, 1, 0, 3)[o] } }
+            val advice = worst?.advice ?: DtcSeverity.UNKNOWN.advice
+            val head = "Your car has flagged ${if (count == 1) "one thing" else "$count things"}."
+            val tail = " $advice Would you like me to explain more?"
+            "$head ${render { it }}$tail" to "$head ${render(SpokenFormat::code)}$tail"
+        } else {
+            fun render(codeText: (String) -> String) = infos.joinToString("; ") { (code, status, info) ->
+                "${codeText(code)} ($status)" + (info?.description?.let { ", $it" } ?: "")
+            }
+            val head = "There ${if (count == 1) "is 1 code" else "are $count codes"}:"
+            "$head ${render { it }}. Ask me to explain any of them." to "$head ${render(SpokenFormat::code)}. Ask me to explain any of them."
+        }
+    }
+
+    private fun explainCode(code: String?, ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
         val target = code ?: run {
             val known = ctx.demoCodes.map { it.code }.ifEmpty { ctx.latestCodeRead?.codes?.map { it.code }.orEmpty() }.distinct()
             when (known.size) {
@@ -174,75 +290,128 @@ class RuleBasedReasoningProvider(
                 )
             }
         }
+        lastTopic = Topic.Code(target)
         val spokenCode = SpokenFormat.code(target)
         val info = knowledge.lookup(target)
-        val system = DtcCodeFormat.system(target)?.label?.lowercase()
-        val caution = " A code points to where a fault was detected, not necessarily its cause; " +
-            "treat any cause as a possibility until it's confirmed by testing."
+        val caution = "Remember, a code tells us what the car noticed, not exactly which part is at fault, so treat causes as possibilities until they're confirmed by testing."
         if (info != null) {
-            val severity = when (info.severity) {
-                DtcSeverity.SEVERE -> " This can be serious. If the check-engine light is flashing or the car runs badly, reduce speed and get it checked soon."
-                DtcSeverity.MODERATE -> " It's usually not an emergency, but it should be checked."
-                DtcSeverity.INFO -> " It's usually minor."
-                DtcSeverity.UNKNOWN -> ""
+            fun build(c: String) = when (level) {
+                ExplanationLevel.EVERYDAY -> "${info.simple} ${info.severity.advice} If a mechanic asks, the code is $c. $caution"
+                ExplanationLevel.DIY -> "${info.simple} Things you can check: ${info.diyChecks} ${info.severity.advice} The code is $c. $caution"
+                ExplanationLevel.ADVANCED -> "$c: ${info.description}. ${info.technical} Common checks: ${info.diyChecks} $caution"
             }
-            val body = "means ${info.description}. ${info.explanation}$severity$caution"
-            return reply("$target $body", ReplyBasis.GENERAL_KNOWLEDGE, "$spokenCode $body")
+            return reply(build(target), ReplyBasis.GENERAL_KNOWLEDGE, build(spokenCode))
         }
-        val scope = DtcCodeFormat.scope(target)
-        val vehicleMake = ctx.vehicle?.make
-        val body = when (scope) {
+        val system = DtcCodeFormat.system(target)
+        val make = ctx.vehicle?.make
+        fun build(c: String) = when (DtcCodeFormat.scope(target)) {
             CodeScope.MANUFACTURER_SPECIFIC ->
-                "is a manufacturer-specific ${system ?: ""} code. Its meaning depends on the manufacturer" +
-                    (vehicleMake?.let { ", so it needs a $it-specific reference" } ?: "") +
-                    ". I don't have its definition yet."
-            else -> "is a ${system ?: "diagnostic"} code, but I don't have its definition in my offline list yet."
+                "Code $c is specific to the car's manufacturer, and it relates to the ${system?.plainLabel ?: "car"}. " +
+                    "I don't have its definition yet" + (make?.let { ", so it needs a $it-specific reference or scan tool" } ?: "") + "."
+            else -> "Code $c relates to the ${system?.plainLabel ?: "car"}, but I don't have its definition in my offline list yet."
         }
-        return reply("$target $body", ReplyBasis.GENERAL_KNOWLEDGE, "$spokenCode $body")
+        return reply(build(target), ReplyBasis.GENERAL_KNOWLEDGE, build(spokenCode))
     }
 
-    private suspend fun liveValue(metric: LiveMetric, ctx: VehicleContext): AssistantReply {
+    private suspend fun liveValue(pid: ObdPid, ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
+        val name = if (level == ExplanationLevel.EVERYDAY) pid.friendlyName.lowercase() else pid.label.lowercase()
         if (ctx.obdState !is ObdConnectionState.Connected) {
             return reply(
-                "I can't read your ${metric.spokenName} because no OBD-II adapter is connected. " +
-                    "Connect one on the Adapter tab and ask again. I won't guess sensor values.",
+                "I can't check your $name because your OBD-II adapter isn't connected. Connect it on the Adapter tab " +
+                    "and ask again. I won't guess readings.",
                 ReplyBasis.NOT_AVAILABLE,
             )
         }
-        return when (val r = diagnostics.readLiveValue(metric.pid)) {
-            is LiveValueResult.Value -> {
-                val value = SpokenFormat.liveValue(metric.pid, r.reading.value)
-                var text = "Your ${metric.spokenName} is $value, read from the vehicle just now."
-                if (metric == LiveMetric.COOLANT_TEMP && r.reading.value >= 115) {
-                    text += " That's higher than normal for most engines. If your temperature gauge is high too, pull over when it's safe and let the engine cool."
-                }
-                reply(text, ReplyBasis.LIVE_VEHICLE_DATA)
-            }
-            LiveValueResult.NotConnected -> reply(
-                "The adapter isn't connected anymore, so I can't read your ${metric.spokenName}.",
-                ReplyBasis.NOT_AVAILABLE,
-            )
-            LiveValueResult.NotSupported -> reply(
-                "Your vehicle didn't report support for ${metric.spokenName} over standard OBD-II.",
-                ReplyBasis.NOT_AVAILABLE,
-            )
-            is LiveValueResult.NoResponse -> reply(
-                "I asked for the ${metric.spokenName} but didn't get a valid answer: ${r.reason}",
-                ReplyBasis.NOT_AVAILABLE,
-            )
+        return when (val r = diagnostics.readLiveValue(pid)) {
+            is LiveValueResult.Value -> { lastTopic = Topic.Live(pid, r.reading); describeLive(pid, r.reading, level) }
+            LiveValueResult.NotConnected -> reply("The adapter isn't connected anymore, so I can't check your $name.", ReplyBasis.NOT_AVAILABLE)
+            LiveValueResult.NotSupported -> reply("Your car doesn't report its $name through the standard connection.", ReplyBasis.NOT_AVAILABLE)
+            is LiveValueResult.NoResponse -> reply("I asked your car for its $name but didn't get a usable answer: ${r.reason}", ReplyBasis.NOT_AVAILABLE)
         }
     }
 
-    private fun connection(ctx: VehicleContext) = when (val s = ctx.obdState) {
+    private fun describeLive(pid: ObdPid, reading: SensorReading, level: ExplanationLevel): AssistantReply {
+        val value = SpokenFormat.liveValue(pid, reading.value)
+        val text = when (level) {
+            ExplanationLevel.EVERYDAY -> "Your ${pid.friendlyName.lowercase()} is $value, read from your car just now." +
+                (LiveInterpretation.plain(pid, reading.value)?.let { " $it" } ?: "")
+            ExplanationLevel.DIY -> "Your ${pid.label.lowercase()} is $value, read from the vehicle just now." +
+                (LiveInterpretation.plain(pid, reading.value)?.let { " $it" } ?: "")
+            ExplanationLevel.ADVANCED -> "${pid.label}: $value (mode 01, PID ${"%02X".format(pid.pid)}), read just now." +
+                (LiveInterpretation.plain(pid, reading.value)?.let { " $it" } ?: "")
+        }
+        return reply(text, ReplyBasis.LIVE_VEHICLE_DATA)
+    }
+
+    private suspend fun sensorReadings(ctx: VehicleContext, level: ExplanationLevel): AssistantReply {
+        if (ctx.obdState !is ObdConnectionState.Connected) {
+            return reply(
+                "I can't show sensor readings because your OBD-II adapter isn't connected. Connect it on the Adapter tab, " +
+                    "and you'll also see live readings there.",
+                ReplyBasis.NOT_AVAILABLE,
+            )
+        }
+        val pids = SENSOR_ORDER.filter { it.visibleAt(level) }
+        val values = pids.mapNotNull { pid -> (diagnostics.readLiveValue(pid) as? LiveValueResult.Value)?.let { pid to it.reading } }
+        if (values.isEmpty()) return reply("I couldn't get any readings from your car. Is the ignition on?", ReplyBasis.NOT_AVAILABLE)
+        val list = values.joinToString("; ") { (pid, r) ->
+            "${if (level == ExplanationLevel.EVERYDAY) pid.friendlyName else pid.label}: ${SpokenFormat.liveValue(pid, r.value)}"
+        }
+        val more = if (level != ExplanationLevel.ADVANCED) " Say \"give me the technical explanation\" or switch to a higher detail level in Settings for more readings." else ""
+        return reply("Here's what your car is reporting right now: $list.$more", ReplyBasis.LIVE_VEHICLE_DATA)
+    }
+
+    private suspend fun symptom(category: SymptomCategory, text: String, ctx: VehicleContext): AssistantReply {
+        lastTopic = Topic.Symptom(category)
+        val vehicle = ctx.vehicle
+        val noted = vehicle?.let {
+            val obs = DiagnosticObservation(UUID.randomUUID().toString(), it.id, now(), ObservationKind.SYMPTOM, text, null, DataOrigin.USER_ENTERED)
+            recorder?.save(obs)
+            pendingObservation = obs
+            " I've noted this in your car's history."
+        }.orEmpty()
+
+        SymptomGuide.safetyAdvice(category)?.let { safety ->
+            val extra = if (category == SymptomCategory.OVERHEATING && ctx.obdState is ObdConnectionState.Connected) {
+                (diagnostics.readLiveValue(ObdPid.COOLANT_TEMP) as? LiveValueResult.Value)?.let {
+                    " Your engine temperature right now is ${SpokenFormat.liveValue(ObdPid.COOLANT_TEMP, it.reading.value)}."
+                }.orEmpty()
+            } else ""
+            return reply("$safety$extra$noted Once you're safe, I can help figure out what's going on.", ReplyBasis.GENERAL_KNOWLEDGE)
+        }
+
+        val opening = SymptomGuide.opening(category)
+        val question = SymptomGuide.followUp(category)
+        pendingFollowUp = question
+        val body = listOfNotNull(opening + noted, question?.question).joinToString(" ")
+        return reply(body, ReplyBasis.GENERAL_KNOWLEDGE)
+    }
+
+    private suspend fun followUpAnswer(question: FollowUpQuestion, answer: String): AssistantReply {
+        pendingObservation?.let { obs ->
+            recorder?.save(obs.copy(text = "${obs.text} — Asked: \"${question.question}\" Answer: \"${answer.trim()}\""))
+        }
+        pendingObservation = null
+        val guidance = question.guidanceFor(answer)
+        return reply(
+            "$guidance This is general guidance, not a diagnosis. A full step-by-step check using your car's live data is coming in a future update.",
+            ReplyBasis.GENERAL_KNOWLEDGE,
+        )
+    }
+
+    private fun connection(ctx: VehicleContext, level: ExplanationLevel) = when (val s = ctx.obdState) {
         is ObdConnectionState.Connected -> reply(
-            "I'm connected to ${s.adapterName} over ${s.transport.label}." +
-                (s.vehicleProtocol?.let { " The vehicle is responding using $it." } ?: " The adapter is connected, but the vehicle hasn't responded yet. Is the ignition on?"),
+            "I'm connected to your adapter, ${s.adapterName}." + when {
+                s.vehicleProtocol == null -> " Your car isn't responding yet. Is the ignition on?"
+                level == ExplanationLevel.ADVANCED -> " The vehicle is responding using ${s.vehicleProtocol}."
+                else -> " Your car is responding."
+            },
             ReplyBasis.LIVE_VEHICLE_DATA,
         )
         is ObdConnectionState.Connecting -> reply("I'm connecting to the adapter now.", ReplyBasis.NOT_AVAILABLE)
-        is ObdConnectionState.Reconnecting -> reply("The adapter disconnected. I'm trying to reconnect, attempt ${s.attempt}.", ReplyBasis.NOT_AVAILABLE)
-        is ObdConnectionState.Failed -> reply("The last connection attempt failed: ${s.message}", ReplyBasis.NOT_AVAILABLE)
-        is ObdConnectionState.Unavailable -> reply("OBD-II isn't available: ${s.reason}", ReplyBasis.NOT_AVAILABLE)
+        is ObdConnectionState.Reconnecting -> reply("The adapter disconnected. I'm trying to reconnect.", ReplyBasis.NOT_AVAILABLE)
+        is ObdConnectionState.Failed -> reply("I couldn't connect to the adapter: ${s.message}", ReplyBasis.NOT_AVAILABLE)
+        is ObdConnectionState.Unavailable -> reply("The adapter connection isn't available: ${s.reason}", ReplyBasis.NOT_AVAILABLE)
         ObdConnectionState.Disconnected -> reply(
             "No OBD-II adapter is connected. You can connect one on the Adapter tab.",
             ReplyBasis.NOT_AVAILABLE,
@@ -251,11 +420,10 @@ class RuleBasedReasoningProvider(
 
     private fun lastService(ctx: VehicleContext): AssistantReply {
         val v = ctx.vehicle ?: return reply(noVehicleHint(ctx)!!, ReplyBasis.NOT_AVAILABLE)
-        val last = ctx.maintenance.maxByOrNull { it.date }
-            ?: return reply(
-                "I don't have any service records for your ${v.shortName()} yet. You can add them on the History screen.",
-                ReplyBasis.NOT_AVAILABLE,
-            )
+        val last = ctx.maintenance.maxByOrNull { it.date } ?: return reply(
+            "I don't have any service records for your ${v.shortName()} yet. You can add them on the History screen.",
+            ReplyBasis.NOT_AVAILABLE,
+        )
         val date = last.date.format(DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US))
         val miles = last.odometerMiles?.let { " at ${SpokenFormat.miles(it)}" }.orEmpty()
         val basis = if (last.origin == DataOrigin.SAMPLE) ReplyBasis.SAMPLE_DATA else ReplyBasis.RECORDED_DATA
@@ -269,8 +437,41 @@ class RuleBasedReasoningProvider(
             "Your profile doesn't have an odometer reading yet. You can add it by editing the vehicle.",
             ReplyBasis.NOT_AVAILABLE,
         )
-        return reply("Your profile lists ${SpokenFormat.miles(miles)} on the odometer. That's the last value entered, not a live reading.", ReplyBasis.VEHICLE_PROFILE)
+        return reply("Your profile lists ${SpokenFormat.miles(miles)}. That's the last number entered, not a live reading.", ReplyBasis.VEHICLE_PROFILE)
     }
 
     private fun Vehicle.shortName() = nickname ?: "$make $model"
+
+    private fun cylinderWord(n: Int) = when (n) {
+        2 -> "two"; 3 -> "three"; 4 -> "four"; 5 -> "five"; 6 -> "six"; 8 -> "eight"; 10 -> "ten"; 12 -> "twelve"
+        else -> n.toString()
+    }
+
+    private companion object {
+        val SENSOR_ORDER = listOf(
+            ObdPid.COOLANT_TEMP, ObdPid.CONTROL_MODULE_VOLTAGE, ObdPid.ENGINE_RPM, ObdPid.VEHICLE_SPEED, ObdPid.FUEL_LEVEL,
+            ObdPid.ENGINE_LOAD, ObdPid.THROTTLE_POSITION, ObdPid.INTAKE_AIR_TEMP,
+            ObdPid.SHORT_TERM_FUEL_TRIM_B1, ObdPid.LONG_TERM_FUEL_TRIM_B1, ObdPid.MAF_RATE, ObdPid.INTAKE_MAP,
+        )
+    }
+}
+
+/** Plain-language context for common readings. General guidance only, never a diagnosis. */
+object LiveInterpretation {
+    fun plain(pid: ObdPid, value: Double): String? = when (pid) {
+        ObdPid.COOLANT_TEMP -> when {
+            value >= 115 -> "That's hotter than normal for most engines. If your temperature gauge is high too, pull over when it's safe and let the engine cool."
+            value >= 75 -> "That's in the normal range for a warmed-up engine."
+            value < 50 -> "The engine is still cold, which is normal right after starting."
+            else -> "The engine is still warming up."
+        }
+        ObdPid.CONTROL_MODULE_VOLTAGE -> when {
+            value >= 15.2 -> "That's higher than normal; the charging system may be overcharging, so have it checked."
+            value >= 13.2 -> "That looks normal for a running engine; the battery is being charged."
+            value >= 12.2 -> "That's a normal battery level with the engine off. With the engine running it would usually be higher."
+            else -> "That's on the low side; the battery may be weak or not charging well."
+        }
+        ObdPid.FUEL_LEVEL -> if (value < 15) "You're getting low on fuel." else null
+        else -> null
+    }
 }
