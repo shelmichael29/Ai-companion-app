@@ -12,6 +12,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Row
+import com.aicarcompanion.app.assistant.conversation.Speaker
+import com.aicarcompanion.app.ui.assistant.AssistantViewModel
+import com.aicarcompanion.app.ui.assistant.MicButton
+import com.aicarcompanion.app.ui.assistant.VoiceStatusText
+import com.aicarcompanion.app.ui.assistant.rememberMicAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -28,15 +35,26 @@ import com.aicarcompanion.app.domain.model.MaintenanceRecord
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.model.Vehicle
 import com.aicarcompanion.app.ui.AppViewModelProvider
+import com.aicarcompanion.app.ui.adapter.describe
+import com.aicarcompanion.app.ui.adapter.formatReading
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SampleDataBanner
 import com.aicarcompanion.app.ui.components.SectionCard
 import java.text.NumberFormat
+import java.time.ZoneId
+import com.aicarcompanion.app.domain.model.DataOrigin
+import com.aicarcompanion.app.domain.model.TroubleCodeRead
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
 @Composable
 fun DashboardScreen(
+    onOpenAssistant: () -> Unit,
+    onOpenAdapter: () -> Unit,
+    onOpenHistory: () -> Unit,
     onAddVehicle: () -> Unit,
     onEditVehicle: (String) -> Unit,
     contentPadding: PaddingValues,
@@ -59,7 +77,7 @@ fun DashboardScreen(
             Button(onClick = onAddVehicle, modifier = Modifier.padding(top = 16.dp)) { Text("Add vehicle") }
         }
 
-        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, contentPadding)
+        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, onOpenAssistant, onOpenAdapter, onOpenHistory, contentPadding)
     }
 }
 
@@ -67,6 +85,9 @@ fun DashboardScreen(
 private fun DashboardContent(
     state: DashboardUiState.Ready,
     onEditVehicle: (String) -> Unit,
+    onOpenAssistant: () -> Unit,
+    onOpenAdapter: () -> Unit,
+    onOpenHistory: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -77,12 +98,36 @@ private fun DashboardContent(
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item { AssistantCard(onOpenAssistant) }
         if (state.containsSampleData) item { SampleDataBanner() }
         item { VehicleCard(state.vehicle, onEdit = { onEditVehicle(state.vehicle.id) }) }
-        item { ConnectionCard(state.obdState) }
-        item { TroubleCodesCard(state.troubleCodes) }
+        item { ConnectionCard(state.obdState, onOpenAdapter) }
+        item { TroubleCodesCard(state.troubleCodes, state.lastCodeRead) }
         item { SensorCard(state.sensorReadings) }
-        item { MaintenanceCard(state.maintenance) }
+        item { MaintenanceCard(state.maintenance, onOpenHistory) }
+    }
+}
+
+/** One-tap voice access from the dashboard. Uses the same app-wide session as the Assistant tab. */
+@Composable
+private fun AssistantCard(
+    onOpenAssistant: () -> Unit,
+    viewModel: AssistantViewModel = viewModel(factory = AppViewModelProvider.Factory),
+) {
+    val voice by viewModel.state.collectAsStateWithLifecycle()
+    val turns by viewModel.turns.collectAsStateWithLifecycle()
+    val name by viewModel.assistantName.collectAsStateWithLifecycle()
+    val micAction = rememberMicAction(viewModel.session)
+    val lastReply = turns.lastOrNull { it.speaker == Speaker.ASSISTANT }
+    SectionCard(title = name) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            MicButton(voice, name, micAction, size = 72.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                VoiceStatusText(voice, name)
+                lastReply?.let { Text(it.text, style = MaterialTheme.typography.bodyMedium, maxLines = 4) }
+            }
+        }
+        TextButton(onClick = onOpenAssistant) { Text("Open conversation") }
     }
 }
 
@@ -91,7 +136,10 @@ private fun VehicleCard(vehicle: Vehicle, onEdit: () -> Unit) {
     SectionCard(title = vehicle.title) {
         if (vehicle.nickname != null) Text(vehicle.displayName, style = MaterialTheme.typography.bodyLarge)
         LabeledValue("Engine", vehicle.engine.description)
+        vehicle.engine.engineCode?.let { LabeledValue("Engine code", it) }
         LabeledValue("Trim", vehicle.trim ?: "—")
+        vehicle.transmission?.let { LabeledValue("Transmission", it) }
+        vehicle.drivetrain?.let { LabeledValue("Drive", it) }
         LabeledValue("Odometer", vehicle.odometerMiles?.let { "${NumberFormat.getIntegerInstance().format(it)} mi" } ?: "—")
         LabeledValue("VIN", vehicle.vin ?: "Not entered")
         Button(onClick = onEdit, modifier = Modifier.padding(top = 4.dp)) { Text("Edit profile") }
@@ -99,24 +147,35 @@ private fun VehicleCard(vehicle: Vehicle, onEdit: () -> Unit) {
 }
 
 @Composable
-private fun ConnectionCard(state: ObdConnectionState) {
-    val (status, detail) = when (state) {
-        ObdConnectionState.Disconnected -> "Not connected" to "Plug in an OBD-II adapter to read live data."
-        is ObdConnectionState.Connecting -> "Connecting…" to state.transport.label
-        is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to state.transport.label
-        is ObdConnectionState.Unavailable -> "Not available yet" to state.reason
-        is ObdConnectionState.Failed -> "Connection failed" to state.message
-    }
+private fun ConnectionCard(state: ObdConnectionState, onOpenAdapter: () -> Unit) {
+    val (status, detail) = describe(state)
     SectionCard(title = "OBD-II adapter") {
-        Text(status, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        Text(
+            status,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
         Text(detail, style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onOpenAdapter) {
+            Text(if (state is ObdConnectionState.Connected) "Live data and codes" else "Connect adapter")
+        }
     }
 }
 
 @Composable
-private fun TroubleCodesCard(codes: List<DiagnosticTroubleCode>) {
+private fun TroubleCodesCard(codes: List<DiagnosticTroubleCode>, lastRead: TroubleCodeRead?) {
+    val isSample = codes.firstOrNull()?.origin == DataOrigin.SAMPLE
     SectionCard(title = "Trouble codes", origin = codes.firstOrNull()?.origin) {
-        if (codes.isEmpty()) Text("No trouble codes.")
+        if (!isSample && lastRead != null) {
+            Text(
+                "Last read ${DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withZone(ZoneId.systemDefault()).format(lastRead.readAt)}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (codes.isEmpty()) {
+            Text(if (lastRead == null) "Codes haven't been read yet. Connect your adapter and tap Read trouble codes." else "No trouble codes were reported.")
+        }
         codes.forEachIndexed { index, dtc ->
             if (index > 0) HorizontalDivider()
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -142,20 +201,18 @@ private fun severityColor(severity: DtcSeverity): Color = when (severity) {
 
 @Composable
 private fun SensorCard(readings: List<SensorReading>) {
-    SectionCard(title = "Sensor snapshot", origin = readings.firstOrNull()?.origin) {
-        if (readings.isEmpty()) Text("No sensor data.")
-        readings.forEach { r ->
-            val value = if (r.value % 1.0 == 0.0) r.value.toLong().toString() else "%.1f".format(r.value)
-            LabeledValue(r.name, "$value ${r.unit}")
-        }
+    SectionCard(title = "Live sensor data", origin = readings.firstOrNull()?.origin) {
+        if (readings.isEmpty()) Text("No live data. Connect an OBD-II adapter with the ignition on to see sensor values.")
+        readings.forEach { r -> LabeledValue(r.name, formatReading(r)) }
     }
 }
 
 @Composable
-private fun MaintenanceCard(records: List<MaintenanceRecord>) {
+private fun MaintenanceCard(records: List<MaintenanceRecord>, onOpenHistory: () -> Unit) {
     val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
     SectionCard(title = "Service history", origin = records.firstOrNull()?.origin) {
         if (records.isEmpty()) Text("No service records yet.")
+        TextButton(onClick = onOpenHistory) { Text("Open history, notes and add records") }
         records.forEachIndexed { index, record ->
             if (index > 0) HorizontalDivider()
             Column {

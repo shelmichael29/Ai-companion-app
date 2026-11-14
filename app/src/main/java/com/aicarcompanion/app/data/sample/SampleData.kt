@@ -1,47 +1,19 @@
 package com.aicarcompanion.app.data.sample
 
 import com.aicarcompanion.app.diagnostics.dtc.GenericDtcCatalog
-import com.aicarcompanion.app.domain.model.Aspiration
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DiagnosticTroubleCode
 import com.aicarcompanion.app.domain.model.DtcStatus
-import com.aicarcompanion.app.domain.model.EngineSpec
-import com.aicarcompanion.app.domain.model.FuelType
 import com.aicarcompanion.app.domain.model.MaintenanceRecord
 import com.aicarcompanion.app.domain.model.SensorReading
-import com.aicarcompanion.app.domain.model.Vehicle
 import java.time.Instant
 import java.time.LocalDate
 
 /**
- * Demonstration data so the UI has something to show before real persistence and OBD-II
- * support exist. Every diagnostic and maintenance item is tagged [DataOrigin.SAMPLE].
+ * Demonstration diagnostics shown only when the user turns on demo data in Settings. Every diagnostic and maintenance item is tagged [DataOrigin.SAMPLE].
  * Values are fixed (not simulated over time) to avoid looking like a live vehicle feed.
  */
 object SampleData {
-
-    val vehicles: List<Vehicle> = listOf(
-        Vehicle(
-            id = "sample-civic",
-            year = 2018,
-            make = "Honda",
-            model = "Civic",
-            trim = "EX",
-            engine = EngineSpec(2.0, 4, FuelType.GASOLINE),
-            odometerMiles = 64_210,
-            nickname = "Sample: Daily driver",
-        ),
-        Vehicle(
-            id = "sample-f150",
-            year = 2015,
-            make = "Ford",
-            model = "F-150",
-            trim = "XLT",
-            engine = EngineSpec(2.7, 6, FuelType.GASOLINE, Aspiration.TURBOCHARGED),
-            odometerMiles = 118_950,
-            nickname = "Sample: Work truck",
-        ),
-    )
 
     private val capturedAt: Instant = Instant.parse("2026-01-01T12:00:00Z")
 

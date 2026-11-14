@@ -1,6 +1,7 @@
 package com.aicarcompanion.app.ui
 
 import com.aicarcompanion.app.domain.model.Aspiration
+import com.aicarcompanion.app.domain.model.EngineLayout
 import com.aicarcompanion.app.domain.model.FuelType
 import com.aicarcompanion.app.ui.vehicles.VehicleField
 import com.aicarcompanion.app.ui.vehicles.VehicleForm
@@ -24,7 +25,8 @@ class VehicleFormValidatorTest {
         val vehicle = (validate(validForm) as VehicleFormResult.Valid).vehicle
         assertEquals("Honda", vehicle.make)
         assertEquals("2018 Honda Civic EX", vehicle.displayName)
-        assertEquals("2.0L I4 Gasoline", vehicle.engine.description)
+        // Layout isn't known from the form, so it must not be guessed.
+        assertEquals("2.0L 4-cyl Gasoline", vehicle.engine.description)
         assertEquals("2HGFC2F59JH000000", vehicle.vin)
         assertEquals(64_210, vehicle.odometerMiles)
     }
@@ -50,6 +52,24 @@ class VehicleFormValidatorTest {
         ) as VehicleFormResult.Valid).vehicle
         assertNull(vehicle.engine.displacementLiters)
         assertEquals("Electric", vehicle.engine.description)
+    }
+
+    @Test fun `2011 BMW 528i N52 is described as an inline six, never a V6`() {
+        val vehicle = (validate(
+            VehicleForm(
+                year = "2011", make = "BMW", model = "528i", trim = "F10", displacementLiters = "3.0",
+                cylinders = "6", layout = EngineLayout.INLINE, engineCode = "N52B30",
+            ),
+        ) as VehicleFormResult.Valid).vehicle
+        assertEquals("3.0L I6 Gasoline", vehicle.engine.description)
+        assertEquals("3.0 liter naturally aspirated inline six-cylinder", vehicle.engine.spokenDescription)
+        assertEquals("N52B30", vehicle.engine.engineCode)
+    }
+
+    @Test fun `six cylinders with unknown layout is not called a V6`() {
+        val vehicle = (validate(VehicleForm(year = "2011", make = "BMW", model = "528i", displacementLiters = "3.0", cylinders = "6"))
+            as VehicleFormResult.Valid).vehicle
+        assertEquals("3.0L 6-cyl Gasoline", vehicle.engine.description)
     }
 
     @Test fun `optional fields may be blank`() {

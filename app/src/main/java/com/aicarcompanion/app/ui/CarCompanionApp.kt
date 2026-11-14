@@ -14,7 +14,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aicarcompanion.app.CarCompanionApplication
+import com.aicarcompanion.app.R
+import com.aicarcompanion.app.ui.adapter.AdapterScreen
+import com.aicarcompanion.app.ui.assistant.AssistantScreen
+import com.aicarcompanion.app.ui.settings.SettingsScreen
+import com.aicarcompanion.app.ui.history.HistoryScreen
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -30,15 +43,21 @@ import com.aicarcompanion.app.ui.vehicles.VehicleListScreen
 
 private object Routes {
     const val DASHBOARD = "dashboard"
+    const val ASSISTANT = "assistant"
+    const val ADAPTER = "adapter"
     const val VEHICLES = "vehicles"
+    const val SETTINGS = "settings"
+    const val HISTORY = "history"
     const val VEHICLE_EDIT = "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}={${VehicleEditViewModel.VEHICLE_ID_ARG}}"
 
     fun vehicleEdit(id: String?) = if (id == null) "vehicle/edit" else "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}=$id"
 }
 
-private enum class TopLevel(val route: String, val label: String, val icon: ImageVector) {
-    DASHBOARD(Routes.DASHBOARD, "Dashboard", Icons.Filled.Home),
-    VEHICLES(Routes.VEHICLES, "Vehicles", Icons.AutoMirrored.Filled.List),
+private enum class TopLevel(val route: String, val label: String, val icon: @Composable () -> Painter) {
+    DASHBOARD(Routes.DASHBOARD, "Dashboard", { rememberVectorPainter(Icons.Filled.Home) }),
+    ASSISTANT(Routes.ASSISTANT, "Assistant", { painterResource(R.drawable.ic_mic) }),
+    ADAPTER(Routes.ADAPTER, "Adapter", { painterResource(R.drawable.ic_bluetooth) }),
+    VEHICLES(Routes.VEHICLES, "Vehicles", { rememberVectorPainter(Icons.AutoMirrored.Filled.List) }),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,10 +66,30 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val topLevel = TopLevel.entries.firstOrNull { it.route == currentRoute }
+    val assistantName by (LocalContext.current.applicationContext as CarCompanionApplication)
+        .container.settings.settings.collectAsStateWithLifecycle()
+        .let { state -> derivedStateOf { state.value.assistantName } }
 
     Scaffold(
         topBar = {
-            if (topLevel != null) TopAppBar(title = { Text(if (topLevel == TopLevel.DASHBOARD) "AI Car Companion" else topLevel.label) })
+            if (topLevel != null) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            when (topLevel) {
+                                TopLevel.DASHBOARD -> "AI Car Companion"
+                                TopLevel.ASSISTANT -> assistantName
+                                else -> topLevel.label
+                            },
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = { navController.navigate(Routes.SETTINGS) }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Settings")
+                        }
+                    },
+                )
+            }
         },
         bottomBar = {
             if (topLevel != null) {
@@ -58,15 +97,9 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                     TopLevel.entries.forEach { dest ->
                         NavigationBarItem(
                             selected = dest == topLevel,
-                            onClick = {
-                                navController.navigate(dest.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(dest.icon, contentDescription = null) },
-                            label = { Text(dest.label) },
+                            onClick = { navController.navigateTopLevel(dest.route) },
+                            icon = { Icon(dest.icon(), contentDescription = null) },
+                            label = { Text(if (dest == TopLevel.ASSISTANT) assistantName else dest.label) },
                         )
                     }
                 }
@@ -83,10 +116,25 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
         NavHost(navController, startDestination = Routes.DASHBOARD) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(
+                    onOpenAssistant = { navController.navigateTopLevel(Routes.ASSISTANT) },
+                    onOpenAdapter = { navController.navigateTopLevel(Routes.ADAPTER) },
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
                     onEditVehicle = { navController.navigate(Routes.vehicleEdit(it)) },
                     contentPadding = padding,
                 )
+            }
+            composable(Routes.ASSISTANT) {
+                AssistantScreen(contentPadding = padding)
+            }
+            composable(Routes.ADAPTER) {
+                AdapterScreen(contentPadding = padding)
+            }
+            composable(Routes.HISTORY) {
+                HistoryScreen(onBack = { navController.popBackStack() })
+            }
+            composable(Routes.SETTINGS) {
+                SettingsScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.VEHICLES) {
                 VehicleListScreen(
@@ -108,4 +156,10 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             }
         }
     }
+}
+
+private fun NavHostController.navigateTopLevel(route: String) = navigate(route) {
+    popUpTo(graph.findStartDestination().id) { saveState = true }
+    launchSingleTop = true
+    restoreState = true
 }

@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!--
-        No permissions are requested yet. Bluetooth (BLUETOOTH_CONNECT / BLUETOOTH_SCAN)
-        and network permissions will be added together with the real OBD-II transports,
-        so users are only asked for access when a feature actually needs it.
-    -->
+    <!-- Vehicle lookups (FuelEconomy.gov, NHTSA vPIC). Normal permission; no prompt. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Push-to-talk with Penelope. Requested at runtime the first time the mic is tapped. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- OBD-II over Bluetooth Classic. Only already-paired adapters are used, so no scanning
+         or location permission is requested. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- Android 11+ package visibility: find the system speech recognizer and TTS engines. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:name=".CarCompanionApplication"
