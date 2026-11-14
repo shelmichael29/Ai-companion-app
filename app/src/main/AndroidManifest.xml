@@ -3,6 +3,18 @@
 
     <!-- Vehicle lookups (FuelEconomy.gov, NHTSA vPIC). Normal permission; no prompt. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Push-to-talk with Penelope. Requested at runtime the first time the mic is tapped. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Android 11+ package visibility: find the system speech recognizer and TTS engines. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
 
     <application
         android:name=".CarCompanionApplication"

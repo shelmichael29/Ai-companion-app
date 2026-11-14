@@ -12,6 +12,13 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Row
+import com.aicarcompanion.app.assistant.conversation.Speaker
+import com.aicarcompanion.app.ui.assistant.AssistantViewModel
+import com.aicarcompanion.app.ui.assistant.MicButton
+import com.aicarcompanion.app.ui.assistant.VoiceStatusText
+import com.aicarcompanion.app.ui.assistant.rememberMicAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,6 +44,7 @@ import java.time.format.FormatStyle
 
 @Composable
 fun DashboardScreen(
+    onOpenAssistant: () -> Unit,
     onAddVehicle: () -> Unit,
     onEditVehicle: (String) -> Unit,
     contentPadding: PaddingValues,
@@ -59,7 +67,7 @@ fun DashboardScreen(
             Button(onClick = onAddVehicle, modifier = Modifier.padding(top = 16.dp)) { Text("Add vehicle") }
         }
 
-        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, contentPadding)
+        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, onOpenAssistant, contentPadding)
     }
 }
 
@@ -67,6 +75,7 @@ fun DashboardScreen(
 private fun DashboardContent(
     state: DashboardUiState.Ready,
     onEditVehicle: (String) -> Unit,
+    onOpenAssistant: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -77,12 +86,36 @@ private fun DashboardContent(
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item { AssistantCard(onOpenAssistant) }
         if (state.containsSampleData) item { SampleDataBanner() }
         item { VehicleCard(state.vehicle, onEdit = { onEditVehicle(state.vehicle.id) }) }
         item { ConnectionCard(state.obdState) }
         item { TroubleCodesCard(state.troubleCodes) }
         item { SensorCard(state.sensorReadings) }
         item { MaintenanceCard(state.maintenance) }
+    }
+}
+
+/** One-tap voice access from the dashboard. Uses the same app-wide session as the Assistant tab. */
+@Composable
+private fun AssistantCard(
+    onOpenAssistant: () -> Unit,
+    viewModel: AssistantViewModel = viewModel(factory = AppViewModelProvider.Factory),
+) {
+    val voice by viewModel.state.collectAsStateWithLifecycle()
+    val turns by viewModel.turns.collectAsStateWithLifecycle()
+    val name by viewModel.assistantName.collectAsStateWithLifecycle()
+    val micAction = rememberMicAction(viewModel.session)
+    val lastReply = turns.lastOrNull { it.speaker == Speaker.ASSISTANT }
+    SectionCard(title = name) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            MicButton(voice, name, micAction, size = 72.dp)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                VoiceStatusText(voice, name)
+                lastReply?.let { Text(it.text, style = MaterialTheme.typography.bodyMedium, maxLines = 4) }
+            }
+        }
+        TextButton(onClick = onOpenAssistant) { Text("Open conversation") }
     }
 }
 
@@ -105,8 +138,10 @@ private fun VehicleCard(vehicle: Vehicle, onEdit: () -> Unit) {
 private fun ConnectionCard(state: ObdConnectionState) {
     val (status, detail) = when (state) {
         ObdConnectionState.Disconnected -> "Not connected" to "Plug in an OBD-II adapter to read live data."
-        is ObdConnectionState.Connecting -> "Connecting…" to state.transport.label
-        is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to state.transport.label
+        is ObdConnectionState.Connecting -> "Connecting…" to (state.adapterName ?: state.transport.label)
+        is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to
+            (state.vehicleProtocol?.let { "Vehicle responding ($it)" } ?: "Vehicle not responding. Is the ignition on?")
+        is ObdConnectionState.Reconnecting -> "Reconnecting (${state.attempt}/${state.maxAttempts})…" to state.adapterName
         is ObdConnectionState.Unavailable -> "Not available yet" to state.reason
         is ObdConnectionState.Failed -> "Connection failed" to state.message
     }

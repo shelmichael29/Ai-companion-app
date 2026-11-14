@@ -13,8 +13,20 @@ enum class ObdTransport(val label: String) {
 
 sealed interface ObdConnectionState {
     data object Disconnected : ObdConnectionState
-    data class Connecting(val transport: ObdTransport) : ObdConnectionState
-    data class Connected(val transport: ObdTransport, val adapterName: String) : ObdConnectionState
+    data class Connecting(val transport: ObdTransport, val adapterName: String? = null) : ObdConnectionState
+
+    /**
+     * The adapter link is up. [vehicleProtocol] is the OBD-II protocol the vehicle answered on,
+     * or null if the adapter is connected but the vehicle hasn't responded (e.g. ignition off).
+     */
+    data class Connected(
+        val transport: ObdTransport,
+        val adapterName: String,
+        val vehicleProtocol: String? = null,
+        val adapterVersion: String? = null,
+    ) : ObdConnectionState
+
+    data class Reconnecting(val adapterName: String, val attempt: Int, val maxAttempts: Int) : ObdConnectionState
     data class Unavailable(val reason: String) : ObdConnectionState
     data class Failed(val message: String) : ObdConnectionState
 }

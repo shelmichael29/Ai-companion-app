@@ -5,7 +5,9 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.aicarcompanion.app.CarCompanionApplication
+import com.aicarcompanion.app.ui.assistant.AssistantViewModel
 import com.aicarcompanion.app.ui.dashboard.DashboardViewModel
+import com.aicarcompanion.app.ui.settings.SettingsViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleListViewModel
 
@@ -19,6 +21,14 @@ object AppViewModelProvider {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
             VehicleListViewModel(c.vehicleRepository)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            AssistantViewModel(c.voiceSession, c.settings)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            SettingsViewModel(c.settings)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
