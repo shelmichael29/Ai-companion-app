@@ -5,7 +5,6 @@ import com.aicarcompanion.app.assistant.VoiceSession
 import com.aicarcompanion.app.assistant.conversation.CommandParser
 import com.aicarcompanion.app.assistant.conversation.ConversationManager
 import com.aicarcompanion.app.assistant.conversation.DiagnosticCommandHandler
-import com.aicarcompanion.app.assistant.conversation.NoAdapterDiagnosticCommandHandler
 import com.aicarcompanion.app.assistant.conversation.RuleBasedReasoningProvider
 import com.aicarcompanion.app.assistant.conversation.VehicleContext
 import com.aicarcompanion.app.assistant.conversation.VehicleContextProvider
@@ -25,8 +24,11 @@ import com.aicarcompanion.app.data.vehicledb.UrlConnectionHttpClient
 import com.aicarcompanion.app.data.vehicledb.VehicleCatalogProvider
 import com.aicarcompanion.app.data.vehicledb.VinDecoder
 import com.aicarcompanion.app.diagnostics.dtc.GenericDtcCatalog
+import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
+import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothGateway
 import com.aicarcompanion.app.diagnostics.obd.ObdConnection
-import com.aicarcompanion.app.diagnostics.obd.UnavailableObdConnection
+import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
+import com.aicarcompanion.app.diagnostics.obd.ObdManager
 import com.aicarcompanion.app.domain.repository.DiagnosticsRepository
 import com.aicarcompanion.app.domain.repository.MaintenanceRepository
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
@@ -35,7 +37,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -53,7 +54,12 @@ interface AppContainer {
     val vehicleCatalog: VehicleCatalogProvider
     val vinDecoder: VinDecoder
     val obdConnection: ObdConnection
+    val diagnosticCommands: DiagnosticCommandHandler
+    val bluetooth: BluetoothGateway
     val voiceSession: VoiceSession
+
+    /** Reconnects to the last-used adapter if Bluetooth is ready. Never prompts the user. */
+    fun autoConnectAdapter()
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -72,11 +78,20 @@ class DefaultAppContainer(context: Context) : AppContainer {
         FuelEconomyCatalogProvider(http, RoomResponseCache(database.responseCacheDao()))
     }
     override val vinDecoder: VinDecoder = NhtsaVinDecoder(http)
-    override val obdConnection: ObdConnection = UnavailableObdConnection()
-    private val diagnosticCommands: DiagnosticCommandHandler = NoAdapterDiagnosticCommandHandler
+    override val bluetooth = BluetoothGateway(appContext)
+    private val obdManager by lazy { ObdManager(appScope, bluetooth, historyRepository) }
+    override val obdConnection: ObdConnection get() = obdManager
+    override val diagnosticCommands: DiagnosticCommandHandler get() = obdManager
+
+    override fun autoConnectAdapter() {
+        val address = settings.settings.value.lastAdapterAddress ?: return
+        if (obdManager.state.value != ObdConnectionState.Disconnected) return
+        if (bluetooth.availability() != BluetoothAvailability.READY) return
+        bluetooth.findPaired(address)?.let(obdManager::connect)
+    }
 
     override val diagnosticsRepository: DiagnosticsRepository by lazy {
-        DefaultDiagnosticsRepository(historyRepository, settings, GenericDtcCatalog, flowOf(emptyList()))
+        DefaultDiagnosticsRepository(historyRepository, settings, GenericDtcCatalog, obdManager.liveReadings)
     }
 
     private val vehicleContext = VehicleContextProvider {

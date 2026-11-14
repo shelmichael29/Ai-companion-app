@@ -24,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicarcompanion.app.CarCompanionApplication
 import com.aicarcompanion.app.R
+import com.aicarcompanion.app.ui.adapter.AdapterScreen
 import com.aicarcompanion.app.ui.assistant.AssistantScreen
 import com.aicarcompanion.app.ui.settings.SettingsScreen
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -42,6 +43,7 @@ import com.aicarcompanion.app.ui.vehicles.VehicleListScreen
 private object Routes {
     const val DASHBOARD = "dashboard"
     const val ASSISTANT = "assistant"
+    const val ADAPTER = "adapter"
     const val VEHICLES = "vehicles"
     const val SETTINGS = "settings"
     const val VEHICLE_EDIT = "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}={${VehicleEditViewModel.VEHICLE_ID_ARG}}"
@@ -52,6 +54,7 @@ private object Routes {
 private enum class TopLevel(val route: String, val label: String, val icon: @Composable () -> Painter) {
     DASHBOARD(Routes.DASHBOARD, "Dashboard", { rememberVectorPainter(Icons.Filled.Home) }),
     ASSISTANT(Routes.ASSISTANT, "Assistant", { painterResource(R.drawable.ic_mic) }),
+    ADAPTER(Routes.ADAPTER, "Adapter", { painterResource(R.drawable.ic_bluetooth) }),
     VEHICLES(Routes.VEHICLES, "Vehicles", { rememberVectorPainter(Icons.AutoMirrored.Filled.List) }),
 }
 
@@ -112,6 +115,7 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             composable(Routes.DASHBOARD) {
                 DashboardScreen(
                     onOpenAssistant = { navController.navigateTopLevel(Routes.ASSISTANT) },
+                    onOpenAdapter = { navController.navigateTopLevel(Routes.ADAPTER) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
                     onEditVehicle = { navController.navigate(Routes.vehicleEdit(it)) },
                     contentPadding = padding,
@@ -119,6 +123,9 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             }
             composable(Routes.ASSISTANT) {
                 AssistantScreen(contentPadding = padding)
+            }
+            composable(Routes.ADAPTER) {
+                AdapterScreen(contentPadding = padding)
             }
             composable(Routes.SETTINGS) {
                 SettingsScreen(onBack = { navController.popBackStack() })

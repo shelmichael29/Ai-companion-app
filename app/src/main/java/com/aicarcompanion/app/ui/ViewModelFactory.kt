@@ -5,6 +5,7 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.aicarcompanion.app.CarCompanionApplication
+import com.aicarcompanion.app.ui.adapter.AdapterViewModel
 import com.aicarcompanion.app.ui.assistant.AssistantViewModel
 import com.aicarcompanion.app.ui.dashboard.DashboardViewModel
 import com.aicarcompanion.app.ui.settings.SettingsViewModel
@@ -29,6 +30,10 @@ object AppViewModelProvider {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
             SettingsViewModel(c.settings)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            AdapterViewModel(c.bluetooth, c.obdConnection, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

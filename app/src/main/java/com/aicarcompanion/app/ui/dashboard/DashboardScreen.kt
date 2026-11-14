@@ -35,6 +35,11 @@ import com.aicarcompanion.app.domain.model.MaintenanceRecord
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.model.Vehicle
 import com.aicarcompanion.app.ui.AppViewModelProvider
+import com.aicarcompanion.app.ui.adapter.describe
+import com.aicarcompanion.app.ui.adapter.formatReading
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SampleDataBanner
 import com.aicarcompanion.app.ui.components.SectionCard
@@ -45,6 +50,7 @@ import java.time.format.FormatStyle
 @Composable
 fun DashboardScreen(
     onOpenAssistant: () -> Unit,
+    onOpenAdapter: () -> Unit,
     onAddVehicle: () -> Unit,
     onEditVehicle: (String) -> Unit,
     contentPadding: PaddingValues,
@@ -67,7 +73,7 @@ fun DashboardScreen(
             Button(onClick = onAddVehicle, modifier = Modifier.padding(top = 16.dp)) { Text("Add vehicle") }
         }
 
-        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, onOpenAssistant, contentPadding)
+        is DashboardUiState.Ready -> DashboardContent(s, onEditVehicle, onOpenAssistant, onOpenAdapter, contentPadding)
     }
 }
 
@@ -76,6 +82,7 @@ private fun DashboardContent(
     state: DashboardUiState.Ready,
     onEditVehicle: (String) -> Unit,
     onOpenAssistant: () -> Unit,
+    onOpenAdapter: () -> Unit,
     contentPadding: PaddingValues,
 ) {
     LazyColumn(
@@ -89,7 +96,7 @@ private fun DashboardContent(
         item { AssistantCard(onOpenAssistant) }
         if (state.containsSampleData) item { SampleDataBanner() }
         item { VehicleCard(state.vehicle, onEdit = { onEditVehicle(state.vehicle.id) }) }
-        item { ConnectionCard(state.obdState) }
+        item { ConnectionCard(state.obdState, onOpenAdapter) }
         item { TroubleCodesCard(state.troubleCodes) }
         item { SensorCard(state.sensorReadings) }
         item { MaintenanceCard(state.maintenance) }
@@ -135,19 +142,19 @@ private fun VehicleCard(vehicle: Vehicle, onEdit: () -> Unit) {
 }
 
 @Composable
-private fun ConnectionCard(state: ObdConnectionState) {
-    val (status, detail) = when (state) {
-        ObdConnectionState.Disconnected -> "Not connected" to "Plug in an OBD-II adapter to read live data."
-        is ObdConnectionState.Connecting -> "Connecting…" to (state.adapterName ?: state.transport.label)
-        is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to
-            (state.vehicleProtocol?.let { "Vehicle responding ($it)" } ?: "Vehicle not responding. Is the ignition on?")
-        is ObdConnectionState.Reconnecting -> "Reconnecting (${state.attempt}/${state.maxAttempts})…" to state.adapterName
-        is ObdConnectionState.Unavailable -> "Not available yet" to state.reason
-        is ObdConnectionState.Failed -> "Connection failed" to state.message
-    }
+private fun ConnectionCard(state: ObdConnectionState, onOpenAdapter: () -> Unit) {
+    val (status, detail) = describe(state)
     SectionCard(title = "OBD-II adapter") {
-        Text(status, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+        Text(
+            status,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
         Text(detail, style = MaterialTheme.typography.bodyMedium)
+        TextButton(onClick = onOpenAdapter) {
+            Text(if (state is ObdConnectionState.Connected) "Live data and codes" else "Connect adapter")
+        }
     }
 }
 
@@ -180,12 +187,9 @@ private fun severityColor(severity: DtcSeverity): Color = when (severity) {
 
 @Composable
 private fun SensorCard(readings: List<SensorReading>) {
-    SectionCard(title = "Sensor snapshot", origin = readings.firstOrNull()?.origin) {
-        if (readings.isEmpty()) Text("No sensor data.")
-        readings.forEach { r ->
-            val value = if (r.value % 1.0 == 0.0) r.value.toLong().toString() else "%.1f".format(r.value)
-            LabeledValue(r.name, "$value ${r.unit}")
-        }
+    SectionCard(title = "Live sensor data", origin = readings.firstOrNull()?.origin) {
+        if (readings.isEmpty()) Text("No live data. Connect an OBD-II adapter with the ignition on to see sensor values.")
+        readings.forEach { r -> LabeledValue(r.name, formatReading(r)) }
     }
 }
 
