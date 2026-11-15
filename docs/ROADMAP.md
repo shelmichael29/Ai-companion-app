@@ -12,9 +12,25 @@
 - **M4 (Phase 4)** — Penelope UI 2.0: design system, voice orb, floating navigation, redesigned
   home/chat/garage, vehicle showcase with user photos, beginner-first diagnostic result cards.
 
+- **M4.1 (Phase 4.1)**: OBD-II connection settings by skill level. Everyday is automatic;
+  DIY adds manual selection, reconnect/reset, details and troubleshooting; Advanced adds the
+  protocol, timing, retry, polling and reconnection settings, adapter identification, a
+  connection test, a redacted traffic log, a read-only expert console and restore defaults.
+
+### Phase 4.1 remaining work (documented, not yet built)
+- **BLE adapters**: a GATT `ElmLink` (service/characteristic discovery for common FFE0/FFF0
+  clones, MTU handling) plus scanning and its permission. Not shown in settings until built.
+- **Wi-Fi adapters**: a TCP `ElmLink` (default 192.168.0.10:35000). It needs the socket bound
+  to the adapter's Wi-Fi network through `ConnectivityManager`, because Android otherwise
+  routes over mobile data when that Wi-Fi has no internet. It also needs host/port settings.
+- **USB adapters**: USB host serial (FTDI/CH340/CP210x drivers) and a device-attach permission flow.
+- **Adapter-specific extensions**: STN/OBDLink `ST` commands (faster CAN, larger buffers),
+  detected from `STI`, with each command added to the allowlist only after review.
+- **Log export to a file**: the copy-to-clipboard export is enough for now.
+
 ## Next (recommended order)
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
-   ELM327 transcripts (add a debug log export) and turn them into parser test fixtures.
+   ELM327 transcripts (Advanced → communication log → Copy log) and turn them into parser test fixtures.
 2. **OBD-II hardening** — foreground service for long sessions, read VIN via mode 09 PID 02
    and compare with the profile, freeze-frame (mode 02) with codes, adaptive polling.
 3. **Mechanic handoff report** — PDF/text via the share sheet: profile, codes with
@@ -23,7 +39,7 @@
    `VehicleContext`; key handling without bundling secrets.
 5. **Voice upgrades** — voice barge-in with echo cancellation (see ARCHITECTURE), ElevenLabs
    `SpeechOutput`, car hands-free microphone routing, steering-wheel/media-button activation.
-6. **BLE and Wi-Fi adapters** — `ElmLink` implementations.
+6. **BLE, Wi-Fi and USB adapters**: `ElmLink` implementations (see Phase 4.1 remaining work).
 7. **Knowledge packs** — vehicle-specific `DtcKnowledgeSource` (e.g. BMW/N52 notes), offline.
 8. Predictive maintenance, health trends, trip summaries, proactive spoken warnings.
 

@@ -25,9 +25,10 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 | Smart Diagnostics engine, SmartFix, Mechanic Pro integration | Contracts/interfaces only |
 | Rename assistant, opt-in demo data | Implemented |
 | Bluetooth Classic ELM327: paired-device selection, init, status, reconnect, live PIDs, read stored/pending codes | Implemented; tested against a scripted fake adapter; **needs real-adapter verification** |
+| OBD-II connection settings by level: Everyday automatic adapter choice; DIY reconnect/reset, details and troubleshooting; Advanced protocol, timeouts, retries, adaptive timing, polling, reconnection, adapter identification, connection test, redacted traffic log, read-only expert console, restore defaults | Implemented (Phase 4.1), unit-tested against a scripted adapter; **needs real-adapter verification** |
 | Read-only safety allowlist (no code clearing / actuator / write commands) | Implemented, unit-tested |
 | Per-vehicle history: service & repairs, notes (symptom / verified finding / possible cause), code reads, sensor snapshots, mileage | Implemented |
-| BLE adapters, Wi-Fi adapters, wake word, AI reasoning, ElevenLabs voice, mechanic export | Planned (interfaces in place) |
+| BLE, Wi-Fi and USB adapters (not offered in settings until implemented), wake word, AI reasoning, ElevenLabs voice, mechanic export | Planned (interfaces in place) |
 
 ## Requirements
 

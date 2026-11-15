@@ -10,6 +10,7 @@ enum class ObdTransport(val label: String) {
     BLUETOOTH_CLASSIC("Bluetooth Classic"),
     BLUETOOTH_LE("Bluetooth Low Energy"),
     WIFI("Wi-Fi"),
+    USB("USB"),
 }
 
 /** Radio capability reported by Android for a paired device. */

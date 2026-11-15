@@ -210,6 +210,58 @@ Package `diagnostics/smart`:
 - Generic OBD-II only: manufacturer modules (BMW DME-specific data, ABS, SRS, transmission
   adaptations) are **not** claimed.
 
+### Connection settings by skill level (Phase 4.1)
+
+The automotive skill level (Everyday / DIY / Advanced, `AppSettings.explanationLevel`) decides
+how much of the connection is exposed. It is independent of any future home-screen layout
+setting (the planned Easy Mode and Customizable layouts): layout must not change connection
+behavior, and the skill level must not change the home layout.
+
+| Level | Adapter screen |
+|---|---|
+| Everyday | One **Connect my adapter** button. `AdapterAutoSelector` picks the last-used adapter, else the only paired device that looks like an OBD-II adapter, and otherwise asks. It never guesses an unrelated device such as headphones. Protocol detection, timing and reconnection are automatic. MAC addresses, radio types and protocols are hidden. |
+| DIY | Full paired-device list with technical details. Also: **Reconnect**, **Reset adapter** (full `ATZ` re-initialization), and **Connection details** (transport, firmware, protocol, port voltage, requests/timeouts, average latency). Plain-language **Troubleshooting** comes from `ConnectionTroubleshooter`. |
+| Advanced | Everything above plus **Advanced connection settings** (`AdvancedConnectionScreen`). |
+
+`ObdConnectionConfig` (persisted by `ObdConfigStore` in its own `obd_settings` preferences file):
+
+| Setting | ELM327 effect | Applies |
+|---|---|---|
+| Protocol: automatic or one of 1–9 | `ATSP0`, `ATSPAn` (try n, then search automatically: the default for manual), or strict `ATSPn`. If the adapter rejects it, the app falls back to `ATSP0` and records the rejection. | Re-initializes |
+| Response timeout 1–10 s and retries 0–3 | App-side wait for the `>` prompt. A timeout is retried, but `ATZ`/`ATWS`/`ATD` are never retried. | Immediately |
+| Adaptive timing: normal, aggressive or off | `ATAT1` / `ATAT2` / `ATAT0` plus `ATSTxx`, with an adapter timeout of 50–1000 ms in 4.096 ms units | Re-initializes |
+| Live-data polling 0.25–5 s | Pause between polling rounds | Immediately |
+| Automatic reconnection and 1–5 attempts | Backoff of 2 s, 5 s, then 10 s. When off, the app reports `Failed` instead of retrying. | Immediately |
+| Compact responses (expert) | `ATS0`; the parser accepts both formats | Re-initializes |
+| Communication log | Redacted in-memory `TrafficLog` | Immediately |
+
+- **Advanced settings apply only at the Advanced level.** `ObdConnectionConfig.effectiveFor(level, stored)`
+  returns `RECOMMENDED` for Everyday and DIY, so changing the level can never leave a beginner
+  with a manual protocol or aggressive timing. The recommended config sends exactly the
+  pre-4.1 init sequence (covered by a test).
+- **Settings only appear when they're supported.** Settings are listed only for implemented
+  transports (`TransportSupport`: Bluetooth Classic today). During init, the session records what
+  the adapter rejected (`AdapterCapabilities`), and the screen flags those options rather than
+  pretending they work.
+- **Adapter identification:** firmware comes from `ATZ`. `AT@1` (description) and `ATRV`
+  (voltage) are read on demand. Firmware "v2.1" is flagged as a likely clone.
+- **Connection test** (`runDiagnostics`) checks the link, adapter response time (`ATI`), port
+  voltage, vehicle response (`0100` + protocol) and the timeout rate. Each check reports
+  pass, check, problem or skipped, with a plain-language next step.
+- **Privacy-conscious logging:** the log is off by default, kept in memory only, and cleared
+  when turned off. Responses to mode 09 info requests (VIN, calibration IDs, CVNs, ECU name)
+  are replaced with a redaction marker, as is any 17-character VIN-shaped token. Long hex
+  data is left alone. Device names and Bluetooth addresses are never logged. **Copy log**
+  exports the redacted text.
+- **Expert console:** commands are checked twice. They must pass `ReadOnlyCommandPolicy`,
+  and also a narrower console list: `ATI`, `AT@1`, `ATRV`, `ATDP(N)` and modes 01, 02, 03, 06, 07,
+  09 and 0A. Commands that change adapter state, such as echo, headers, protocol or resets,
+  are refused there because they would break the app's parsing mid-session; those settings are
+  changed through the settings, which re-initialize safely. Clearing codes (04), UDS
+  write/reset/routine/security services and custom headers stay blocked everywhere.
+- **Safety:** none of these settings changes how safety answers are routed, or turns missing
+  data into values. A reading that times out is reported as missing.
+
 ## Persistence
 
 Room schema v1 (unchanged in Phase 3) (`app/schemas/…/1.json`): `vehicles`, `service_records`, `dtc_reads` +

@@ -40,7 +40,7 @@ class ObdManagerTest {
             { queue.removeFirstOrNull() ?: throw IOException("adapter not found") },
             history,
             now = { Instant.parse("2026-11-14T12:00:00Z") },
-            reconnectDelaysMillis = listOf(1_000, 1_000),
+            reconnectDelaysOverride = listOf(1_000, 1_000),
         )
     }
 

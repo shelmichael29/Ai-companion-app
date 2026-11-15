@@ -80,3 +80,26 @@
 
 Please report: adapter name and radio type shown, protocol, which live values appear, any
 error text, and whether codes match another scan tool.
+
+## 3a. Connection settings by level (Phase 4.1)
+Change the level under **Settings → Detail level**.
+1. **Everyday:** Adapter screen → **Connect my adapter**. It should connect to the Panlong
+   without asking. MAC addresses, protocol and firmware must not be shown.
+2. **DIY:** you should see **Connection details** (firmware, protocol and, after **Check voltage**,
+   the port voltage at about 12.4 V engine off or about 14 V running) and **Troubleshooting** with
+   the ignition off. **Reset adapter** should reconnect within a few seconds. **Reconnect**
+   should appear after a failure.
+3. **Advanced:** **Advanced connection settings**:
+   - **Run connection test** with the engine running: every step should be OK or Check.
+   - Protocol → *ISO 15765-4 CAN 11-bit 500k*. The adapter reconnects and "Car is answering on"
+     stays CAN 11-bit 500k.
+   - Protocol → *SAE J1850 PWM* with fallback on: the car should still connect (fallback). With
+     fallback off, expect no vehicle response. Then **Restore recommended defaults**.
+   - Adaptive timing → Off, adapter wait 200 ms. Live data should keep updating.
+   - Polling 0.25 s versus 3 s: the update speed changes visibly.
+   - Communication log on: entries appear. Send `0902` in the console (after ticking the
+     acknowledgement). The reply is shown on screen, but the log shows "[redacted: vehicle
+     identifier]". **Copy log**, paste it somewhere private, and confirm no VIN appears.
+   - Console: `04`, `ATSH7E0` and `ATZ` must all be refused.
+4. Switch back to **Everyday** with custom settings saved. The connection must return to
+   automatic, and the Advanced screen should say the settings are saved but not active.
