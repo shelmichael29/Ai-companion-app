@@ -72,8 +72,16 @@ class SettingsViewModel(
     private val store: SettingsStore,
     private val speech: SpeechOutput,
     private val session: VoiceSession,
+    val aiStatus: kotlinx.coroutines.flow.StateFlow<com.aicarcompanion.app.ai.AiStatus>,
+    val aiModelName: String,
+    val aiAppCheckProvider: String,
 ) : ViewModel() {
     val settings = store.settings
+
+    fun setAiEnabled(enabled: Boolean) = store.update { it.copy(aiEnabled = enabled) }
+
+    /** Clears the transcript and the AI's conversation memory. */
+    fun resetConversation() = session.conversation.clear()
 
     private val _voices = MutableStateFlow<List<VoiceOption>>(emptyList())
     val voices = _voices.asStateFlow()
@@ -188,6 +196,43 @@ fun SettingsScreen(
                 settings.reduceMotion,
                 viewModel::setReduceMotion,
             )
+
+            Heading("Smarter answers (Gemini)")
+            val ai by viewModel.aiStatus.collectAsStateWithLifecycle()
+            SwitchRow(
+                "Use Gemini for conversations",
+                "${settings.assistantName} uses Google's Gemini AI for natural conversation. Safety warnings, warning-code reads " +
+                    "and live readings always come from the app itself, never from the AI.",
+                settings.aiEnabled,
+                viewModel::setAiEnabled,
+            )
+            Text("Status: ${ai.label}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Model: ${viewModel.aiModelName} · App Check: ${viewModel.aiAppCheckProvider}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            com.aicarcompanion.app.ui.design.ExpandableSection("What is sent to Google?") {
+                Text(
+                    "When this is on, these go to Google's Gemini API through Firebase so ${settings.assistantName} can answer: " +
+                        "what you say or type to her (speech is turned into text first), the recent conversation, your car's " +
+                        "year, make, model, trim and engine details, odometer, saved warning codes with their dates, recent " +
+                        "service titles and dates, problems you've described, adapter connection status and your detail level.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    "Never sent: your VIN, car nickname, photos, receipts, costs, shop names, service notes or location.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    "Google's Gemini API terms apply. On Google's free tier, Google may use conversations to improve its " +
+                        "products and people may review them, so please don't share personal or sensitive information. " +
+                        "Turn this off to keep conversations on your phone with built-in answers.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            OutlinedButton(onClick = viewModel::resetConversation, modifier = Modifier.heightIn(min = 48.dp)) {
+                Text("Reset conversation")
+            }
 
             Heading("Conversation")
             SwitchRow(

@@ -86,6 +86,16 @@ fun AssistantScreen(
         PenelopeTopBar(name, onBack = onBackHome) {
             if (turns.isNotEmpty()) TextButton(onClick = viewModel::clearTranscript) { Text("Clear") }
         }
+        val ai by viewModel.aiStatus.collectAsStateWithLifecycle()
+        com.aicarcompanion.app.ui.design.StatusBadge(
+            when (ai) {
+                is com.aicarcompanion.app.ai.AiStatus.Ready, is com.aicarcompanion.app.ai.AiStatus.Standby -> "Smarter answers on"
+                is com.aicarcompanion.app.ai.AiStatus.Unavailable -> "Smarter answers unavailable · basic answers"
+                else -> "Basic answers"
+            },
+            if (ai is com.aicarcompanion.app.ai.AiStatus.Ready || ai is com.aicarcompanion.app.ai.AiStatus.Standby) t.brandColors[2] else t.textSecondary,
+            icon = com.aicarcompanion.app.ui.design.PenelopeIcons.Sparkle,
+        )
         VoiceOrb(OrbMode.from(state), level, micAction, micActionLabel(state, name), size = 132.dp)
         Text(
             state.statusText(name),

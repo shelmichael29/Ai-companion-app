@@ -5,6 +5,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Firebase is optional at build time: with app/google-services.json present (local file or
+ * written by CI from a secret) the app can use Gemini via Firebase AI Logic; without it the
+ * app builds and runs with Penelope's built-in answers only. The file is never committed.
+ */
+val firebaseConfigured = file("google-services.json").exists()
+if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
+
 android {
     namespace = "com.aicarcompanion.app"
     compileSdk = 35
@@ -14,8 +22,9 @@ android {
         // API 26 gives us java.time and a modern Bluetooth stack for future OBD-II work.
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
+        buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
     }
 
     buildTypes {
@@ -39,6 +48,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -63,6 +73,13 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+
+    // Gemini through Firebase AI Logic (no API key in the app), protected by App Check.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.ai)
+    implementation(libs.firebase.config)
+    implementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug) // debug builds only
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

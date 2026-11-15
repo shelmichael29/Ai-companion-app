@@ -63,6 +63,14 @@ interface AppContainer {
     val speechOutput: SpeechOutput
     val vehiclePhotos: com.aicarcompanion.app.data.photos.VehiclePhotoStore
 
+    /** Gemini availability, for Settings and the chat screen. */
+    val aiStatus: kotlinx.coroutines.flow.StateFlow<com.aicarcompanion.app.ai.AiStatus>
+    val aiModelName: String
+    val aiAppCheckProvider: String
+
+    /** Sets up App Check and Remote Config when Firebase is configured. Safe otherwise. */
+    fun initializeAi()
+
     /** Called when the app leaves the foreground: the microphone must never stay on in the background. */
     fun onAppBackgrounded()
 
@@ -108,6 +116,11 @@ class DefaultAppContainer(context: Context) : AppContainer {
             vehicle = id?.let { vehicleRepository.observeVehicle(it).first() },
             latestCodeRead = id?.let { historyRepository.latestTroubleCodeRead(it).first() },
             maintenance = id?.let { maintenanceRepository.history(it).first() }.orEmpty(),
+            recentSymptoms = id?.let { vid ->
+                historyRepository.observations(vid).first()
+                    .filter { it.kind == com.aicarcompanion.app.domain.model.ObservationKind.SYMPTOM }
+                    .map { it.text }.take(3)
+            }.orEmpty(),
             obdState = obdConnection.state.value,
             demoCodes = if (settings.settings.value.demoDataEnabled) SampleData.troubleCodes() else emptyList(),
         )
@@ -129,10 +142,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     private val voiceSessionLazy = lazy {
         val assistantName = { settings.settings.value.assistantName }
-        val reasoning = RuleBasedReasoningProvider(
-            CommandParser(assistantName), vehicleContext, diagnosticCommands, GenericDtcCatalog,
-            recorder = { historyRepository.saveObservation(it) },
-        )
+        val parser = CommandParser(assistantName)
+        val recorder = com.aicarcompanion.app.assistant.conversation.ObservationRecorder { historyRepository.saveObservation(it) }
+        val ruleBased = RuleBasedReasoningProvider(parser, vehicleContext, diagnosticCommands, GenericDtcCatalog, recorder)
+        val reasoning = geminiProvider(parser, ruleBased, recorder)
         VoiceSession(
             scope = appScope,
             input = AndroidSpeechInput(appContext),
@@ -143,6 +156,33 @@ class DefaultAppContainer(context: Context) : AppContainer {
         )
     }
     override val voiceSession: VoiceSession by voiceSessionLazy
+
+    private val aiClient by lazy { com.aicarcompanion.app.ai.FirebaseAiChatClient(appContext) }
+    private var gemini: com.aicarcompanion.app.ai.GeminiReasoningProvider? = null
+    private val fallbackAiStatus = kotlinx.coroutines.flow.MutableStateFlow<com.aicarcompanion.app.ai.AiStatus>(com.aicarcompanion.app.ai.AiStatus.NotConfigured)
+
+    private fun geminiProvider(
+        parser: CommandParser,
+        ruleBased: RuleBasedReasoningProvider,
+        recorder: com.aicarcompanion.app.assistant.conversation.ObservationRecorder,
+    ) = com.aicarcompanion.app.ai.GeminiReasoningProvider(
+        parser = parser,
+        deterministic = ruleBased,
+        context = vehicleContext,
+        client = aiClient,
+        knowledge = GenericDtcCatalog,
+        aiEnabled = { settings.settings.value.aiEnabled },
+        recorder = recorder,
+    ).also { provider ->
+        gemini = provider
+        appScope.launch { settings.settings.map { it.aiEnabled }.distinctUntilChanged().collect { provider.refreshStatus() } }
+    }
+
+    override val aiStatus: kotlinx.coroutines.flow.StateFlow<com.aicarcompanion.app.ai.AiStatus>
+        get() { voiceSession; return gemini?.status ?: fallbackAiStatus }
+    override val aiModelName: String get() = aiClient.modelName
+    override val aiAppCheckProvider: String get() = com.aicarcompanion.app.ai.AppCheckInstaller.PROVIDER_NAME
+    override fun initializeAi() = aiClient.initialize()
 
     override fun onAppBackgrounded() {
         if (voiceSessionLazy.isInitialized()) voiceSession.onAppBackgrounded()
