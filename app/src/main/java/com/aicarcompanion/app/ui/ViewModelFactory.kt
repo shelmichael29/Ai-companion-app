@@ -27,11 +27,11 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            AssistantViewModel(c.voiceSession, c.settings)
+            AssistantViewModel(c.voiceSession, c.settings, c.aiStatus)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            SettingsViewModel(c.settings, c.speechOutput, c.voiceSession)
+            SettingsViewModel(c.settings, c.speechOutput, c.voiceSession, c.aiStatus, c.aiModelName, c.aiAppCheckProvider)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

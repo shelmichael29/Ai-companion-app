@@ -9,7 +9,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 > Live values are shown/spoken only when read from a connected adapter; every item carries
 > its origin (vehicle, saved history, entered by you, sample).
 
-## Features (v0.4)
+## Features (v0.5)
 
 | Area | Status |
 |---|---|
@@ -22,6 +22,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 | Symptom conversations ("why is my car shaking?") with safety-first guidance and one follow-up question | Implemented (general guidance only), unit-tested |
 | Penelope UI 2.0: brand design system (light + dark), glowing voice orb driven by real voice state and mic level, floating nav, redesigned Home/Chat/Garage, vehicle showcase with your own photo, car-health result cards | Implemented; rendered off-device for review; **needs on-device check** |
 | Suggested questions: warning lights, "can I still drive?", repair-estimate explanations | Implemented (general guidance only), unit-tested |
+| Gemini conversations via Firebase AI Logic (App Check, grounded in verified car data, safety logic stays deterministic, offline fallback, on/off switch) | Implemented, unit-tested with a fake model; **needs Firebase config + device test** (see docs/FIREBASE_SETUP.md) |
 | Smart Diagnostics engine, SmartFix, Mechanic Pro integration | Contracts/interfaces only |
 | Rename assistant, opt-in demo data | Implemented |
 | Bluetooth Classic ELM327: paired-device selection, init, status, reconnect, live PIDs, read stored/pending codes | Implemented; tested against a scripted fake adapter; **needs real-adapter verification** |
@@ -36,7 +37,8 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 - JDK 17+, Android SDK Platform 35 (Android Studio does this for you).
 - Optional: an ELM327-compatible **Bluetooth Classic** OBD-II adapter (e.g. Panlong).
 
-No accounts, API keys, paid services or credentials.
+No API keys are stored in the app. Gemini is optional and needs your own Firebase project
+(`google-services.json`, kept out of git); see [docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md).
 
 ## Build & run
 

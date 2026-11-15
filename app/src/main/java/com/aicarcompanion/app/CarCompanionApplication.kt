@@ -9,6 +9,7 @@ class CarCompanionApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = DefaultAppContainer(this)
+        container.initializeAi()
         container.autoConnectAdapter()
     }
 }

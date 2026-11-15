@@ -10,7 +10,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
 /** Thin UI wrapper around the app-scoped [VoiceSession]. */
-class AssistantViewModel(val session: VoiceSession, private val store: SettingsStore) : ViewModel() {
+class AssistantViewModel(
+    val session: VoiceSession,
+    private val store: SettingsStore,
+    val aiStatus: StateFlow<com.aicarcompanion.app.ai.AiStatus> =
+        kotlinx.coroutines.flow.MutableStateFlow(com.aicarcompanion.app.ai.AiStatus.NotConfigured),
+) : ViewModel() {
     val state = session.state
     val conversationActive = session.conversationActive
     val inputLevel = session.inputLevel

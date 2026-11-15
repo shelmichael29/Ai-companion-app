@@ -16,6 +16,7 @@ enum class ReplyBasis(val label: String) {
     GENERAL_KNOWLEDGE("General information"),
     NOT_AVAILABLE("Information not available"),
     CONVERSATION("Assistant"),
+    AI_EXPLANATION("AI explanation (Gemini) · not a reading from your car"),
 }
 
 /** Something the voice session should do after speaking a reply. */

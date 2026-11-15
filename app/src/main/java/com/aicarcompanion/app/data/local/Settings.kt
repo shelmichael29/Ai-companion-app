@@ -39,6 +39,8 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Calmer visuals: static orb, no background motion. Android's "Remove animations" also applies. */
     val reduceMotion: Boolean = false,
+    /** Use Gemini (via Firebase AI Logic) for conversation when the app is configured for it. */
+    val aiEnabled: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_ASSISTANT_NAME = "Penelope"
@@ -107,6 +109,7 @@ object SettingsCodec {
     private const val KEY_LEVEL = "explanation_level"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_REDUCE_MOTION = "reduce_motion"
+    private const val KEY_AI = "ai_enabled"
 
     fun read(store: KeyValueStore): AppSettings {
         val defaults = AppSettings()
@@ -124,6 +127,7 @@ object SettingsCodec {
                 ?: defaults.explanationLevel,
             themeMode = ThemeMode.entries.firstOrNull { it.name == store.getString(KEY_THEME) } ?: defaults.themeMode,
             reduceMotion = store.getBoolean(KEY_REDUCE_MOTION) ?: defaults.reduceMotion,
+            aiEnabled = store.getBoolean(KEY_AI) ?: defaults.aiEnabled,
         )
     }
 
@@ -141,6 +145,7 @@ object SettingsCodec {
             KEY_LEVEL to s.explanationLevel.name,
             KEY_THEME to s.themeMode.name,
             KEY_REDUCE_MOTION to s.reduceMotion,
+            KEY_AI to s.aiEnabled,
         ),
     )
 }

@@ -20,3 +20,8 @@ captures/
 *.keystore
 keystore.properties
 secrets.properties
+
+# Firebase client config: kept out of git. Local builds read app/google-services.json;
+# CI writes it from the GOOGLE_SERVICES_JSON repository secret. See docs/FIREBASE_SETUP.md.
+google-services.json
+app/google-services.json

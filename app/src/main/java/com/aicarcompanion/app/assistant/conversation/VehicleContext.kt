@@ -16,6 +16,8 @@ data class VehicleContext(
     val obdState: ObdConnectionState,
     /** Sample codes, only when the user has turned on demo data. Always labeled as sample. */
     val demoCodes: List<DiagnosticTroubleCode> = emptyList(),
+    /** Recent problems the owner described (symptom observations), newest first. */
+    val recentSymptoms: List<String> = emptyList(),
 )
 
 fun interface VehicleContextProvider {
