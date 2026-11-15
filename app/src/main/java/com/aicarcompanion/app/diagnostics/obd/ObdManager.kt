@@ -25,6 +25,26 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.Instant
 
+/** Connection controls used by the DIY and Advanced levels. */
+interface ObdAdvancedControls {
+    val adapterInfo: StateFlow<AdapterInfo?>
+    val stats: StateFlow<ConnectionStats>
+    val trafficLog: TrafficLog
+    val currentDevice: AdapterDevice?
+    fun reconnect()
+    fun resetAdapter()
+    fun applyConfig()
+    suspend fun refreshAdapterDetails(): AdapterInfo?
+    suspend fun runDiagnostics(): ConnectionDiagnosticReport
+    suspend fun sendConsoleCommand(command: String): ConsoleResult
+}
+
+sealed interface ConsoleResult {
+    data class Response(val text: String) : ConsoleResult
+    data class Blocked(val reason: String) : ConsoleResult
+    data class Failed(val reason: String) : ConsoleResult
+}
+
 /** Opens a link to an adapter. Bluetooth Classic today; BLE and Wi-Fi can provide their own. */
 fun interface ElmLinkFactory {
     /** @throws IOException if the adapter can't be reached. */
@@ -41,9 +61,22 @@ class ObdManager(
     private val linkFactory: ElmLinkFactory,
     private val history: VehicleHistoryRepository,
     private val now: () -> Instant = Instant::now,
-    private val reconnectDelaysMillis: List<Long> = listOf(2_000, 5_000, 10_000),
-    private val pollIntervalMillis: Long = 1_000,
-) : ObdConnection, DiagnosticCommandHandler {
+    /** Overrides the configured reconnect delays (tests). */
+    private val reconnectDelaysOverride: List<Long>? = null,
+    /** The configuration to use right now (already resolved for the user's level). */
+    private val config: () -> ObdConnectionConfig = { ObdConnectionConfig.RECOMMENDED },
+) : ObdConnection, DiagnosticCommandHandler, ObdAdvancedControls {
+
+    private val statsTracker = ConnectionStatsTracker()
+    override val stats: StateFlow<ConnectionStats> = statsTracker.stats
+    override val trafficLog = TrafficLog()
+    private val observers = TrafficObservers(statsTracker, trafficLog)
+
+    private val _adapterInfo = MutableStateFlow<AdapterInfo?>(null)
+    override val adapterInfo: StateFlow<AdapterInfo?> = _adapterInfo.asStateFlow()
+
+    private var appliedInitSignature: List<Any>? = null
+    private val reconnectDelaysMillis: List<Long> get() = reconnectDelaysOverride ?: config().reconnectDelaysMillis
 
     private val _state = MutableStateFlow<ObdConnectionState>(ObdConnectionState.Disconnected)
     override val state: StateFlow<ObdConnectionState> = _state.asStateFlow()
@@ -108,14 +141,23 @@ class ObdManager(
     }
 
     private suspend fun open(device: AdapterDevice) {
+        val cfg = config()
+        trafficLog.enabled = cfg.communicationLog
         val newLink = linkFactory.open(device)
         link = newLink
-        val newSession = Elm327Session(newLink)
+        val newSession = Elm327Session(newLink, observers, statsTracker::onRetry)
         session = newSession
-        val init = newSession.initialize()
+        val init = newSession.initialize(cfg)
+        appliedInitSignature = cfg.initSignature
         probe = init.vehicle
         _supported.value = init.vehicle?.supportedPids.orEmpty()
         adapterVersion = init.adapterVersion
+        _adapterInfo.value = AdapterInfo(
+            firmware = init.adapterVersion,
+            protocolName = init.vehicle?.protocolName,
+            protocolNumber = init.vehicle?.protocolNumber,
+            capabilities = newSession.capabilities,
+        )
         updateConnected()
     }
 
@@ -132,6 +174,107 @@ class ObdManager(
         session = null
         probe = null
         _supported.value = emptySet()
+        _adapterInfo.value = null
+    }
+
+    // ---- Advanced controls -------------------------------------------------------------
+
+    override val currentDevice: AdapterDevice? get() = device
+
+    override fun reconnect() {
+        val d = device ?: return
+        statsTracker.onReconnect()
+        connect(d)
+    }
+
+    /** Re-runs the full adapter reset and initialization (ATZ …) on the same adapter. */
+    override fun resetAdapter() {
+        val d = device ?: return
+        statsTracker.reset()
+        connect(d)
+    }
+
+    /**
+     * Applies changed settings. Timeouts, retries, polling and logging apply immediately;
+     * protocol, timing and response-format changes re-initialize the adapter.
+     */
+    override fun applyConfig() {
+        val cfg = config()
+        trafficLog.enabled = cfg.communicationLog
+        session?.let { it.timeoutMillis = cfg.responseTimeoutMillis.toLong(); it.retries = cfg.retries }
+        val connected = _state.value is ObdConnectionState.Connected
+        if (connected && appliedInitSignature != null && appliedInitSignature != cfg.initSignature) resetAdapter()
+    }
+
+    override suspend fun refreshAdapterDetails(): AdapterInfo? {
+        val (desc, volts) = guarded { it.identify() } ?: return _adapterInfo.value
+        val caps = session?.capabilities
+        _adapterInfo.value = _adapterInfo.value?.copy(description = desc, voltage = volts, capabilities = caps ?: AdapterCapabilities())
+        return _adapterInfo.value
+    }
+
+    override suspend fun runDiagnostics(): ConnectionDiagnosticReport {
+        val steps = mutableListOf<DiagnosticStep>()
+        val s = _state.value
+        if (s !is ObdConnectionState.Connected) {
+            steps += DiagnosticStep("Bluetooth link", DiagnosticStep.Result.FAIL, "Not connected to an adapter. Connect first, then run the test again.")
+            return ConnectionDiagnosticReport(steps)
+        }
+        steps += DiagnosticStep("Bluetooth link", DiagnosticStep.Result.PASS, "Connected over ${s.transport.label}.")
+
+        val started = System.nanoTime()
+        val ati = guarded { it.execute("ATI") }
+        val ms = (System.nanoTime() - started) / 1_000_000
+        steps += if (ati == null) {
+            DiagnosticStep("Adapter responds", DiagnosticStep.Result.FAIL, "The adapter didn't answer. Unplug it for 10 seconds, plug it back in, then reconnect.")
+        } else {
+            val firmware = Elm327ResponseParser.lines(ati).firstOrNull() ?: "unknown"
+            DiagnosticStep(
+                "Adapter responds", if (ms > 1_000) DiagnosticStep.Result.WARN else DiagnosticStep.Result.PASS,
+                "Answered in $ms ms (firmware: $firmware)." + if (ms > 1_000) " That's slow; the adapter or Bluetooth link may be struggling." else "",
+            )
+        }
+
+        val info = refreshAdapterDetails()
+        val volts = info?.voltage
+        steps += when {
+            volts == null -> DiagnosticStep("Battery voltage at port", DiagnosticStep.Result.SKIPPED, "This adapter can't measure voltage.")
+            volts < 11.8 -> DiagnosticStep("Battery voltage at port", DiagnosticStep.Result.WARN, "%.1f V is low. Readings can be unreliable; charge or test the battery.".format(volts))
+            volts > 15.0 -> DiagnosticStep("Battery voltage at port", DiagnosticStep.Result.WARN, "%.1f V is higher than normal. Have the charging system checked.".format(volts))
+            else -> DiagnosticStep("Battery voltage at port", DiagnosticStep.Result.PASS, "%.1f V.".format(volts))
+        }
+
+        val newProbe = guarded { it.probeVehicle() }
+        if (newProbe != null) {
+            probe = newProbe
+            _supported.value = newProbe.supportedPids
+            updateConnected()
+        }
+        steps += if (newProbe == null) {
+            DiagnosticStep("Vehicle responds", DiagnosticStep.Result.FAIL, "The car didn't answer. Turn the ignition on (or start the engine) and run the test again.")
+        } else {
+            DiagnosticStep("Vehicle responds", DiagnosticStep.Result.PASS, "Answered on ${newProbe.protocolName ?: "OBD-II"} with ${newProbe.supportedPids.size} supported readings.")
+        }
+
+        val st = statsTracker.stats.value
+        steps += when {
+            st.requests < 5 -> DiagnosticStep("Connection quality", DiagnosticStep.Result.SKIPPED, "Not enough traffic yet to judge.")
+            st.timeoutRate > 0.2 -> DiagnosticStep("Connection quality", DiagnosticStep.Result.WARN, "${st.timeouts} of ${st.requests} requests timed out. Try a longer response timeout or fewer live readings.")
+            else -> DiagnosticStep("Connection quality", DiagnosticStep.Result.PASS, "${st.requests} requests, ${st.timeouts} timeouts, average ${st.averageLatencyMillis ?: 0} ms.")
+        }
+        return ConnectionDiagnosticReport(steps)
+    }
+
+    override suspend fun sendConsoleCommand(command: String): ConsoleResult {
+        if (!ReadOnlyCommandPolicy.isConsoleAllowed(command)) {
+            return ConsoleResult.Blocked(
+                "\"${ReadOnlyCommandPolicy.normalize(command)}\" isn't allowed here. The console only sends identification " +
+                    "and read-only OBD-II requests (AT I, AT @1, AT RV, AT DP, modes 01, 02, 03, 06, 07, 09, 0A).",
+            )
+        }
+        if (_state.value !is ObdConnectionState.Connected) return ConsoleResult.Failed("Not connected.")
+        val raw = guarded { it.execute(command) } ?: return ConsoleResult.Failed("No answer in time.")
+        return ConsoleResult.Response(raw)
     }
 
     /** Runs [block] against the session; an I/O failure triggers reconnection. */
@@ -153,11 +296,17 @@ class ObdManager(
         closeLink()
         connectionJob?.cancel()
         // Report the drop immediately so nothing treats the dead link as connected.
-        _state.value = ObdConnectionState.Reconnecting(d.name, 1, reconnectDelaysMillis.size)
+        val delays = reconnectDelaysMillis
+        if (delays.isEmpty()) {
+            _state.value = ObdConnectionState.Failed("Lost connection to ${d.name}. Automatic reconnection is off; reconnect from the Adapter screen.")
+            return
+        }
+        _state.value = ObdConnectionState.Reconnecting(d.name, 1, delays.size)
         connectionJob = scope.launch {
-            for ((index, wait) in reconnectDelaysMillis.withIndex()) {
-                _state.value = ObdConnectionState.Reconnecting(d.name, index + 1, reconnectDelaysMillis.size)
+            for ((index, wait) in delays.withIndex()) {
+                _state.value = ObdConnectionState.Reconnecting(d.name, index + 1, delays.size)
                 delay(wait)
+                statsTracker.onReconnect()
                 try {
                     open(d)
                     return@launch
@@ -225,7 +374,7 @@ class ObdManager(
                     Elm327ResponseParser.decodePid(raw, pid)?.let { latest[pid] = reading(pid, it) }
                 }
                 send(latest.values.toList())
-                delay(pollIntervalMillis)
+                delay(config().pollIntervalMillis.toLong())
             }
         }
     }.shareIn(scope, SharingStarted.WhileSubscribed(3_000), replay = 1)

@@ -53,6 +53,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.aicarcompanion.app.CarCompanionApplication
 import com.aicarcompanion.app.ui.adapter.AdapterScreen
+import com.aicarcompanion.app.ui.adapter.AdvancedConnectionScreen
 import com.aicarcompanion.app.ui.assistant.AssistantScreen
 import com.aicarcompanion.app.ui.design.PenelopeBackground
 import com.aicarcompanion.app.ui.design.PenelopeIcons
@@ -73,6 +74,7 @@ private object Routes {
     const val HISTORY = "history"
     const val SETTINGS = "settings"
     const val ADAPTER = "adapter"
+    const val ADAPTER_ADVANCED = "adapter/advanced"
     const val RESULTS = "results"
     const val VEHICLE_EDIT = "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}={${VehicleEditViewModel.VEHICLE_ID_ARG}}"
 
@@ -150,7 +152,16 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             composable(Routes.ADAPTER) {
                 Column {
                     PenelopeTopBar("OBD-II adapter", onBack = { navController.popBackStack() })
-                    AdapterScreen(contentPadding = PaddingValues(bottom = navBottom))
+                    AdapterScreen(
+                        contentPadding = PaddingValues(bottom = navBottom),
+                        onOpenAdvanced = { navController.navigate(Routes.ADAPTER_ADVANCED) },
+                    )
+                }
+            }
+            composable(Routes.ADAPTER_ADVANCED) {
+                Column {
+                    PenelopeTopBar("Advanced connection", onBack = { navController.popBackStack() })
+                    AdvancedConnectionScreen(contentPadding = PaddingValues(bottom = navBottom))
                 }
             }
             composable(Routes.SETTINGS) {

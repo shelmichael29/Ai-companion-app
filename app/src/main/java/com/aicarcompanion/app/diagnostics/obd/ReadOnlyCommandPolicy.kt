@@ -15,7 +15,7 @@ object ReadOnlyCommandPolicy {
         // Adapter setup (affects only the adapter, never the vehicle).
         Regex("^ATZ$"), Regex("^ATWS$"), Regex("^ATD$"), Regex("^ATI$"), Regex("^AT@1$"),
         Regex("^ATE[01]$"), Regex("^ATL[01]$"), Regex("^ATS[01]$"), Regex("^ATH[01]$"),
-        Regex("^ATAT[012]$"), Regex("^ATSP[0-9A-C]$"), Regex("^ATTP[0-9A-C]$"), Regex("^ATST[0-9A-F]{2}$"),
+        Regex("^ATAT[012]$"), Regex("^ATSP[0-9A-C]$"), Regex("^ATSPA[1-9A-C]$"), Regex("^ATTP[0-9A-C]$"), Regex("^ATST[0-9A-F]{2}$"),
         Regex("^ATDPN?$"), Regex("^ATRV$"), Regex("^ATCAF1$"),
         // OBD-II read-only services.
         Regex("^01[0-9A-F]{2}[1-9]?$"), // current data
@@ -26,6 +26,23 @@ object ReadOnlyCommandPolicy {
         Regex("^09[0-9A-F]{2}$"), // vehicle information (VIN, calibration IDs)
         Regex("^0A$"), // permanent DTCs
     )
+
+    /**
+     * The narrower set offered in the Advanced "send a command" console: identification and
+     * read-only vehicle queries only. Adapter-state changes (echo, headers, linefeeds, protocol,
+     * timing, resets) are excluded because they would break the app's own parsing mid-session;
+     * those are changed through the settings, which re-initialize the adapter safely.
+     */
+    private val CONSOLE = listOf(
+        Regex("^ATI$"), Regex("^AT@1$"), Regex("^ATRV$"), Regex("^ATDPN?$"),
+        Regex("^01[0-9A-F]{2}$"), Regex("^02[0-9A-F]{4}$"), Regex("^03$"), Regex("^06[0-9A-F]{2}$"),
+        Regex("^07$"), Regex("^09[0-9A-F]{2}$"), Regex("^0A$"),
+    )
+
+    fun isConsoleAllowed(command: String): Boolean {
+        val c = normalize(command)
+        return isAllowed(c) && CONSOLE.any { it.matches(c) }
+    }
 
     fun normalize(command: String): String = command.uppercase().filterNot { it.isWhitespace() }
 

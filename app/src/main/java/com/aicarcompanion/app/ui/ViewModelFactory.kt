@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.aicarcompanion.app.CarCompanionApplication
 import com.aicarcompanion.app.ui.adapter.AdapterViewModel
+import com.aicarcompanion.app.ui.adapter.AdvancedConnectionViewModel
 import com.aicarcompanion.app.ui.assistant.AssistantViewModel
 import com.aicarcompanion.app.ui.home.HomeViewModel
 import com.aicarcompanion.app.ui.history.HistoryViewModel
@@ -38,7 +39,11 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            AdapterViewModel(c.bluetooth, c.obdConnection, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository)
+            AdapterViewModel(c.bluetooth, c.obdConnection, c.obdControls, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            AdvancedConnectionViewModel(c.obdConfig, c.obdControls, c.obdConnection, c.settings)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

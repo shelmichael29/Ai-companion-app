@@ -34,33 +34,108 @@ data class VehicleProbe(
 /**
  * Serializes commands to one adapter, enforces [ReadOnlyCommandPolicy], and performs the
  * standard ELM327 initialization sequence. Tolerates clones that reject optional commands.
+ * Timeouts and retries come from [ObdConnectionConfig]; every exchange is reported to [observer]
+ * (connection statistics and the optional redacted traffic log).
  */
-class Elm327Session(private val link: ElmLink) {
+class Elm327Session(
+    private val link: ElmLink,
+    private val observer: ElmTrafficObserver? = null,
+    private val onRetry: () -> Unit = {},
+) {
     private val mutex = Mutex()
 
-    suspend fun execute(command: String, timeoutMillis: Long = DEFAULT_TIMEOUT): String = mutex.withLock {
+    /** Default wait for an answer, from the connection settings. */
+    @Volatile var timeoutMillis: Long = DEFAULT_TIMEOUT
+
+    /** Extra attempts after a timeout, from the connection settings. */
+    @Volatile var retries: Int = 0
+
+    var capabilities = AdapterCapabilities()
+        private set
+
+    suspend fun execute(command: String, timeoutMillis: Long = this.timeoutMillis): String = mutex.withLock {
         ReadOnlyCommandPolicy.requireAllowed(command)
         val normalized = ReadOnlyCommandPolicy.normalize(command)
-        link.write("$normalized\r")
-        val raw = link.readUntilPrompt(timeoutMillis)
-        clean(raw, normalized)
+        // Resets are never repeated automatically; everything else may retry after a timeout.
+        val attempts = if (normalized == "ATZ" || normalized == "ATWS" || normalized == "ATD") 1 else 1 + retries.coerceAtLeast(0)
+        var lastTimeout: ObdTimeoutException? = null
+        repeat(attempts) { attempt ->
+            if (attempt > 0) onRetry()
+            val started = System.nanoTime()
+            try {
+                link.write("$normalized\r")
+                val raw = link.readUntilPrompt(timeoutMillis)
+                val cleaned = clean(raw, normalized)
+                observer?.onExchange(normalized, cleaned, elapsed(started), outcomeOf(cleaned))
+                return@withLock cleaned
+            } catch (e: ObdTimeoutException) {
+                observer?.onExchange(normalized, null, elapsed(started), ExchangeOutcome.TIMEOUT)
+                lastTimeout = e
+            } catch (e: IOException) {
+                observer?.onExchange(normalized, null, elapsed(started), ExchangeOutcome.LINK_LOST)
+                throw e
+            }
+        }
+        throw lastTimeout ?: ObdTimeoutException("No response")
     }
 
-    suspend fun initialize(): ElmInitResult {
+    /** Initializes with the recommended, fully automatic configuration. */
+    suspend fun initialize(): ElmInitResult = initialize(ObdConnectionConfig.RECOMMENDED)
+
+    /**
+     * Resets and configures the adapter. With the recommended config this sends exactly:
+     * ATZ, ATE0, ATL0, ATS1, ATH0, ATAT1, ATSP0. Options the adapter rejects fall back to the
+     * automatic behavior and are recorded in [capabilities] so the UI only offers what works.
+     */
+    suspend fun initialize(config: ObdConnectionConfig): ElmInitResult {
+        timeoutMillis = config.responseTimeoutMillis.toLong()
+        retries = config.retries
         val reset = execute("ATZ", RESET_TIMEOUT)
         val version = Elm327ResponseParser.lines(reset).firstOrNull { it.startsWith("ELM") || it.contains("V1.") }
         execute("ATE0")                      // echo off (required)
         optional("ATL0")                     // no linefeeds
-        optional("ATS1")                     // keep spaces; parser handles both
-        optional("ATH0")                     // headers off
-        optional("ATAT1")                    // adaptive timing
-        optional("ATSP0")                    // automatic protocol search
+        var caps = AdapterCapabilities()
+        if (config.compactResponses) {
+            val ok = optional("ATS0")        // no spaces; parser handles both
+            caps = caps.copy(compactResponses = ok)
+            if (ok != true) optional("ATS1")
+        } else {
+            optional("ATS1")                 // keep spaces; parser handles both
+        }
+        optional("ATH0")                     // headers off (required by the parser)
+        when (config.adaptiveTiming) {
+            AdaptiveTiming.NORMAL -> caps = caps.copy(adaptiveTiming = optional("ATAT1"))
+            AdaptiveTiming.AGGRESSIVE -> {
+                val ok = optional("ATAT2")
+                caps = caps.copy(aggressiveTiming = ok)
+                if (ok != true) caps = caps.copy(adaptiveTiming = optional("ATAT1"))
+            }
+            AdaptiveTiming.OFF -> {
+                caps = caps.copy(adaptiveTiming = optional("ATAT0"))
+                caps = caps.copy(fixedTimeout = optional(config.adapterTimeoutCommand))
+            }
+        }
+        val protocolOk = optional(config.protocolCommand)
+        if (config.protocol != ObdProtocol.AUTO) {
+            caps = caps.copy(manualProtocol = protocolOk)
+            if (protocolOk != true) optional("ATSP0") // never leave the adapter without a working protocol
+        }
+        capabilities = caps
         return ElmInitResult(version?.let(::tidyVersion), probeVehicle())
+    }
+
+    /** Reads the adapter's description and port voltage. Both are optional on clones. */
+    suspend fun identify(): Pair<String?, Double?> {
+        val desc = runCatching { execute("AT@1") }.getOrNull()
+            ?.let { Elm327ResponseParser.lines(it).firstOrNull() }?.takeIf { it != "?" }
+        val volts = runCatching { execute("ATRV") }.getOrNull()?.let(Elm327ResponseParser::decodeAdapterVoltage)
+        capabilities = capabilities.copy(description = desc != null, voltage = volts != null)
+        return desc to volts
     }
 
     /** Asks the vehicle which PIDs it supports. Null when the vehicle doesn't respond (e.g. ignition off). */
     suspend fun probeVehicle(): VehicleProbe? {
-        val first = execute("0100", SEARCH_TIMEOUT)
+        val first = execute("0100", maxOf(SEARCH_TIMEOUT, timeoutMillis))
         val supported = Elm327ResponseParser.decodeSupportedPids(first, 0x00).toMutableSet()
         if (supported.isEmpty()) return null
         var base = 0x20
@@ -73,8 +148,11 @@ class Elm327Session(private val link: ElmLink) {
         return VehicleProbe(number, number?.let(PROTOCOL_NAMES::get), supported)
     }
 
-    private suspend fun optional(command: String) {
-        runCatching { execute(command) }.onFailure { if (it is IOException && it !is ObdTimeoutException) throw it }
+    /** true = accepted, false = adapter answered "?", null = no answer in time. */
+    private suspend fun optional(command: String): Boolean? = try {
+        !isUnsupported(execute(command))
+    } catch (e: ObdTimeoutException) {
+        null
     }
 
     private fun tidyVersion(v: String) =
@@ -92,6 +170,20 @@ class Elm327Session(private val link: ElmLink) {
             "8" to "ISO 15765-4 CAN (11-bit, 250 kbaud)", "9" to "ISO 15765-4 CAN (29-bit, 250 kbaud)",
             "A" to "SAE J1939 CAN", "B" to "User CAN 1", "C" to "User CAN 2",
         )
+
+        private fun elapsed(startedNanos: Long) = (System.nanoTime() - startedNanos) / 1_000_000
+
+        fun isUnsupported(cleaned: String) = Elm327ResponseParser.lines(cleaned).any { it == "?" }
+
+        fun outcomeOf(cleaned: String): ExchangeOutcome {
+            val lines = Elm327ResponseParser.lines(cleaned)
+            return when {
+                lines.any { it == "?" } -> ExchangeOutcome.UNSUPPORTED
+                lines.any { it.contains("NO DATA") } -> ExchangeOutcome.NO_DATA
+                lines.any { l -> listOf("UNABLE TO CONNECT", "ERROR", "STOPPED", "BUFFER FULL").any { l.contains(it) } } -> ExchangeOutcome.ERROR
+                else -> ExchangeOutcome.OK
+            }
+        }
 
         /** Removes the prompt and any echoed command line. */
         fun clean(raw: String, command: String): String = raw
