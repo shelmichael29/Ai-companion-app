@@ -32,6 +32,11 @@ import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothGateway
 import com.aicarcompanion.app.diagnostics.obd.ObdConnection
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.diagnostics.obd.ObdManager
+import com.aicarcompanion.app.diagnostics.obd.ObdConfigStore
+import com.aicarcompanion.app.diagnostics.obd.ObdAdvancedControls
+import com.aicarcompanion.app.diagnostics.obd.ObdConnectionConfig
+import com.aicarcompanion.app.data.local.SharedPreferencesKeyValueStore
+import kotlinx.coroutines.flow.combine
 import com.aicarcompanion.app.domain.repository.DiagnosticsRepository
 import com.aicarcompanion.app.domain.repository.MaintenanceRepository
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
@@ -59,6 +64,9 @@ interface AppContainer {
     val obdConnection: ObdConnection
     val diagnosticCommands: DiagnosticCommandHandler
     val bluetooth: BluetoothGateway
+    /** Saved OBD-II connection settings (applied only at the Advanced level). */
+    val obdConfig: ObdConfigStore
+    val obdControls: ObdAdvancedControls
     val voiceSession: VoiceSession
     val speechOutput: SpeechOutput
     val vehiclePhotos: com.aicarcompanion.app.data.photos.VehiclePhotoStore
@@ -87,7 +95,19 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
     override val vinDecoder: VinDecoder = NhtsaVinDecoder(http)
     override val bluetooth = BluetoothGateway(appContext)
-    private val obdManager by lazy { ObdManager(appScope, bluetooth, historyRepository) }
+    override val obdConfig = ObdConfigStore(
+        SharedPreferencesKeyValueStore(
+            appContext.getSharedPreferences("obd_settings", Context.MODE_PRIVATE),
+        ),
+    )
+    private val obdManager by lazy {
+        ObdManager(appScope, bluetooth, historyRepository, config = {
+            ObdConnectionConfig.effectiveFor(
+                settings.settings.value.explanationLevel, obdConfig.config.value,
+            )
+        })
+    }
+    override val obdControls: ObdAdvancedControls get() = obdManager
     override val obdConnection: ObdConnection get() = obdManager
     override val diagnosticCommands: DiagnosticCommandHandler get() = obdManager
 
@@ -152,6 +172,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
         // Live polling covers only the readings the user's detail level shows.
         appScope.launch {
             settings.settings.map { it.explanationLevel }.distinctUntilChanged().collect { obdConnection.setLiveDetail(it) }
+        }
+        // Re-apply connection settings when they, or the level that decides whether they apply, change.
+        appScope.launch {
+            combine(settings.settings.map { it.explanationLevel }, obdConfig.config) { level, cfg ->
+                ObdConnectionConfig.effectiveFor(level, cfg)
+            }.distinctUntilChanged().collect { obdManager.applyConfig() }
         }
     }
 }

@@ -11,6 +11,8 @@ import com.aicarcompanion.app.data.local.SettingsStore
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothGateway
 import com.aicarcompanion.app.diagnostics.obd.AdapterDevice
+import com.aicarcompanion.app.diagnostics.obd.AdapterAutoSelector
+import com.aicarcompanion.app.diagnostics.obd.ObdAdvancedControls
 import com.aicarcompanion.app.diagnostics.obd.ObdConnection
 import com.aicarcompanion.app.domain.model.RecordedSensorReading
 import com.aicarcompanion.app.domain.model.SensorReading
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 class AdapterViewModel(
     private val gateway: BluetoothGateway,
     val obd: ObdConnection,
+    val controls: ObdAdvancedControls,
     private val commands: DiagnosticCommandHandler,
     private val settings: SettingsStore,
     private val vehicles: VehicleRepository,
@@ -50,6 +53,28 @@ class AdapterViewModel(
         message = null
         settings.update { it.copy(lastAdapterAddress = device.address) }
         obd.connect(device)
+    }
+
+    /** Everyday level: pick the adapter automatically when the choice is unambiguous. */
+    fun connectAutomatically() {
+        refresh()
+        when (val choice = AdapterAutoSelector.choose(devices, lastAdapterAddress)) {
+            is AdapterAutoSelector.Choice.Selected -> connect(choice.device)
+            is AdapterAutoSelector.Choice.NeedsUser -> message = "I found more than one possible adapter. Tap the one plugged into your car."
+            AdapterAutoSelector.Choice.NoneFound -> message =
+                "I couldn't find a paired adapter. Plug it in, turn the ignition on, and pair it in Bluetooth settings first."
+        }
+    }
+
+    fun reconnect() { message = null; controls.reconnect() }
+    fun resetAdapter() { message = "Resetting the adapter…"; controls.resetAdapter() }
+
+    fun refreshDetails() {
+        viewModelScope.launch {
+            busy = true
+            controls.refreshAdapterDetails()
+            busy = false
+        }
     }
 
     fun disconnect() = obd.disconnect()

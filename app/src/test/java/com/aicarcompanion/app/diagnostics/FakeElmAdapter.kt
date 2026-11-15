@@ -14,6 +14,8 @@ class FakeElmAdapter(
     val written = mutableListOf<String>()
     var failAfterWrites: Int? = null
     var closed = false
+    /** Command -> how many times it should time out before answering. */
+    val timeouts = mutableMapOf<String, Int>()
 
     val responses = mutableMapOf(
         "ATZ" to "\r\rELM327 v1.5",
@@ -50,6 +52,13 @@ class FakeElmAdapter(
     }
 
     override suspend fun readUntilPrompt(timeoutMillis: Long): String {
+        val last = written.lastOrNull()
+        val left = last?.let { timeouts[it] } ?: 0
+        if (left > 0) {
+            timeouts[last!!] = left - 1
+            pending = null
+            throw com.aicarcompanion.app.diagnostics.obd.ObdTimeoutException("timeout")
+        }
         val r = pending ?: throw IOException("nothing pending")
         pending = null
         return "$r\r\r>"

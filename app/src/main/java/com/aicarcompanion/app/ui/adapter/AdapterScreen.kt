@@ -43,6 +43,7 @@ import com.aicarcompanion.app.assistant.conversation.SpokenFormat
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.obd.AdapterDevice
 import com.aicarcompanion.app.diagnostics.obd.AdapterRadio
+import com.aicarcompanion.app.diagnostics.obd.ConnectionTroubleshooter
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.domain.model.SensorReading
@@ -54,9 +55,12 @@ import com.aicarcompanion.app.ui.components.SectionCard
 @Composable
 fun AdapterScreen(
     contentPadding: PaddingValues,
+    onOpenAdvanced: () -> Unit = {},
     viewModel: AdapterViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     val state by viewModel.obd.state.collectAsStateWithLifecycle()
+    val stats by viewModel.controls.stats.collectAsStateWithLifecycle()
+    val info by viewModel.controls.adapterInfo.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
@@ -71,7 +75,22 @@ fun AdapterScreen(
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        val level = viewModel.level
         item { StatusCard(state, viewModel) }
+        if (level != ExplanationLevel.EVERYDAY) {
+            item { ConnectionDetailsCard(state, viewModel) }
+            val tips = ConnectionTroubleshooter.tips(state, stats, info)
+            if (tips.isNotEmpty()) item {
+                SectionCard("Troubleshooting") { tips.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) } }
+            }
+        }
+        if (level == ExplanationLevel.ADVANCED) {
+            item {
+                OutlinedButton(onClick = onOpenAdvanced, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text("Advanced connection settings")
+                }
+            }
+        }
 
         val connected = state as? ObdConnectionState.Connected
         if (connected?.vehicleProtocol != null) {
@@ -110,7 +129,7 @@ fun AdapterScreen(
             BluetoothAvailability.READY -> {
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Paired devices", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        Text(if (level == ExplanationLevel.EVERYDAY) "Or choose your adapter" else "Paired devices", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                         TextButton(onClick = viewModel::refresh) { Text("Refresh") }
                     }
                 }
@@ -120,7 +139,9 @@ fun AdapterScreen(
                     }
                 }
                 items(viewModel.devices, key = { it.address }) { device ->
-                    DeviceRow(device, state, viewModel.isLikelySameAdapter(device)) { viewModel.connect(device) }
+                    DeviceRow(device, state, viewModel.isLikelySameAdapter(device), showTechnical = level != ExplanationLevel.EVERYDAY) {
+                        viewModel.connect(device)
+                    }
                 }
                 item {
                     OutlinedButton(
@@ -150,11 +171,17 @@ private fun StatusCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
             )
         }
         Text(detail, style = MaterialTheme.typography.bodyMedium)
-        if (state is ObdConnectionState.Connected) {
-            if (viewModel.level == ExplanationLevel.ADVANCED) {
-                state.adapterVersion?.let { LabeledValue("Adapter", it) }
-                state.vehicleProtocol?.let { LabeledValue("Protocol", it) }
+        val idle = state is ObdConnectionState.Disconnected || state is ObdConnectionState.Failed
+        if (idle && viewModel.bluetoothReady()) {
+            if (viewModel.level == ExplanationLevel.EVERYDAY) {
+                Button(onClick = viewModel::connectAutomatically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Text("Connect my adapter")
+                }
+            } else if (viewModel.controls.currentDevice != null) {
+                Button(onClick = viewModel::reconnect, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reconnect") }
             }
+        }
+        if (state is ObdConnectionState.Connected) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (state.vehicleProtocol == null) {
                     Button(onClick = viewModel::retryVehicle, modifier = Modifier.heightIn(min = 48.dp)) { Text("Check vehicle again") }
@@ -211,18 +238,18 @@ fun formatReading(r: SensorReading): String {
 }
 
 @Composable
-private fun DeviceRow(device: AdapterDevice, state: ObdConnectionState, lastUsed: Boolean, onConnect: () -> Unit) {
+private fun DeviceRow(device: AdapterDevice, state: ObdConnectionState, lastUsed: Boolean, showTechnical: Boolean, onConnect: () -> Unit) {
     val busy = state is ObdConnectionState.Connecting || state is ObdConnectionState.Reconnecting
     val isCurrent = (state as? ObdConnectionState.Connected)?.adapterName == device.name
     Column {
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(device.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                Text("${device.radio.label} · ${device.address}", style = MaterialTheme.typography.bodySmall)
+                if (showTechnical) Text("${device.radio.label} · ${device.address}", style = MaterialTheme.typography.bodySmall)
                 val tags = listOfNotNull(
                     "Looks like an OBD-II adapter".takeIf { device.looksLikeObdAdapter },
                     "Last used".takeIf { lastUsed },
-                    "BLE adapters not supported yet".takeIf { device.radio == AdapterRadio.LE_ONLY },
+                    "Bluetooth LE adapters not supported yet".takeIf { device.radio == AdapterRadio.LE_ONLY },
                 )
                 if (tags.isNotEmpty()) Text(tags.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
@@ -233,5 +260,35 @@ private fun DeviceRow(device: AdapterDevice, state: ObdConnectionState, lastUsed
             ) { Text(if (isCurrent) "Connected" else "Connect") }
         }
         HorizontalDivider()
+    }
+}
+
+/** DIY and Advanced: what the adapter is, how the link is doing, and manual controls. */
+@Composable
+private fun ConnectionDetailsCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
+    val info by viewModel.controls.adapterInfo.collectAsStateWithLifecycle()
+    val stats by viewModel.controls.stats.collectAsStateWithLifecycle()
+    SectionCard("Connection details") {
+        val connected = state as? ObdConnectionState.Connected
+        LabeledValue("Connection", connected?.transport?.label ?: "None")
+        LabeledValue("Adapter firmware", info?.firmware ?: "—")
+        LabeledValue("Vehicle protocol", info?.protocolName ?: if (connected != null) "Car not answering" else "—")
+        info?.voltage?.let { LabeledValue("Voltage at port", "%.1f V".format(it)) }
+        if (stats.requests > 0) {
+            LabeledValue("Requests / timeouts", "${stats.requests} / ${stats.timeouts}")
+            stats.averageLatencyMillis?.let { LabeledValue("Average answer time", "$it ms") }
+        }
+        if (connected != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = viewModel::refreshDetails, enabled = !viewModel.busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("Check voltage")
+                }
+                OutlinedButton(onClick = viewModel::resetAdapter, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reset adapter") }
+            }
+            Text(
+                "Reset restarts the adapter and checks the car again. It only affects the adapter, never your car's computers.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
