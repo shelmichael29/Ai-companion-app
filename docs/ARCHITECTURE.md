@@ -88,6 +88,33 @@ storage. Otherwise an illustrated placeholder is drawn.
 headline, what's happening, urgency (icon + words + color), next steps, and expandable technical
 details. Sample data is badged.
 
+## Gemini conversations (Phase 5A)
+
+```
+VoiceSession ─▶ ConversationManager ─▶ GeminiReasoningProvider (ReasoningProvider)
+                                         ├─ AiRouting: DETERMINISTIC ─▶ RuleBasedReasoningProvider (unchanged)
+                                         │    end/pause/repeat · urgent safety symptoms · "can I still drive"
+                                         │    live readings & sensor lists (direct requests) · code reads
+                                         │    code definitions · adapter status · help
+                                         └─ AI ─▶ AiChatClient (FirebaseAiChatClient → Firebase AI Logic → Gemini)
+                                              system instruction = PromptBuilder (persona, rules, level,
+                                              verified VEHICLE FACTS) + last 12 turns of history
+                                              ─▶ ReplyGuard (clean for speech; reject invented codes or
+                                                 unverified readings → deterministic answer instead)
+```
+
+- AI replies carry `ReplyBasis.AI_EXPLANATION`; vehicle data and safety warnings never come from
+  the model. History includes deterministic turns, so follow-ups ("what should I do about it?")
+  have context. `ConversationManager.clear()` resets it.
+- Failures (offline, timeout, App Check, quota, disabled service, model unavailable) never throw:
+  the deterministic answer is returned with a one-time notice, and `AiStatus` shows the reason.
+- Model: Remote Config `penelope_model`, validated by `ModelSelection` (stable Flash only).
+- Security: no Gemini key in the app; App Check (Play Integrity in release, debug provider only
+  in `src/debug`); limited-use tokens; `google-services.json` git-ignored, CI uses a secret.
+  Setup: `docs/FIREBASE_SETUP.md`.
+- Future: function calling for live data, response streaming to TTS for lower latency, and an
+  ElevenLabs `SpeechOutput`; none require changes to this routing.
+
 ## Penelope (voice) — hands-free conversation
 
 ```

@@ -19,6 +19,21 @@
 - Airplane mode: lists you opened before still appear ("Saved list"); new ones show an
   error with Retry; **Manual** always works.
 
+## 1a. Gemini conversations (Phase 5A)
+1. Put `google-services.json` in `app/`, build and install the **debug** variant from Android Studio.
+2. Register the App Check debug token (docs/FIREBASE_SETUP.md §3).
+3. Settings → Smarter answers: switch on; status should become "Working" after a question.
+4. Talk (hands-free) and check:
+   - "Is premium fuel really necessary for my car?" → natural answer labeled "AI explanation".
+   - Follow-up: "What happens if I use regular?" → answer uses the previous turn.
+   - "My car shakes a little at stop lights" → helpful reply, maybe one follow-up question.
+   - "Explain that more simply."
+   - Safety stays deterministic: "I smell burning" → "Safety first…" (not labeled AI).
+   - Data stays deterministic: "What's my coolant temperature?" without the adapter → says it
+     isn't connected; never a made-up number.
+5. Airplane mode → Penelope answers with built-in logic and says she can't reach smarter answers.
+6. Turn the switch off → built-in answers only. Settings → Reset conversation clears memory.
+
 ## 1b. Penelope UI 2.0 (Phase 4)
 1. Home: greeting, glowing orb, "Talk to Penelope". Tap the orb or button → orb shows ripples
    that react to your voice → thinking arc → speaking waveform. Pause/End buttons appear.
