@@ -71,10 +71,11 @@ jobs:
         id: build
         run: ./gradlew assembleDebug
 
+      # testDebugUnitTest covers the Android modules; :enet-core:test the pure-Kotlin ENET library.
       - name: Run unit tests
         id: tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./gradlew testDebugUnitTest
+        run: ./gradlew testDebugUnitTest :enet-core:test
 
       # Runs even if tests failed, so both results are reported in one run. Lint errors fail the job.
       - name: Run Android lint
@@ -99,7 +100,7 @@ jobs:
               print(f"| {name} | {icon.get(outcome, '')} {outcome} |")
           total = failed = skipped = 0
           failures = []
-          for path in glob.glob("app/build/test-results/testDebugUnitTest/*.xml"):
+          for path in glob.glob("*/build/test-results/**/*.xml", recursive=True):
               suite = ET.parse(path).getroot()
               total += int(suite.get("tests", 0)); skipped += int(suite.get("skipped", 0))
               for case in suite.iter("testcase"):
@@ -110,11 +111,10 @@ jobs:
               print(f"\n**Unit tests:** {total - failed - skipped} passed, {failed} failed, {skipped} skipped (of {total}).")
           for f in failures[:30]:
               print(f"- ❌ {f}")
-          lint = "app/build/reports/lint-results-debug.xml"
-          if os.path.exists(lint):
+          for lint in sorted(glob.glob("*/build/reports/lint-results-debug.xml")):
               issues = list(ET.parse(lint).getroot().iter("issue"))
               errors = sum(1 for i in issues if i.get("severity") in ("Error", "Fatal"))
-              print(f"\n**Lint:** {errors} errors, {len(issues) - errors} warnings.")
+              print(f"\n**Lint ({lint.split('/')[0]}):** {errors} errors, {len(issues) - errors} warnings.")
           PY
 
       - name: Name the APK artifact
@@ -126,6 +126,7 @@ jobs:
         run: |
           version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
           echo "name=ai-car-companion-${version}-debug-${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "sha=${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Upload debug APK
         if: success()
@@ -136,15 +137,24 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload ENET tester APK (experimental)
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: enet-tester-debug-${{ steps.apk.outputs.sha }}
+          path: enet-tester/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload test and lint reports
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v6
         with:
           name: reports-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            app/build/reports/tests/
-            app/build/reports/lint-results-debug.*
-            app/build/test-results/
+            */build/reports/tests/
+            */build/reports/lint-results-debug.*
+            */build/test-results/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -153,7 +163,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: build-reports-${{ github.event.pull_request.head.sha || github.sha }}
-          path: app/build/reports
+          path: |
+            */build/reports
           if-no-files-found: ignore
 
       - name: Remove Firebase config

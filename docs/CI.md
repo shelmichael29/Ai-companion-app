@@ -13,7 +13,7 @@ If you push again before a run finishes, the older run is cancelled.
 | Step | Command | Fails the run when |
 |---|---|---|
 | Debug build | `./gradlew assembleDebug` | The code doesn't compile |
-| Unit tests | `./gradlew testDebugUnitTest` | Any test fails |
+| Unit tests | `./gradlew testDebugUnitTest :enet-core:test` | Any test fails |
 | Android lint | `./gradlew lintDebug` | Lint finds an error (warnings are reported but allowed) |
 
 Lint runs even when tests fail, so one run shows both results.
@@ -62,7 +62,9 @@ Also note:
 - **Every Gemini failure type** falls back to the built-in answer, with a one-time notice and the correct status. Penelope recovers when Gemini comes back.
 - **AI replies that invent trouble codes or live readings** are replaced with the verified answer.
 
+The experimental ENET tester (`:enet-tester`, `:enet-core`) is built, tested and linted in the same run. Its APK is saved as `enet-tester-debug-<commit>` (see `docs/ENET_TESTER.md`).
+
 ## Running the same checks locally
 ```
-./gradlew assembleDebug testDebugUnitTest lintDebug
+./gradlew assembleDebug testDebugUnitTest :enet-core:test lintDebug
 ```
