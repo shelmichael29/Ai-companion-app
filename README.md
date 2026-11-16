@@ -10,6 +10,11 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 > its origin (vehicle, saved history, entered by you, sample).
 
 ## Features (v0.6)
+- **v0.7 Everyday Driver dashboard:**
+  - a large glass voice orb with live conversation words;
+  - an honest, plain-language car health status;
+  - four quick actions.
+  - **New "Midnight" navy-and-cyan style:** the default, with Amethyst purple still available in Settings.
 
 | Area | Status |
 |---|---|

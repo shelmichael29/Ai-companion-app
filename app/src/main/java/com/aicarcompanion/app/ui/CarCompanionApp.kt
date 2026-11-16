@@ -112,7 +112,8 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
     val enter: EnterTransition = if (t.reducedMotion) EnterTransition.None else fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 24 }
     val exit: ExitTransition = if (t.reducedMotion) ExitTransition.None else fadeOut(tween(180))
 
-    PenelopeBackground(waves = currentRoute == Routes.HOME) {
+    // The Everyday dashboard uses only the soft atmospheric light, as in its design references.
+    PenelopeBackground(waves = currentRoute == Routes.HOME && settings.explanationLevel != com.aicarcompanion.app.data.local.ExplanationLevel.EVERYDAY) {
         NavHost(
             navController,
             startDestination = Routes.HOME,

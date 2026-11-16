@@ -134,6 +134,7 @@ fun HomeScreen(
         onOpenHistory = onOpenHistory,
         onOpenExtras = onOpenExtras,
         onOpenConnectionSettings = onOpenConnectionSettings,
+        onOpenChat = onOpenChat,
         items = DashboardPlanner.itemsFor(settings.explanationLevel, settings.dashboard),
         kind = DashboardKind.forLevel(settings.explanationLevel),
         aiStatus = aiStatus,
@@ -173,7 +174,28 @@ fun HomeContent(
     /** Shortcuts to show, from [DashboardPlanner]. Defaults to the Everyday arrangement. */
     items: List<DashboardItem> = DashboardPlanner.defaults(com.aicarcompanion.app.data.local.ExplanationLevel.EVERYDAY),
     kind: DashboardKind = DashboardKind.COMPANION,
+    onOpenChat: () -> Unit = {},
 ) {
+    if (kind == DashboardKind.COMPANION) {
+        EverydayDriverDashboard(
+            contentPadding = contentPadding,
+            voice = voice,
+            conversationActive = conversationActive,
+            micLevel = micLevel,
+            assistantName = assistantName,
+            greeting = greeting,
+            ui = ui,
+            aiStatus = aiStatus,
+            items = items,
+            actions = EverydayActions(
+                onMic = onMic, onPause = onPause, onEnd = onEnd, onAsk = onSuggestion, onOpenChat = onOpenChat,
+                onOpenResults = onOpenResults, onOpenAdapter = onOpenAdapter, onOpenHistory = onOpenHistory,
+                onOpenGarage = onOpenGarage, onOpenSettings = onOpenSettings, onOpenExtras = onOpenExtras,
+                onAddVehicle = onAddVehicle, onOpenAppSettings = onOpenAppSettings,
+            ),
+        )
+        return
+    }
     val t = Penelope.tokens
     val name = assistantName
     var showAllSuggestions by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }

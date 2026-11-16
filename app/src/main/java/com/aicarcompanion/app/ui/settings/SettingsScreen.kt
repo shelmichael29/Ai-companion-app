@@ -106,6 +106,7 @@ class SettingsViewModel(
     fun setDashboard(dashboard: com.aicarcompanion.app.dashboard.DashboardSettings) = store.update { it.copy(dashboard = dashboard) }
     fun setVoice(id: String?) = store.update { it.copy(ttsVoice = id) }
     fun setTheme(mode: ThemeMode) = store.update { it.copy(themeMode = mode) }
+    fun setColorStyle(style: com.aicarcompanion.app.data.local.ColorStyle) = store.update { it.copy(colorStyle = style) }
     fun setReduceMotion(enabled: Boolean) = store.update { it.copy(reduceMotion = enabled) }
 
     fun setEngine(id: String?) {
@@ -194,6 +195,21 @@ fun SettingsScreen(
                     )
                 }
             }
+            Text("Colors", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                com.aicarcompanion.app.data.local.ColorStyle.entries.forEach { style ->
+                    androidx.compose.material3.FilterChip(
+                        selected = settings.colorStyle == style,
+                        onClick = { viewModel.setColorStyle(style) },
+                        label = { Text(style.label) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    )
+                }
+            }
+            Text(
+                settings.colorStyle.description,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             SwitchRow(
                 "Reduce motion",
                 "Keeps the voice orb and background still. Android's \"Remove animations\" setting does this too.",
