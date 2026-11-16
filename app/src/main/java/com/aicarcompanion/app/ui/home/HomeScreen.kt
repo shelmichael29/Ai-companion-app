@@ -238,12 +238,17 @@ fun HomeContent(
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
             QuickTile(PenelopeIcons.Garage, "My Vehicle", ui.vehicle?.let { "${it.year} ${it.make}" } ?: "Add one", onOpenGarage)
+            val healthShort = when {
+                health.hasIssues -> "${ui.codes.size} code${if (ui.codes.size == 1) "" else "s"}"
+                ui.lastRead == null -> "Not checked"
+                else -> "All clear"
+            }
             QuickTile(
                 if (health.hasIssues) PenelopeIcons.Alert else PenelopeIcons.Shield, "Car Health",
-                health.title, onOpenResults, accent = if (health.hasIssues) t.warning else null,
+                healthShort, onOpenResults, accent = if (health.hasIssues) t.warning else null, spokenDetail = health.title,
             )
-            QuickTile(PenelopeIcons.History, "History", "Service & codes", onOpenHistory)
-            QuickTile(Icons.Outlined.Settings, "Settings", "Voice & profile", onOpenSettings)
+            QuickTile(PenelopeIcons.History, "History", "Records", onOpenHistory, spokenDetail = "service records and code reads")
+            QuickTile(Icons.Outlined.Settings, "Settings", "Voice", onOpenSettings, spokenDetail = "voice, profile and app settings")
         }
 
         // Vehicle showcase
@@ -276,14 +281,21 @@ internal fun aiStatusChip(status: AiStatus): Pair<String, Color> {
 
 /** A round, glowing shortcut with a label: large touch target, one TalkBack stop. */
 @Composable
-private fun QuickTile(icon: ImageVector, label: String, detail: String, onClick: () -> Unit, accent: Color? = null) {
+private fun QuickTile(
+    icon: ImageVector,
+    label: String,
+    detail: String,
+    onClick: () -> Unit,
+    accent: Color? = null,
+    spokenDetail: String = detail,
+) {
     val t = Penelope.tokens
     Column(
         Modifier
             .width(84.dp)
             .clip(RoundedCornerShape(24.dp))
             .clickable(role = Role.Button, onClickLabel = "open $label", onClick = onClick)
-            .semantics(mergeDescendants = true) { contentDescription = "$label, $detail" }
+            .semantics(mergeDescendants = true) { contentDescription = "$label, $spokenDetail" }
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -298,6 +310,9 @@ private fun QuickTile(icon: ImageVector, label: String, detail: String, onClick:
             Icon(icon, contentDescription = null, tint = accent ?: t.brandColors[2], modifier = Modifier.size(26.dp))
         }
         Text(label, style = MaterialTheme.typography.labelMedium, color = t.textPrimary, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
-        Text(detail, style = MaterialTheme.typography.labelSmall, color = t.textSecondary, maxLines = 1, textAlign = TextAlign.Center)
+        Text(
+            detail, style = MaterialTheme.typography.labelSmall, color = t.textSecondary, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, textAlign = TextAlign.Center,
+        )
     }
 }

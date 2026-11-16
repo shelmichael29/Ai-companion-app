@@ -9,7 +9,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 > Live values are shown/spoken only when read from a connected adapter; every item carries
 > its origin (vehicle, saved history, entered by you, sample).
 
-## Features (v0.5)
+## Features (v0.6)
 
 | Area | Status |
 |---|---|
@@ -20,6 +20,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 | Natural voice: explicit pitch + separate speed, voice/engine choice, sample, reset | Implemented; **needs on-device listening check** |
 | Everyday / DIY / Advanced explanations; "explain more simply", "technical explanation", "sensor readings" | Implemented, unit-tested |
 | Symptom conversations ("why is my car shaking?") with safety-first guidance and one follow-up question | Implemented (general guidance only), unit-tested |
+| Purple-and-black redesign (v0.6): dark-first theme, smoother voice orb with distinct listening/thinking/speaking/paused/error states, AI status under the orb, round quick-access tiles, build-generated version label | Implemented; contrast unit-tested; rendered off-device; **needs on-device check** |
 | Penelope UI 2.0: brand design system (light + dark), glowing voice orb driven by real voice state and mic level, floating nav, redesigned Home/Chat/Garage, vehicle showcase with your own photo, car-health result cards | Implemented; rendered off-device for review; **needs on-device check** |
 | Suggested questions: warning lights, "can I still drive?", repair-estimate explanations | Implemented (general guidance only), unit-tested |
 | Gemini conversations via Firebase AI Logic (App Check, grounded in verified car data, safety logic stays deterministic, offline fallback, on/off switch) | Implemented, unit-tested with a fake model; **needs Firebase config + device test** (see docs/FIREBASE_SETUP.md) |
