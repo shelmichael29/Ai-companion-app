@@ -1,6 +1,21 @@
 package com.aicarcompanion.app.ui.home
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.aicarcompanion.app.ai.AiStatus
+import com.aicarcompanion.app.ui.design.AppBuildInfo
+import com.aicarcompanion.app.ui.design.BuildLabel
+import com.aicarcompanion.app.ui.design.StatusBadge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -77,6 +92,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenResults: () -> Unit,
     onAddVehicle: () -> Unit,
+    onOpenHistory: () -> Unit = {},
     assistant: AssistantViewModel = viewModel(factory = AppViewModelProvider.Factory),
     home: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
@@ -85,6 +101,7 @@ fun HomeScreen(
     val level by assistant.inputLevel.collectAsStateWithLifecycle()
     val settings by assistant.settings.collectAsStateWithLifecycle()
     val ui by home.state.collectAsStateWithLifecycle()
+    val aiStatus by assistant.aiStatus.collectAsStateWithLifecycle()
     val versions by home.photoVersions.collectAsStateWithLifecycle()
     val micAction = rememberMicAction(assistant.session)
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -109,6 +126,8 @@ fun HomeScreen(
         onOpenSettings = onOpenSettings,
         onOpenResults = onOpenResults,
         onAddVehicle = onAddVehicle,
+        onOpenHistory = onOpenHistory,
+        aiStatus = aiStatus,
         onSelectVehicle = home::select,
         onPhotoPicked = { uri -> vehicleId?.let { home.savePhoto(it, uri) } },
     )
@@ -138,6 +157,8 @@ fun HomeContent(
     onAddVehicle: () -> Unit,
     onSelectVehicle: (String) -> Unit,
     onPhotoPicked: (android.net.Uri) -> Unit,
+    onOpenHistory: () -> Unit = {},
+    aiStatus: AiStatus = AiStatus.Off,
 ) {
     val t = Penelope.tokens
     val name = assistantName
@@ -191,6 +212,8 @@ fun HomeContent(
         if (voice is VoiceState.Error && (voice as VoiceState.Error).needsPermission) {
             TextButton(onClick = onOpenAppSettings) { Text("Open app settings") }
         }
+        val (aiText, aiColor) = aiStatusChip(aiStatus)
+        StatusBadge(aiText, aiColor, Modifier.padding(top = 2.dp), icon = PenelopeIcons.Sparkle)
 
         VoiceSessionControls(voice, conversationActive, name, onPause, onEnd, onMic, Modifier.padding(top = 6.dp))
 
@@ -208,24 +231,19 @@ fun HomeContent(
             }
         }
 
-        // Car health summary
+        // Quick access: soft round tiles instead of boxed cards.
         val health = healthSummary(ui.codes, ui.lastRead)
-        GlassPanel(
-            Modifier.fillMaxWidth().padding(top = 22.dp)
-                .clickable(role = Role.Button, onClickLabel = "see car health", onClick = onOpenResults),
-            contentPadding = 16.dp,
+        Row(
+            Modifier.fillMaxWidth().padding(top = 26.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (health.hasIssues) PenelopeIcons.Alert else PenelopeIcons.Shield, contentDescription = null,
-                    tint = if (health.hasIssues) t.warning else t.brandColors[1], modifier = Modifier.size(28.dp),
-                )
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(health.title, style = MaterialTheme.typography.titleMedium, color = t.textPrimary)
-                    Text(health.subtitle, style = MaterialTheme.typography.bodySmall, color = t.textSecondary)
-                }
-                Icon(PenelopeIcons.ChevronRight, contentDescription = null, tint = t.textSecondary)
-            }
+            QuickTile(PenelopeIcons.Garage, "My Vehicle", ui.vehicle?.let { "${it.year} ${it.make}" } ?: "Add one", onOpenGarage)
+            QuickTile(
+                if (health.hasIssues) PenelopeIcons.Alert else PenelopeIcons.Shield, "Car Health",
+                health.title, onOpenResults, accent = if (health.hasIssues) t.warning else null,
+            )
+            QuickTile(PenelopeIcons.History, "History", "Service & codes", onOpenHistory)
+            QuickTile(Icons.Outlined.Settings, "Settings", "Voice & profile", onOpenSettings)
         }
 
         // Vehicle showcase
@@ -239,7 +257,47 @@ fun HomeContent(
             onOpenAdapter = onOpenAdapter,
             onAddVehicle = onAddVehicle,
             onPhotoPicked = onPhotoPicked,
-            modifier = Modifier.padding(top = 16.dp, bottom = 24.dp),
+            modifier = Modifier.padding(top = 22.dp, bottom = 12.dp),
         )
+        if (AppBuildInfo.showOnHome) BuildLabel(Modifier.fillMaxWidth().padding(bottom = 16.dp))
+    }
+}
+
+/** Label and color for Penelope's "smarter answers" connection, shown under the orb. */
+@Composable
+internal fun aiStatusChip(status: AiStatus): Pair<String, Color> {
+    val t = Penelope.tokens
+    return when (status) {
+        is AiStatus.Ready, is AiStatus.Standby -> "Smarter answers on" to t.brandColors[1]
+        is AiStatus.Unavailable -> "Offline · using basic answers" to t.warning
+        AiStatus.NotConfigured, AiStatus.Off -> "Basic answers" to t.textSecondary
+    }
+}
+
+/** A round, glowing shortcut with a label: large touch target, one TalkBack stop. */
+@Composable
+private fun QuickTile(icon: ImageVector, label: String, detail: String, onClick: () -> Unit, accent: Color? = null) {
+    val t = Penelope.tokens
+    Column(
+        Modifier
+            .width(84.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .clickable(role = Role.Button, onClickLabel = "open $label", onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = "$label, $detail" }
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(Brush.radialGradient(listOf(t.brandColors[0].copy(alpha = 0.35f), t.glassFill)))
+                .border(1.dp, t.glassBorder, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = accent ?: t.brandColors[2], modifier = Modifier.size(26.dp))
+        }
+        Text(label, style = MaterialTheme.typography.labelMedium, color = t.textPrimary, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
+        Text(detail, style = MaterialTheme.typography.labelSmall, color = t.textSecondary, maxLines = 1, textAlign = TextAlign.Center)
     }
 }

@@ -14,7 +14,7 @@ enum class ExplanationLevel(val label: String, val description: String) {
     ADVANCED("Advanced / professional", "Technical terms, code definitions and all available live data."),
 }
 
-enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark") }
+enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark (Penelope default)") }
 
 /** User preferences. Small enough for SharedPreferences; no extra dependency needed. */
 data class AppSettings(
@@ -36,7 +36,8 @@ data class AppSettings(
     /** Keep listening after each reply (hands-free conversation). On by default. */
     val continuousConversation: Boolean = true,
     val explanationLevel: ExplanationLevel = ExplanationLevel.EVERYDAY,
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** Penelope is designed black-and-purple first; Light and Match phone remain available. */
+    val themeMode: ThemeMode = ThemeMode.DARK,
     /** Calmer visuals: static orb, no background motion. Android's "Remove animations" also applies. */
     val reduceMotion: Boolean = false,
     /** Use Gemini (via Firebase AI Logic) for conversation when the app is configured for it. */

@@ -224,7 +224,7 @@ fun SuggestionPill(text: String, onClick: () -> Unit, modifier: Modifier = Modif
     }
 }
 
-/** The assistant's name as a blue-to-violet gradient wordmark. */
+/** The assistant's name as a lavender-to-purple gradient wordmark. */
 @Composable
 fun BrandWordmark(name: String, modifier: Modifier = Modifier, fontSizeSp: Int = 26) {
     val t = Penelope.tokens
@@ -233,7 +233,7 @@ fun BrandWordmark(name: String, modifier: Modifier = Modifier, fontSizeSp: Int =
         modifier = modifier.semantics { heading() },
         style = TextStyle(
             brush = Brush.linearGradient(
-                if (t.isDark) listOf(Color(0xFF7FD8FA), Color(0xFFC3A8FF)) else listOf(t.brandColors[1], t.brandColors[2]),
+                if (t.isDark) listOf(Color(0xFFE9D5FF), t.brandColors[1]) else listOf(t.brandColors[1], t.brandColors[2]),
             ),
             fontSize = fontSizeSp.sp,
             fontWeight = FontWeight.SemiBold,
@@ -249,7 +249,7 @@ fun LogoMark(modifier: Modifier = Modifier, size: Dp = 36.dp) {
     Canvas(modifier.size(size)) {
         val w = this.size.width
         val c = Offset(w / 2f, w / 2f)
-        drawCircle(Brush.linearGradient(t.brandColors, start = Offset.Zero, end = Offset(w, w)))
+        drawCircle(Brush.linearGradient(t.brandGradientColors, start = Offset.Zero, end = Offset(w, w)))
         val stroke = w * 0.075f
         drawCircle(Color.White, radius = w * 0.30f, center = c, style = Stroke(stroke))
         drawCircle(Color.White, radius = w * 0.075f, center = c)

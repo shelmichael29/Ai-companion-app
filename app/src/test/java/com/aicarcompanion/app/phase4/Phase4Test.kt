@@ -209,6 +209,6 @@ class Phase4Test {
         val s = PersistentSettingsStore(kv).settings.value
         assertEquals(ThemeMode.DARK, s.themeMode)
         assertTrue(s.reduceMotion)
-        assertEquals(ThemeMode.SYSTEM, PersistentSettingsStore(MapKeyValueStore()).settings.value.themeMode)
+        assertEquals("Penelope defaults to the black-and-purple dark theme", ThemeMode.DARK, PersistentSettingsStore(MapKeyValueStore()).settings.value.themeMode)
     }
 }

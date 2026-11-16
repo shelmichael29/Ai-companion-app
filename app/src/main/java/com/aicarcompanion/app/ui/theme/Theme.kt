@@ -23,21 +23,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicarcompanion.app.data.local.ThemeMode
 
-/** Penelope brand palette. */
+/** Penelope brand palette: deep black and charcoal with electric purple and soft lavender light. */
 object PenelopePalette {
-    val Blue = Color(0xFF397EBC)
-    val Cyan = Color(0xFF35C9F4)
-    val Violet = Color(0xFF8655F5)
-    val Lavender = Color(0xFFE9DEFF)
-    val Pearl = Color(0xFFF6F7FF)
-    val Ink = Color(0xFF1C254A)
-    val InkSoft = Color(0xFF55607F)
-    val Night = Color(0xFF0B1026)
-    val NightRaised = Color(0xFF151B38)
-    val Moon = Color(0xFFE8ECFF)
-    val Coral = Color(0xFFE5484D)
-    val Amber = Color(0xFFE59A1A)
-    val Mint = Color(0xFF2BB673)
+    // Neutrals
+    val Black = Color(0xFF050407)
+    val Charcoal = Color(0xFF0D0B12)
+    val Raised = Color(0xFF16131F)
+    val RaisedHigh = Color(0xFF201B2C)
+    val Line = Color(0xFF2E2840)
+    // Purples
+    val DeepViolet = Color(0xFF5B21B6)
+    val ElectricPurple = Color(0xFF7C3AED)
+    val Violet = Color(0xFF9333EA)
+    val Lilac = Color(0xFFA78BFA)
+    val Lavender = Color(0xFFC4B5FD)
+    val Mist = Color(0xFFEDE9FE)
+    val Orchid = Color(0xFFD946EF)
+    // Text
+    val Moon = Color(0xFFF5F3FF)
+    val MoonSoft = Color(0xFFBDB6D3)
+    val Ink = Color(0xFF1B1530)
+    val InkSoft = Color(0xFF5A5275)
+    val Pearl = Color(0xFFF8F6FF)
+    // Status
+    val Coral = Color(0xFFF87171)
+    val Amber = Color(0xFFFBBF24)
+    val Mint = Color(0xFF4ADE80)
 }
 
 /** Design tokens beyond Material's color scheme: gradients, glass and glow. */
@@ -50,6 +61,12 @@ data class PenelopeTokens(
     val glowB: Color,
     val glowC: Color,
     val brandGradient: Brush,
+    /** Stops of [brandGradient]; white text sits on these (checked for contrast in tests). */
+    val brandGradientColors: List<Color>,
+    /**
+     * Accent colors: [0] deep fill, [1] accent for icons and labels, [2] soft highlight for text.
+     * [1] and [2] are readable on [backgroundBase] and [glassStrong] (checked in tests).
+     */
     val brandColors: List<Color>,
     val glassFill: Color,
     val glassBorder: Color,
@@ -63,104 +80,105 @@ data class PenelopeTokens(
     val reducedMotion: Boolean,
 )
 
-val LocalPenelope = staticCompositionLocalOf { lightTokens(reducedMotion = false) }
+val LocalPenelope = staticCompositionLocalOf { penelopeTokens(dark = true, reducedMotion = false) }
 
-private val brand = listOf(PenelopePalette.Cyan, PenelopePalette.Blue, PenelopePalette.Violet)
+private val gradientStops = listOf(PenelopePalette.DeepViolet, PenelopePalette.ElectricPurple, PenelopePalette.Violet)
 
-private fun lightTokens(reducedMotion: Boolean) = PenelopeTokens(
+/** Token set for the dark (default) or light theme. Internal so contrast can be unit-tested. */
+internal fun penelopeTokens(dark: Boolean, reducedMotion: Boolean): PenelopeTokens = if (dark) PenelopeTokens(
+    isDark = true,
+    background = Brush.verticalGradient(listOf(Color(0xFF0B0912), PenelopePalette.Black, Color(0xFF0E0819))),
+    backgroundBase = PenelopePalette.Black,
+    glowA = PenelopePalette.ElectricPurple.copy(alpha = 0.24f),
+    glowB = PenelopePalette.Orchid.copy(alpha = 0.10f),
+    glowC = PenelopePalette.Lilac.copy(alpha = 0.14f),
+    brandGradient = Brush.linearGradient(gradientStops),
+    brandGradientColors = gradientStops,
+    brandColors = listOf(PenelopePalette.ElectricPurple, PenelopePalette.Lilac, PenelopePalette.Lavender),
+    glassFill = Color.White.copy(alpha = 0.05f),
+    glassBorder = PenelopePalette.Lilac.copy(alpha = 0.18f),
+    glassStrong = PenelopePalette.Raised.copy(alpha = 0.96f),
+    textPrimary = PenelopePalette.Moon,
+    textSecondary = PenelopePalette.MoonSoft,
+    success = PenelopePalette.Mint,
+    warning = PenelopePalette.Amber,
+    danger = PenelopePalette.Coral,
+    reducedMotion = reducedMotion,
+) else PenelopeTokens(
     isDark = false,
-    background = Brush.verticalGradient(listOf(Color(0xFFFBFCFF), PenelopePalette.Pearl, Color(0xFFF0ECFF))),
+    background = Brush.verticalGradient(listOf(Color(0xFFFCFBFF), PenelopePalette.Pearl, Color(0xFFF1EBFF))),
     backgroundBase = PenelopePalette.Pearl,
-    glowA = PenelopePalette.Cyan.copy(alpha = 0.22f),
-    glowB = PenelopePalette.Violet.copy(alpha = 0.18f),
-    glowC = PenelopePalette.Lavender.copy(alpha = 0.9f),
-    brandGradient = Brush.linearGradient(brand),
-    brandColors = brand,
-    glassFill = Color.White.copy(alpha = 0.62f),
-    glassBorder = Color.White.copy(alpha = 0.9f),
-    glassStrong = Color.White.copy(alpha = 0.85f),
+    glowA = PenelopePalette.ElectricPurple.copy(alpha = 0.14f),
+    glowB = PenelopePalette.Orchid.copy(alpha = 0.08f),
+    glowC = PenelopePalette.Mist,
+    brandGradient = Brush.linearGradient(gradientStops),
+    brandGradientColors = gradientStops,
+    brandColors = listOf(PenelopePalette.Lilac, PenelopePalette.ElectricPurple, PenelopePalette.DeepViolet),
+    glassFill = Color.White.copy(alpha = 0.70f),
+    glassBorder = PenelopePalette.Lavender.copy(alpha = 0.6f),
+    glassStrong = Color.White.copy(alpha = 0.92f),
     textPrimary = PenelopePalette.Ink,
     textSecondary = PenelopePalette.InkSoft,
-    success = Color(0xFF1E8A57),
-    warning = Color(0xFFA86400),
+    success = Color(0xFF15803D),
+    warning = Color(0xFF9A5B00),
     danger = Color(0xFFC62A2F),
     reducedMotion = reducedMotion,
 )
 
-private fun darkTokens(reducedMotion: Boolean) = PenelopeTokens(
-    isDark = true,
-    background = Brush.verticalGradient(listOf(Color(0xFF0E1432), PenelopePalette.Night, Color(0xFF130C2E))),
-    backgroundBase = PenelopePalette.Night,
-    glowA = PenelopePalette.Cyan.copy(alpha = 0.16f),
-    glowB = PenelopePalette.Violet.copy(alpha = 0.22f),
-    glowC = PenelopePalette.Blue.copy(alpha = 0.18f),
-    brandGradient = Brush.linearGradient(brand),
-    brandColors = brand,
-    glassFill = Color.White.copy(alpha = 0.07f),
-    glassBorder = Color.White.copy(alpha = 0.14f),
-    glassStrong = Color(0xFF1B2246).copy(alpha = 0.92f),
-    textPrimary = PenelopePalette.Moon,
-    textSecondary = Color(0xFFA9B2D6),
-    success = Color(0xFF5BD69A),
-    warning = Color(0xFFFFC266),
-    danger = Color(0xFFFF7A7E),
-    reducedMotion = reducedMotion,
-)
-
 private val LightColors = lightColorScheme(
-    primary = PenelopePalette.Blue,
+    primary = PenelopePalette.ElectricPurple,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFDDEBFA),
+    primaryContainer = PenelopePalette.Mist,
     onPrimaryContainer = PenelopePalette.Ink,
-    secondary = PenelopePalette.Violet,
+    secondary = PenelopePalette.DeepViolet,
     onSecondary = Color.White,
-    secondaryContainer = PenelopePalette.Lavender,
+    secondaryContainer = PenelopePalette.Mist,
     onSecondaryContainer = PenelopePalette.Ink,
-    tertiary = Color(0xFF6E4BD8),
-    tertiaryContainer = Color(0xFFEDE5FF),
+    tertiary = PenelopePalette.Violet,
+    tertiaryContainer = Color(0xFFF3E8FF),
     onTertiaryContainer = PenelopePalette.Ink,
     background = PenelopePalette.Pearl,
     onBackground = PenelopePalette.Ink,
-    surface = Color(0xFFFBFBFF),
+    surface = Color(0xFFFCFBFF),
     onSurface = PenelopePalette.Ink,
-    surfaceVariant = Color(0xFFEDEFFA),
+    surfaceVariant = Color(0xFFEEEAF8),
     onSurfaceVariant = PenelopePalette.InkSoft,
-    surfaceContainerHighest = Color(0xFFEDEFFA),
-    surfaceContainerHigh = Color(0xFFF2F3FC),
-    surfaceContainer = Color(0xFFF5F6FD),
-    surfaceContainerLow = Color(0xFFF8F9FE),
-    outline = Color(0xFFC7CCE3),
-    outlineVariant = Color(0xFFE1E4F2),
+    surfaceContainerHighest = Color(0xFFEEEAF8),
+    surfaceContainerHigh = Color(0xFFF3F0FB),
+    surfaceContainer = Color(0xFFF6F3FD),
+    surfaceContainerLow = Color(0xFFF9F7FE),
+    outline = Color(0xFFCBC3E3),
+    outlineVariant = Color(0xFFE4DEF3),
     error = Color(0xFFC62A2F),
     errorContainer = Color(0xFFFFE3E3),
     onErrorContainer = Color(0xFF5C0A0D),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF7FB8EE),
-    onPrimary = Color(0xFF06223D),
-    primaryContainer = Color(0xFF1C3A63),
+    primary = PenelopePalette.Lilac,
+    onPrimary = Color(0xFF1E0B4B),
+    primaryContainer = PenelopePalette.DeepViolet,
     onPrimaryContainer = PenelopePalette.Moon,
-    secondary = Color(0xFFB79BFF),
+    secondary = PenelopePalette.Lavender,
     onSecondary = Color(0xFF250B61),
-    secondaryContainer = Color(0xFF332066),
+    secondaryContainer = Color(0xFF2E1A55),
     onSecondaryContainer = PenelopePalette.Moon,
-    tertiary = Color(0xFFC6B2FF),
-    tertiaryContainer = Color(0xFF2E2260),
+    tertiary = Color(0xFFE9D5FF),
+    tertiaryContainer = Color(0xFF3B1A5E),
     onTertiaryContainer = PenelopePalette.Moon,
-    background = PenelopePalette.Night,
+    background = PenelopePalette.Black,
     onBackground = PenelopePalette.Moon,
-    surface = PenelopePalette.NightRaised,
+    surface = PenelopePalette.Charcoal,
     onSurface = PenelopePalette.Moon,
-    surfaceVariant = Color(0xFF1E2548),
-    onSurfaceVariant = Color(0xFFA9B2D6),
-    surfaceContainerHighest = Color(0xFF242B52),
-    surfaceContainerHigh = Color(0xFF1E2548),
-    surfaceContainer = Color(0xFF191F40),
-    surfaceContainerLow = Color(0xFF141A38),
-    outline = Color(0xFF3B4573),
-    outlineVariant = Color(0xFF2A3259),
-    error = Color(0xFFFF8A8E),
+    surfaceVariant = PenelopePalette.RaisedHigh,
+    onSurfaceVariant = PenelopePalette.MoonSoft,
+    surfaceContainerHighest = Color(0xFF26203A),
+    surfaceContainerHigh = PenelopePalette.RaisedHigh,
+    surfaceContainer = PenelopePalette.Raised,
+    surfaceContainerLow = Color(0xFF110E18),
+    outline = Color(0xFF4A4163),
+    outlineVariant = PenelopePalette.Line,
+    error = Color(0xFFFCA5A5),
     errorContainer = Color(0xFF4A1418),
     onErrorContainer = Color(0xFFFFDADB),
 )
@@ -186,17 +204,18 @@ private val PenelopeTypography = Typography(
     labelSmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight.Medium, fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp),
 )
 
+/** Generous, organic rounding: fewer hard boxes. */
 private val PenelopeShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(22.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    extraSmall = RoundedCornerShape(12.dp),
+    small = RoundedCornerShape(18.dp),
+    medium = RoundedCornerShape(26.dp),
+    large = RoundedCornerShape(32.dp),
+    extraLarge = RoundedCornerShape(40.dp),
 )
 
 @Composable
 fun CarCompanionTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    themeMode: ThemeMode = ThemeMode.DARK,
     reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -211,7 +230,7 @@ fun CarCompanionTheme(
             .getOrDefault(false)
     }
     val reduced = reduceMotion || systemAnimationsOff
-    val tokens = if (dark) darkTokens(reduced) else lightTokens(reduced)
+    val tokens = penelopeTokens(dark, reduced)
     CompositionLocalProvider(LocalPenelope provides tokens) {
         MaterialTheme(
             colorScheme = if (dark) DarkColors else LightColors,

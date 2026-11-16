@@ -69,7 +69,7 @@ fun CarIllustration(modifier: Modifier = Modifier) {
                 drawPath(CAR_BODY, Color.White.copy(alpha = 0.35f), style = Stroke(1.5f))
                 drawPath(CAR_WINDOWS, Color.White.copy(alpha = if (t.isDark) 0.35f else 0.7f))
                 listOf(64f, 186f).forEach { x ->
-                    drawCircle(if (t.isDark) Color(0xFF0B1026) else Color(0xFF1C254A), 16f, Offset(x, 74f))
+                    drawCircle(if (t.isDark) Color(0xFF050407) else Color(0xFF1B1530), 16f, Offset(x, 74f))
                     drawCircle(Color.White.copy(alpha = 0.8f), 7f, Offset(x, 74f))
                 }
                 drawLine(Color.White.copy(alpha = 0.55f), Offset(40f, 58f), Offset(220f, 56f), strokeWidth = 1.2f)

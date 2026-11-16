@@ -290,6 +290,7 @@ fun SettingsScreen(
             )
 
             Heading("About")
+            com.aicarcompanion.app.ui.design.BuildLabel(Modifier.fillMaxWidth())
             Text(
                 "Vehicle lookups use free public services: FuelEconomy.gov (U.S. DOE/EPA) and NHTSA vPIC. " +
                     "Speech uses your phone's built-in recognition and text-to-speech. No accounts or paid services are used. " +

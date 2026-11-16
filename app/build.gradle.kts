@@ -22,13 +22,19 @@ android {
         // API 26 gives us java.time and a modern Bluetooth stack for future OBD-II work.
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
     }
 
     buildTypes {
+        debug {
+            // Test builds read e.g. "v0.6.0-beta • Build 6" on the home and About screens.
+            versionNameSuffix = "-beta"
+            buildConfigField("boolean", "SHOW_BUILD_LABEL", "true")
+        }
         release {
+            buildConfigField("boolean", "SHOW_BUILD_LABEL", "false")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
