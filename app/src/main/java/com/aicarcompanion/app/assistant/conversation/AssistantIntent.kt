@@ -73,6 +73,9 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
         if (symptom != null && symptom.isUrgent) return AssistantIntent.Symptom(symptom, utterance.trim())
 
         return when {
+            // "Can I still drive?" and its everyday variations come before everything else below, so a
+            // safety question mixed with other words (help, a repair quote, a light) gets the safety answer.
+            has(*CAN_I_DRIVE_PHRASES) -> AssistantIntent.CanIDrive
             has("repair", "estimate", "quote", "the shop said", "mechanic said", "they said i need", "what is a", "what's a", "what does a") &&
                 (has("repair", "estimate", "quote", "shop", "mechanic") || RepairGlossary.find(text) != null) ->
                 AssistantIntent.RepairHelp(RepairGlossary.find(text)?.name)
@@ -82,7 +85,6 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
             has("tell me more", "more detail", "more details", "go on", "elaborate", "what else") -> AssistantIntent.MoreDetail
             has("say that again", "repeat that", "repeat", "what did you say", "come again") -> AssistantIntent.Repeat
             has("sensor readings", "sensor data", "live data", "all the readings", "the readings", "all readings", "all sensors") -> AssistantIntent.SensorReadings
-            has("still drive", "safe to drive", "okay to drive", "ok to drive", "can i drive", "should i drive", "is it safe") -> AssistantIntent.CanIDrive
             has("explain", "what does", "what is", "what's", "meaning", "mean") && has("code", "codes", "dtc") ->
                 AssistantIntent.ExplainCode(null)
             has("trouble code", "trouble codes", "error code", "error codes", "check engine", "dtc", "dtcs",
@@ -163,6 +165,15 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
     }
 
     private companion object {
+        /** Everyday ways of asking whether it's safe to keep driving. Matched on word boundaries. */
+        val CAN_I_DRIVE_PHRASES = arrayOf(
+            "still drive", "can i drive", "should i drive", "should i be driving", "is it safe",
+            "safe to drive", "okay to drive", "ok to drive", "alright to drive", "all right to drive", "fine to drive",
+            "safe for me to drive", "safe enough to drive", "dangerous to drive", "is it dangerous",
+            "keep driving", "continue driving", "carry on driving", "drive it home", "drive home",
+            "pull over", "stop driving", "should i stop", "do i need to stop", "is my car safe", "car safe to",
+        )
+
         val END_PHRASES = setOf(
             "stop", "stop listening", "goodbye", "bye", "bye bye", "good bye", "that's all", "thats all", "that's it",
             "thats it", "end conversation", "end the conversation", "we're done", "were done", "i'm done", "im done",

@@ -115,6 +115,9 @@ VoiceSession ─▶ ConversationManager ─▶ GeminiReasoningProvider (Reasonin
 - Future: function calling for live data, response streaming to TTS for lower latency, and an
   ElevenLabs `SpeechOutput`; none require changes to this routing.
 
+- **Safety questions:** about 25 everyday phrasings (`CommandParser.CAN_I_DRIVE_PHRASES`) are recognized as "can I still drive?". Examples: "can I keep driving", "should I pull over", "do I need to stop", "is it dangerous to drive". They're checked before every other topic except urgent symptoms, so they always get the built-in, offline answer immediately, never Gemini. Urgent symptoms such as smoke or oil pressure still take priority, with their specific advice.
+- **Guard around the AI client:** `GeminiReasoningProvider.generateSafely` turns any exception from the client, a `LinkageError` (for example, a missing SDK class), or no answer within 30 s into an `AiResult.Failure`. Penelope then gives her built-in answer and never crashes or goes silent. Cancellation, such as the user ending the conversation, still stops the request.
+
 ## Penelope (voice) — hands-free conversation
 
 ```
