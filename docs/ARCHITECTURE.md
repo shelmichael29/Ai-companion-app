@@ -51,6 +51,38 @@ Offline: responses are cached in Room (cache-first, 30-day freshness, stale copy
 network fails). Manual entry always works. Another provider (proprietary backend, offline
 knowledge pack) implements `VehicleCatalogProvider` / `VinDecoder`.
 
+## UI polish (v0.6): purple and black
+The Phase 4 structure below still applies. The palette and the home screen changed.
+
+- **Palette (`PenelopePalette`):** near-black `#050407` and charcoal `#0D0B12` backgrounds, with raised panels at `#16131F`. Electric purple `#7C3AED` (between deep violet `#5B21B6` and violet `#9333EA`) for gradients and fills; lilac `#A78BFA` and lavender `#C4B5FD` for accents and soft glows.
+- **Default theme:** dark is now the default for new installs (`AppSettings.themeMode = DARK`). Light (lavender-white) and "Match phone" remain in Settings.
+- **Tokens:** `penelopeTokens(dark, reducedMotion)` builds the token set. `brandGradientColors` are the gradient stops that white text sits on.
+- **Contrast checks:** `UiPolishTest` checks WCAG AA (4.5:1) for primary/secondary text, accents, warning and danger on the background and panels in both themes, and for white on every gradient stop.
+- **Shapes:** larger corner radii (12–40 dp) for a softer, less boxy look.
+- **Voice orb (`VoiceOrb.kt`):**
+  - **API unchanged:** same API and the same `OrbMode.from(VoiceState)` mapping.
+  - **Smooth transitions:** each state has a target look (energy, inner/mid/outer colors, halo), and changes animate over about 0.6–0.7 s instead of switching instantly.
+  - **Inside the sphere:** three soft "aurora" lights drift, livelier at higher energy, under a glassy highlight.
+  - **States are shown by shape as well as color:**
+
+    | State | Shape |
+    |---|---|
+    | Idle | Faint ring, slow breathing |
+    | Listening | Ripples that react to the real microphone level |
+    | Thinking | Rotating comet arc |
+    | Speaking | Wavy rings |
+    | Paused | Pause bars |
+    | Error | Coral ring and "!" mark |
+  - **Reduced motion:** everything is static (colors snap, no infinite animations).
+  - **TalkBack:** content description and state description are unchanged.
+- **Home screen:**
+  - **Under the orb:** the voice status text, then an AI status chip from `AiStatus`: "Smarter answers on", "Offline · using basic answers" or "Basic answers".
+  - **Quick access:** the boxed car-health card is replaced by four round tiles: **My Vehicle**, **Car Health** (code count, "All clear" or "Not checked"), **History** and **Settings**. Each tile is a single TalkBack stop with a full description and is at least 48 dp.
+- **Version label:** `AppBuildInfo` / `BuildLabel` builds `v<VERSION_NAME> • Build <VERSION_CODE>` from `BuildConfig`, never hard-coded.
+  - **Where it shows:** at the bottom of the home screen when `BuildConfig.SHOW_BUILD_LABEL` is true (debug builds only), and in Settings → About in every build.
+  - **Debug builds:** add `versionNameSuffix = "-beta"`, e.g. "v0.6.0-beta • Build 6".
+- **Screenshots:** `docs/screenshots/ui-polish-home-states.png` (rendered off-device with reduced motion).
+
 ## Visual design system (Phase 4, "Penelope UI 2.0")
 
 All UI is Jetpack Compose. `ui/theme/Theme.kt` defines a fixed brand theme (the earlier

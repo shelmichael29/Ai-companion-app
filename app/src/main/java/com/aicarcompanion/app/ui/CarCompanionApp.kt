@@ -126,6 +126,7 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onOpenResults = { navController.navigate(Routes.RESULTS) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
+                    onOpenHistory = { navController.navigateTab(Routes.HISTORY) },
                 )
             }
             composable(Routes.GARAGE) {
