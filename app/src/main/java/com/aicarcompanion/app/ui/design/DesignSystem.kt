@@ -373,4 +373,8 @@ object PenelopeIcons {
     val Info = line("info", "M12,3.5 A8.5,8.5 0 1 1 11.99,3.5", "M12,11 V16.5", "M12,7.8 H12.01")
     val Check = line("check", "M5,12.5 L10,17 L19,7.5")
     val Link = line("link", "M7,12 C7,9 9,7 12,7 H13", "M17,12 C17,15 15,17 12,17 H11", "M9,12 H15")
+    val Plug = line("plug", "M9,3.5 V8", "M15,3.5 V8", "M6.5,8 H17.5 V11 A5.5,5.5 0 0 1 6.5,11 Z", "M12,16.5 V20.5")
+    val Tune = line("tune", "M4,7 H13", "M17,7 H20", "M15,5 V9", "M4,17 H7", "M11,17 H20", "M9,15 V19")
+    val Gauge = line("gauge", "M4.5,16 A8,8 0 1 1 19.5,16", "M12,13 L15.5,9", "M12,13 H12.01")
+    val Grid = line("grid", "M5,5 H10 V10 H5 Z", "M14,5 H19 V10 H14 Z", "M5,14 H10 V19 H5 Z", "M14,16.5 H19", "M16.5,14 V19")
 }

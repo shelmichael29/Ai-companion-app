@@ -13,6 +13,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.aicarcompanion.app.ai.AiStatus
+import com.aicarcompanion.app.dashboard.DashboardItem
+import com.aicarcompanion.app.dashboard.DashboardKind
+import com.aicarcompanion.app.dashboard.DashboardPlanner
 import com.aicarcompanion.app.ui.design.AppBuildInfo
 import com.aicarcompanion.app.ui.design.BuildLabel
 import com.aicarcompanion.app.ui.design.StatusBadge
@@ -93,6 +96,8 @@ fun HomeScreen(
     onOpenResults: () -> Unit,
     onAddVehicle: () -> Unit,
     onOpenHistory: () -> Unit = {},
+    onOpenExtras: () -> Unit = {},
+    onOpenConnectionSettings: () -> Unit = {},
     assistant: AssistantViewModel = viewModel(factory = AppViewModelProvider.Factory),
     home: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
@@ -127,6 +132,10 @@ fun HomeScreen(
         onOpenResults = onOpenResults,
         onAddVehicle = onAddVehicle,
         onOpenHistory = onOpenHistory,
+        onOpenExtras = onOpenExtras,
+        onOpenConnectionSettings = onOpenConnectionSettings,
+        items = DashboardPlanner.itemsFor(settings.explanationLevel, settings.dashboard),
+        kind = DashboardKind.forLevel(settings.explanationLevel),
         aiStatus = aiStatus,
         onSelectVehicle = home::select,
         onPhotoPicked = { uri -> vehicleId?.let { home.savePhoto(it, uri) } },
@@ -159,6 +168,11 @@ fun HomeContent(
     onPhotoPicked: (android.net.Uri) -> Unit,
     onOpenHistory: () -> Unit = {},
     aiStatus: AiStatus = AiStatus.Off,
+    onOpenExtras: () -> Unit = {},
+    onOpenConnectionSettings: () -> Unit = {},
+    /** Shortcuts to show, from [DashboardPlanner]. Defaults to the Everyday arrangement. */
+    items: List<DashboardItem> = DashboardPlanner.defaults(com.aicarcompanion.app.data.local.ExplanationLevel.EVERYDAY),
+    kind: DashboardKind = DashboardKind.COMPANION,
 ) {
     val t = Penelope.tokens
     val name = assistantName
@@ -190,7 +204,7 @@ fun HomeContent(
 
         // Orb
         BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-            val orbSize = minOf(maxWidth * 0.72f, 280.dp)
+            val orbSize = minOf(maxWidth * 0.72f, 280.dp) * kind.orbScale
             VoiceOrb(
                 mode = OrbMode.from(voice),
                 level = micLevel,
@@ -231,24 +245,46 @@ fun HomeContent(
             }
         }
 
-        // Quick access: soft round tiles instead of boxed cards.
+        // Quick access: soft round tiles instead of boxed cards. Which tiles, and their order,
+        // come from the home layout setting for the current knowledge level.
         val health = healthSummary(ui.codes, ui.lastRead)
-        Row(
+        FlowRow(
             Modifier.fillMaxWidth().padding(top = 26.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = 4,
         ) {
-            QuickTile(PenelopeIcons.Garage, "My Vehicle", ui.vehicle?.let { "${it.year} ${it.make}" } ?: "Add one", onOpenGarage)
-            val healthShort = when {
-                health.hasIssues -> "${ui.codes.size} code${if (ui.codes.size == 1) "" else "s"}"
-                ui.lastRead == null -> "Not checked"
-                else -> "All clear"
+            items.forEach { item ->
+                when (item) {
+                    DashboardItem.MY_VEHICLE ->
+                        QuickTile(PenelopeIcons.Garage, "My Vehicle", ui.vehicle?.let { "${it.year} ${it.make}" } ?: "Add one", onOpenGarage)
+                    DashboardItem.CAR_HEALTH -> {
+                        val healthShort = when {
+                            health.hasIssues -> "${ui.codes.size} code${if (ui.codes.size == 1) "" else "s"}"
+                            ui.lastRead == null -> "Not checked"
+                            else -> "All clear"
+                        }
+                        QuickTile(
+                            if (health.hasIssues) PenelopeIcons.Alert else PenelopeIcons.Shield, "Car Health",
+                            healthShort, onOpenResults, accent = if (health.hasIssues) t.warning else null, spokenDetail = health.title,
+                        )
+                    }
+                    DashboardItem.HISTORY ->
+                        QuickTile(PenelopeIcons.History, "History", "Records", onOpenHistory, spokenDetail = "service records and code reads")
+                    DashboardItem.SETTINGS ->
+                        QuickTile(Icons.Outlined.Settings, "Settings", "Voice", onOpenSettings, spokenDetail = "voice, profile and app settings")
+                    DashboardItem.ADAPTER -> {
+                        val (connText, _) = connectionSummary(ui.obdState)
+                        QuickTile(PenelopeIcons.Plug, "Adapter", shortConnection(ui.obdState), onOpenAdapter, spokenDetail = connText)
+                    }
+                    DashboardItem.CONNECTION_SETTINGS ->
+                        QuickTile(PenelopeIcons.Tune, "Connection", "Protocol", onOpenConnectionSettings, spokenDetail = "protocol, timing and adapter test")
+                    DashboardItem.MILEAGE_LOG ->
+                        QuickTile(PenelopeIcons.Gauge, "Mileage", "Log", onOpenHistory, spokenDetail = "mileage log")
+                    DashboardItem.EXTRAS ->
+                        QuickTile(PenelopeIcons.Grid, "Extras", "Tools", onOpenExtras, spokenDetail = "optional tools")
+                }
             }
-            QuickTile(
-                if (health.hasIssues) PenelopeIcons.Alert else PenelopeIcons.Shield, "Car Health",
-                healthShort, onOpenResults, accent = if (health.hasIssues) t.warning else null, spokenDetail = health.title,
-            )
-            QuickTile(PenelopeIcons.History, "History", "Records", onOpenHistory, spokenDetail = "service records and code reads")
-            QuickTile(Icons.Outlined.Settings, "Settings", "Voice", onOpenSettings, spokenDetail = "voice, profile and app settings")
         }
 
         // Vehicle showcase
@@ -266,6 +302,14 @@ fun HomeContent(
         )
         if (AppBuildInfo.showOnHome) BuildLabel(Modifier.fillMaxWidth().padding(bottom = 16.dp))
     }
+}
+
+/** A few words for the Adapter tile; the full sentence is read by TalkBack. */
+internal fun shortConnection(state: com.aicarcompanion.app.diagnostics.obd.ObdConnectionState): String = when (state) {
+    is com.aicarcompanion.app.diagnostics.obd.ObdConnectionState.Connected -> if (state.vehicleProtocol != null) "Connected" else "No car"
+    is com.aicarcompanion.app.diagnostics.obd.ObdConnectionState.Connecting,
+    is com.aicarcompanion.app.diagnostics.obd.ObdConnectionState.Reconnecting -> "Connecting"
+    else -> "Not connected"
 }
 
 /** Label and color for Penelope's "smarter answers" connection, shown under the orb. */

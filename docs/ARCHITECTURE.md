@@ -324,6 +324,28 @@ behavior, and the skill level must not change the home layout.
 - **Safety:** none of these settings changes how safety answers are routed, or turns missing
   data into values. A reading that times out is reported as missing.
 
+## Dashboards and home layout (Phase A1: groundwork)
+
+Two independent settings decide the home screen:
+
+- **Knowledge level** (`ExplanationLevel`) picks the dashboard kind (`DashboardKind`):
+  Everyday → `COMPANION`, DIY → `WORKSHOP`, Advanced → `TELEMETRY`. All three keep the voice orb;
+  only its size changes (`orbScale`).
+- **Home layout** (`HomeLayout`): `EASY` (Penelope's arrangement) or `CUSTOMIZABLE` (the user's
+  shortcuts and order). Stored **per knowledge level** in `AppSettings.dashboard`
+  (`home_layout_<level>`, `home_items_<level>`), so changing level never erases a customization.
+
+`dashboard/Dashboard.kt` (pure Kotlin, unit-tested) holds the rules in `DashboardPlanner`:
+- **Defaults per level:** Everyday has 5 shortcuts. DIY adds Adapter. Advanced adds Adapter and Connection.
+- **Saved lists are cleaned up, not trusted:** duplicates, unknown names and items not offered at that level are dropped.
+- **Required shortcuts:** **Car Health** and **Extras** can be moved but never hidden, so a warning is never hidden by a customization and optional tools stay discoverable.
+- **Optional (Extras) tools** never appear on a default home screen.
+
+`ExtraTool` lists Extras. Planned tools are shown as "not available yet" and are never clickable.
+Settings → **Home screen** edits the layout; reordering uses Move up/down buttons, so it works with TalkBack.
+
+The three full dashboards (A2–A4) build on this.
+
 ## Persistence
 
 Room schema v1 (unchanged in Phase 3) (`app/schemas/…/1.json`): `vehicles`, `service_records`, `dtc_reads` +

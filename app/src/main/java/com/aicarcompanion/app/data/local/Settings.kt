@@ -2,6 +2,10 @@ package com.aicarcompanion.app.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.aicarcompanion.app.dashboard.DashboardItem
+import com.aicarcompanion.app.dashboard.DashboardSettings
+import com.aicarcompanion.app.dashboard.HomeLayout
+import com.aicarcompanion.app.dashboard.LevelLayout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,6 +46,8 @@ data class AppSettings(
     val reduceMotion: Boolean = false,
     /** Use Gemini (via Firebase AI Logic) for conversation when the app is configured for it. */
     val aiEnabled: Boolean = true,
+    /** Home-screen layout per knowledge level (Easy or Customizable). Independent of [explanationLevel]. */
+    val dashboard: DashboardSettings = DashboardSettings(),
 ) {
     companion object {
         const val DEFAULT_ASSISTANT_NAME = "Penelope"
@@ -111,6 +117,8 @@ object SettingsCodec {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_REDUCE_MOTION = "reduce_motion"
     private const val KEY_AI = "ai_enabled"
+    private fun keyLayout(level: ExplanationLevel) = "home_layout_${level.name.lowercase()}"
+    private fun keyItems(level: ExplanationLevel) = "home_items_${level.name.lowercase()}"
 
     fun read(store: KeyValueStore): AppSettings {
         val defaults = AppSettings()
@@ -129,8 +137,28 @@ object SettingsCodec {
             themeMode = ThemeMode.entries.firstOrNull { it.name == store.getString(KEY_THEME) } ?: defaults.themeMode,
             reduceMotion = store.getBoolean(KEY_REDUCE_MOTION) ?: defaults.reduceMotion,
             aiEnabled = store.getBoolean(KEY_AI) ?: defaults.aiEnabled,
+            dashboard = readDashboard(store),
         )
     }
+
+    /** Unknown or removed shortcut names are skipped, so an app update can't break a saved layout. */
+    private fun readDashboard(store: KeyValueStore): DashboardSettings {
+        val byLevel = ExplanationLevel.entries.mapNotNull { level ->
+            val layout = HomeLayout.entries.firstOrNull { it.name == store.getString(keyLayout(level)) } ?: return@mapNotNull null
+            val items = store.getString(keyItems(level))?.split(',')
+                ?.mapNotNull { name -> DashboardItem.entries.firstOrNull { it.name == name.trim() } }
+            level to LevelLayout(layout, items)
+        }.toMap()
+        return DashboardSettings(byLevel)
+    }
+
+    private fun dashboardValues(d: DashboardSettings): Map<String, Any?> = ExplanationLevel.entries.flatMap { level ->
+        val choice = d.byLevel[level]
+        listOf(
+            keyLayout(level) to choice?.layout?.name,
+            keyItems(level) to choice?.customItems?.joinToString(",") { it.name },
+        )
+    }.toMap()
 
     fun write(store: KeyValueStore, s: AppSettings) = store.write(
         mapOf(
@@ -147,7 +175,7 @@ object SettingsCodec {
             KEY_THEME to s.themeMode.name,
             KEY_REDUCE_MOTION to s.reduceMotion,
             KEY_AI to s.aiEnabled,
-        ),
+        ) + dashboardValues(s.dashboard),
     )
 }
 
