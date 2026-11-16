@@ -18,6 +18,11 @@ class FakeTransport(private val now: () -> Long) : EnetTransport {
     val udpSent = mutableListOf<Sent>()
     var udpOpenFails = false
     var udpOpened = 0
+    /** Overrides what the "OS" reports for the UDP socket (to simulate a wrong binding). */
+    var udpBoundTo: Ipv4Address? = null
+    var udpBroadcast: Boolean = true
+    var udpSendFails = false
+    var udpReceiveFails = false
 
     enum class Connect { OK, REFUSED, TIMEOUT }
     /** port → how connecting behaves, and how long it takes. */
@@ -35,12 +40,16 @@ class FakeTransport(private val now: () -> Long) : EnetTransport {
         udpOpened++
         val inbox = mutableListOf<Pending>()
         return object : UdpChannel {
+            override val info = SocketInfo(udpBoundTo ?: local, 50123, udpBroadcast, "simulated network binding (eth0)")
+
             override suspend fun send(to: Ipv4Address, port: Int, data: ByteArray) {
+                if (udpSendFails) throw java.net.NoRouteToHostException("No route to host")
                 udpSent += Sent(to, port, data)
                 udpReplies[to to port].orEmpty().forEach { (d, dg) -> inbox += Pending(now() + d, dg) }
             }
 
             override suspend fun receive(timeoutMillis: Long): Datagram? {
+                if (udpReceiveFails) throw java.net.SocketException("Network is unreachable")
                 val next = inbox.minByOrNull { it.at }
                 if (next == null || next.at > now() + timeoutMillis) {
                     delay(timeoutMillis); return null
@@ -63,6 +72,8 @@ class FakeTransport(private val now: () -> Long) : EnetTransport {
         }
         val inbox = mutableListOf<Pending>()
         return object : TcpChannel {
+            override val info = SocketInfo(local, 40001, null, "simulated network binding (eth0)")
+
             override suspend fun write(data: ByteArray) {
                 tcpWritten += port to data
                 tcpResponder[port]?.invoke(data).orEmpty().forEach { (d, b) -> inbox += Pending(now() + d, b) }

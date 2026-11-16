@@ -37,6 +37,16 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlin.math.roundToInt
+import com.aicarcompanion.enet.PortCheckResult
+import com.aicarcompanion.enet.DiscoveryOptions
+import com.aicarcompanion.enet.ConnectionOptions
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.Slider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -148,11 +158,19 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                     enabled = !busy && localOk && targetProblem == null,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 ) { Text("Discover gateway") }
-                Text("Sends a few identification requests on the selected interface only, then listens for 2 seconds.", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "Sends the HSFZ identification packet (00 00 00 00 00 11) to UDP port 6811 on the selected interface only, " +
+                        "then listens for ${"%.0f".format(vm.listenMillis / 1000.0)} seconds (change in Advanced settings).",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 when (val d = vm.discovery) {
                     null -> Unit
                     is DiscoveryResult.Refused -> Text(d.reason, color = MaterialTheme.colorScheme.error)
                     is DiscoveryResult.Completed -> {
+                        d.socket?.let { so ->
+                            Text("Socket ${so.endpoint} · broadcast ${if (so.broadcastEnabled == true) "on" else "off"}", style = MaterialTheme.typography.bodySmall)
+                        }
+                        d.bindingWarnings.forEach { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                         Text(
                             if (d.gateways.isEmpty()) "No gateway answered (${d.probesSent} requests sent)." else "${d.gateways.size} gateway(s) found:",
                             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
@@ -173,7 +191,36 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
         }
 
         item {
-            Section("4. Connection test") {
+            Section("4. TCP port 6801 check") {
+                Text(
+                    "Connects to the gateway address entered above on TCP port 6801, measures how long it takes, and closes. " +
+                        "Nothing is sent to the car.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Button(
+                    onClick = vm::checkPort,
+                    enabled = !busy && localOk && vm.targetText.isNotBlank() && targetProblem == null,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text("Check TCP port 6801") }
+                when (val p = vm.portCheck) {
+                    null -> Unit
+                    is PortCheckResult.Refused -> Text(p.reason, color = MaterialTheme.colorScheme.error)
+                    is PortCheckResult.Open -> Text(
+                        "OK · Port 6801 on ${p.target} is open (${p.latencyMillis} ms, from ${p.local.endpoint}).",
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    is PortCheckResult.Closed -> Text(
+                        "Failed · Port 6801 on ${p.target}: ${p.reason}",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                }
+            }
+        }
+
+        item {
+            Section("5. Connection test") {
                 Check("Send TesterPresent to the gateway (read-only \"are you there?\")", vm.sendTesterPresent) { vm.sendTesterPresent = it }
                 Check("Ask the gateway for ignition status (experimental, read-only)", vm.queryIgnition) { vm.queryIgnition = it }
                 Check("Check whether DoIP port 13400 is open (connect only)", vm.checkDoipPort) { vm.checkDoipPort = it }
@@ -206,6 +253,20 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                     CircularProgressIndicator(Modifier.padding(end = 12.dp))
                     Text(msg)
+                }
+            }
+        }
+
+        item {
+            Section("Advanced settings (Advanced/Professional)") {
+                var open by rememberSaveable { mutableStateOf(false) }
+                TextButton(onClick = { open = !open }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(if (open) "Hide advanced settings" else "Show advanced settings")
+                }
+                if (open) {
+                    SecondsSlider("Discovery listen time", vm.listenMillis, DiscoveryOptions.LISTEN_RANGE, vm::updateListenMillis)
+                    SecondsSlider("TCP connect timeout", vm.connectTimeoutMillis, ConnectionOptions.CONNECT_TIMEOUT_RANGE, vm::updateConnectTimeout)
+                    TextButton(onClick = vm::restoreAdvancedDefaults, modifier = Modifier.heightIn(min = 48.dp)) { Text("Restore defaults (5 s / 5 s)") }
                 }
             }
         }
@@ -266,3 +327,24 @@ private fun StepOutcome.label() = when (this) {
     StepOutcome.SKIPPED -> "Skipped"
 }
 
+
+/** A whole-seconds slider; TalkBack reads the label and current value. */
+@Composable
+private fun SecondsSlider(label: String, valueMillis: Long, range: LongRange, onChange: (Long) -> Unit) {
+    val seconds = (valueMillis / 1000).toInt()
+    val min = (range.first / 1000).toInt()
+    val max = (range.last / 1000).toInt()
+    Column {
+        Text("$label: $seconds s", style = MaterialTheme.typography.bodyMedium)
+        Slider(
+            value = seconds.toFloat(),
+            onValueChange = { onChange(it.roundToInt() * 1000L) },
+            valueRange = min.toFloat()..max.toFloat(),
+            steps = (max - min - 1).coerceAtLeast(0),
+            modifier = Modifier.fillMaxWidth().semantics {
+                contentDescription = label
+                stateDescription = "$seconds seconds"
+            },
+        )
+    }
+}
