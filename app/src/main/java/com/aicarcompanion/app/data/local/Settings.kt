@@ -20,6 +20,12 @@ enum class ExplanationLevel(val label: String, val description: String) {
 
 enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark (Penelope default)") }
 
+/** Accent color family. Independent of [ThemeMode]: each style has a dark and a light version. */
+enum class ColorStyle(val label: String, val description: String) {
+    MIDNIGHT("Midnight", "Deep navy with cyan and blue light (default)."),
+    AMETHYST("Amethyst", "Black with electric purple and lavender light."),
+}
+
 /** User preferences. Small enough for SharedPreferences; no extra dependency needed. */
 data class AppSettings(
     val activeVehicleId: String? = null,
@@ -42,6 +48,8 @@ data class AppSettings(
     val explanationLevel: ExplanationLevel = ExplanationLevel.EVERYDAY,
     /** Penelope is designed black-and-purple first; Light and Match phone remain available. */
     val themeMode: ThemeMode = ThemeMode.DARK,
+    /** Accent colors: Midnight (navy and cyan) by default, or the original Amethyst purple. */
+    val colorStyle: ColorStyle = ColorStyle.MIDNIGHT,
     /** Calmer visuals: static orb, no background motion. Android's "Remove animations" also applies. */
     val reduceMotion: Boolean = false,
     /** Use Gemini (via Firebase AI Logic) for conversation when the app is configured for it. */
@@ -115,6 +123,7 @@ object SettingsCodec {
     private const val KEY_CONTINUOUS = "continuous_conversation"
     private const val KEY_LEVEL = "explanation_level"
     private const val KEY_THEME = "theme_mode"
+    private const val KEY_COLOR_STYLE = "color_style"
     private const val KEY_REDUCE_MOTION = "reduce_motion"
     private const val KEY_AI = "ai_enabled"
     private fun keyLayout(level: ExplanationLevel) = "home_layout_${level.name.lowercase()}"
@@ -135,6 +144,7 @@ object SettingsCodec {
             explanationLevel = ExplanationLevel.entries.firstOrNull { it.name == store.getString(KEY_LEVEL) }
                 ?: defaults.explanationLevel,
             themeMode = ThemeMode.entries.firstOrNull { it.name == store.getString(KEY_THEME) } ?: defaults.themeMode,
+            colorStyle = ColorStyle.entries.firstOrNull { it.name == store.getString(KEY_COLOR_STYLE) } ?: defaults.colorStyle,
             reduceMotion = store.getBoolean(KEY_REDUCE_MOTION) ?: defaults.reduceMotion,
             aiEnabled = store.getBoolean(KEY_AI) ?: defaults.aiEnabled,
             dashboard = readDashboard(store),
@@ -173,6 +183,7 @@ object SettingsCodec {
             KEY_CONTINUOUS to s.continuousConversation,
             KEY_LEVEL to s.explanationLevel.name,
             KEY_THEME to s.themeMode.name,
+            KEY_COLOR_STYLE to s.colorStyle.name,
             KEY_REDUCE_MOTION to s.reduceMotion,
             KEY_AI to s.aiEnabled,
         ) + dashboardValues(s.dashboard),

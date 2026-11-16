@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
         })
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle()
-            CarCompanionTheme(themeMode = settings.themeMode, reduceMotion = settings.reduceMotion) {
+            CarCompanionTheme(themeMode = settings.themeMode, reduceMotion = settings.reduceMotion, colorStyle = settings.colorStyle) {
                 CarCompanionApp()
             }
         }

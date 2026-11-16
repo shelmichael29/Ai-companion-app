@@ -77,7 +77,8 @@ class DashboardUiTest {
     @Test fun everydayHomeShowsSimpleShortcutsAndExtras() {
         var extrasOpened = false
         home(ExplanationLevel.EVERYDAY) { extrasOpened = true }
-        compose.onNodeWithContentDescription("Car Health, Car health not checked yet").performScrollTo().assertIsDisplayed()
+        // The Everyday dashboard shows car health as its own section rather than a shortcut.
+        compose.onNodeWithContentDescription("Vehicle health: Add your car").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("My Vehicle, Add one").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("Adapter", substring = true).assertDoesNotExist()
         compose.onNodeWithContentDescription("Extras, optional tools").performScrollTo().performClick()

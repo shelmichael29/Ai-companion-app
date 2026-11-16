@@ -1,5 +1,9 @@
 package com.aicarcompanion.app.ui
 
+import com.aicarcompanion.app.data.local.ColorStyle
+import com.aicarcompanion.app.ui.theme.MidnightPalette
+import com.aicarcompanion.app.ui.theme.penelopeColorScheme
+
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
@@ -27,8 +31,18 @@ class UiPolishTest {
         assertTrue("$name contrast %.2f < $min".format(c), c >= min)
     }
 
-    @Test fun `dark theme is black with purple accents`() {
+    @Test fun `Midnight is the default style, navy with cyan and blue accents`() {
+        assertEquals(ColorStyle.MIDNIGHT, AppSettings().colorStyle)
         val t = penelopeTokens(dark = true, reducedMotion = false)
+        assertEquals(ColorStyle.MIDNIGHT, t.style)
+        assertTrue("background is near-black", t.backgroundBase.luminance() < 0.01f)
+        assertTrue("background leans navy", t.backgroundBase.blue > t.backgroundBase.red)
+        val accent = t.brandColors[1]
+        assertTrue("accent is cyan/blue (blue and green above red)", accent.blue > accent.red && accent.green > accent.red)
+    }
+
+    @Test fun `Amethyst keeps the black and purple look`() {
+        val t = penelopeTokens(dark = true, reducedMotion = false, style = ColorStyle.AMETHYST)
         assertTrue(t.isDark)
         assertTrue("background is near-black", t.backgroundBase.luminance() < 0.01f)
         val accent = t.brandColors[1]
@@ -36,11 +50,19 @@ class UiPolishTest {
     }
 
     @Test fun `text and accents meet WCAG AA contrast in both themes`() {
-        for (dark in listOf(true, false)) {
-            val t = penelopeTokens(dark, reducedMotion = false)
+        for (style in ColorStyle.entries) for (dark in listOf(true, false)) {
+            val t = penelopeTokens(dark, reducedMotion = false, style = style)
             val base = t.backgroundBase
             val raised = t.glassStrong.compositeOver(base)
-            val label = if (dark) "dark" else "light"
+            val label = "$style " + if (dark) "dark" else "light"
+            val scheme = penelopeColorScheme(dark, style)
+            for ((bgName, bg) in listOf("scheme background" to scheme.background, "scheme surface" to scheme.surface)) {
+                assertReadable("$label onSurface on $bgName", scheme.onSurface, bg)
+                assertReadable("$label onSurfaceVariant on $bgName", scheme.onSurfaceVariant, bg)
+                assertReadable("$label onBackground on $bgName", scheme.onBackground, bg)
+                assertReadable("$label primary on $bgName", scheme.primary, bg)
+            }
+            assertReadable("$label onPrimary on primary", scheme.onPrimary, scheme.primary)
             for ((bgName, bg) in listOf("background" to base, "panel" to raised)) {
                 assertReadable("$label textPrimary on $bgName", t.textPrimary, bg)
                 assertReadable("$label textSecondary on $bgName", t.textSecondary, bg)
@@ -56,7 +78,8 @@ class UiPolishTest {
 
     @Test fun `new installs default to the dark theme`() {
         assertEquals(ThemeMode.DARK, AppSettings().themeMode)
-        assertEquals(PenelopePalette.Black, penelopeTokens(dark = true, reducedMotion = true).backgroundBase)
+        assertEquals(MidnightPalette.Night, penelopeTokens(dark = true, reducedMotion = true).backgroundBase)
+        assertEquals(PenelopePalette.Black, penelopeTokens(dark = true, reducedMotion = true, style = ColorStyle.AMETHYST).backgroundBase)
     }
 
     @Test fun `version label comes from the build configuration`() {

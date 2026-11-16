@@ -346,6 +346,37 @@ Settings → **Home screen** edits the layout; reordering uses Move up/down butt
 
 The three full dashboards (A2–A4) build on this.
 
+## Everyday Driver dashboard and color styles (Phase A2)
+
+**Color styles** (`ColorStyle`, Settings → Appearance → Colors) are separate from light/dark:
+- **Midnight** (default): near-black navy with cyan, teal and blue light, taken from the design references.
+- **Amethyst**: the earlier black and purple look.
+
+Each style has its own token set (`penelopeTokens(dark, reducedMotion, style)`), Material color scheme (`penelopeColorScheme`) and orb colors (`OrbColors`). `UiPolishTest` checks WCAG AA contrast for all four combinations.
+
+**Default text color:** `CarCompanionTheme` sets `LocalContentColor` to `onBackground`. Screens draw on Penelope's own background rather than a Material Surface, so before this, text without a color of its own fell back to black (Settings, History, vehicle editing).
+
+**Voice orb** (`VoiceOrb`): a dark glass sphere with sweeping bands of light, a turning crescent rim and a halo.
+- **Real state only:** the look follows the voice session; listening ripples follow the real microphone level.
+- **Speaking:** Android TTS reports no loudness, so speaking uses a steady rhythmic animation, never a made-up waveform.
+- **Performance:** animation values are read only while drawing, so the screen isn't rebuilt every frame.
+- **Reduced motion** makes the orb still. Each state also has its own shape cue.
+
+**`EverydayDriverDashboard`** is shown when the knowledge level is Everyday (`DashboardKind.COMPANION`). Its parts:
+- **`EverydayHeader`:** Extras, the car name with connection status, and Settings.
+- **The large orb.**
+- **`VoiceInteractionPanel`:** greeting, "How can I help with your car?", live words from the voice session, and the mic row (pause and end while a conversation is active).
+- **`VehicleHealthSummary`:** a bold, plain-language status from `everydayHealth()`.
+- **`QuickActions`:** What's wrong with my car? (sends the question to Penelope), Check engine light (results), Maintenance (history), Ask Penelope (chat).
+- **Pills** for any extra shortcuts added in the Customizable layout.
+
+`everydayHealth()` is pure logic and unit-tested:
+- "All clear" appears only after a real code read;
+- sample data is always labeled;
+- missing information is explained, never guessed.
+
+DIY and Advanced keep the previous home design until their own dashboards land.
+
 ## Persistence
 
 Room schema v1 (unchanged in Phase 3) (`app/schemas/…/1.json`): `vehicles`, `service_records`, `dtc_reads` +

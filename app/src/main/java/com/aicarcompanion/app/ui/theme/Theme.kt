@@ -3,6 +3,7 @@ package com.aicarcompanion.app.ui.theme
 import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -21,6 +22,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aicarcompanion.app.data.local.ColorStyle
 import com.aicarcompanion.app.data.local.ThemeMode
 
 /** Penelope brand palette: deep black and charcoal with electric purple and soft lavender light. */
@@ -51,6 +53,55 @@ object PenelopePalette {
     val Mint = Color(0xFF4ADE80)
 }
 
+/**
+ * Midnight palette, taken from the design references: near-black navy with cyan, teal and blue
+ * light. The default color style.
+ */
+object MidnightPalette {
+    // Neutrals
+    val Night = Color(0xFF03060C)
+    val Navy = Color(0xFF0A1220)
+    val Raised = Color(0xFF0F1A2C)
+    val RaisedHigh = Color(0xFF162338)
+    val Line = Color(0xFF22344D)
+    // Blues and cyans
+    val Abyss = Color(0xFF061A33)
+    val DeepOcean = Color(0xFF0B4A6F)
+    val Ocean = Color(0xFF0E7490)
+    val Royal = Color(0xFF1D4ED8)
+    val Sky = Color(0xFF0EA5E9)
+    val Azure = Color(0xFF38BDF8)
+    val Cyan = Color(0xFF22D3EE)
+    val Teal = Color(0xFF14B8A6)
+    val Aqua = Color(0xFF5EEAD4)
+    val Ice = Color(0xFFA5F3FC)
+    val Frost = Color(0xFFBAE6FD)
+    // Text
+    val Moon = Color(0xFFEAF4FF)
+    val MoonSoft = Color(0xFF9FB3C8)
+    val Ink = Color(0xFF0A1A2B)
+    val InkSoft = Color(0xFF46596E)
+    val Pearl = Color(0xFFF4F8FC)
+    val SkyDeep = Color(0xFF0369A1)
+    val OceanDeep = Color(0xFF075985)
+}
+
+/** Colors the voice orb is drawn with; each color style has its own. */
+@Immutable
+data class OrbColors(
+    /** Dark core of the sphere. */
+    val core: Color,
+    /** Main body color. */
+    val body: Color,
+    /** Two light ribbons that flow inside and around the sphere. */
+    val ribbonA: Color,
+    val ribbonB: Color,
+    /** Bright rim and highlights. */
+    val rim: Color,
+    /** Soft glow around the sphere. */
+    val halo: Color,
+)
+
 /** Design tokens beyond Material's color scheme: gradients, glass and glow. */
 @Immutable
 data class PenelopeTokens(
@@ -78,14 +129,76 @@ data class PenelopeTokens(
     val danger: Color,
     /** True when motion should be minimized (system "Remove animations" or the in-app setting). */
     val reducedMotion: Boolean,
+    val orb: OrbColors = MIDNIGHT_ORB,
+    val style: ColorStyle = ColorStyle.MIDNIGHT,
 )
 
 val LocalPenelope = staticCompositionLocalOf { penelopeTokens(dark = true, reducedMotion = false) }
 
 private val gradientStops = listOf(PenelopePalette.DeepViolet, PenelopePalette.ElectricPurple, PenelopePalette.Violet)
+private val midnightStops = listOf(MidnightPalette.DeepOcean, MidnightPalette.Ocean, MidnightPalette.Royal)
 
-/** Token set for the dark (default) or light theme. Internal so contrast can be unit-tested. */
-internal fun penelopeTokens(dark: Boolean, reducedMotion: Boolean): PenelopeTokens = if (dark) PenelopeTokens(
+internal val MIDNIGHT_ORB = OrbColors(
+    core = MidnightPalette.Abyss, body = Color(0xFF0B3B66), ribbonA = MidnightPalette.Azure,
+    ribbonB = MidnightPalette.Aqua, rim = MidnightPalette.Frost, halo = MidnightPalette.Sky,
+)
+internal val AMETHYST_ORB = OrbColors(
+    core = Color(0xFF1E0B4B), body = PenelopePalette.DeepViolet, ribbonA = PenelopePalette.Lilac,
+    ribbonB = PenelopePalette.Orchid, rim = PenelopePalette.Lavender, halo = PenelopePalette.ElectricPurple,
+)
+
+/** Token set for a color style in the dark (default) or light theme. Internal so contrast can be unit-tested. */
+internal fun penelopeTokens(dark: Boolean, reducedMotion: Boolean, style: ColorStyle = ColorStyle.MIDNIGHT): PenelopeTokens =
+    when (style) {
+        ColorStyle.MIDNIGHT -> midnightTokens(dark, reducedMotion)
+        ColorStyle.AMETHYST -> amethystTokens(dark, reducedMotion)
+    }
+
+private fun midnightTokens(dark: Boolean, reducedMotion: Boolean): PenelopeTokens = if (dark) PenelopeTokens(
+    isDark = true,
+    background = Brush.verticalGradient(listOf(Color(0xFF071222), MidnightPalette.Night, Color(0xFF030912))),
+    backgroundBase = MidnightPalette.Night,
+    glowA = MidnightPalette.Sky.copy(alpha = 0.22f),
+    glowB = MidnightPalette.Teal.copy(alpha = 0.12f),
+    glowC = MidnightPalette.Royal.copy(alpha = 0.16f),
+    brandGradient = Brush.linearGradient(midnightStops),
+    brandGradientColors = midnightStops,
+    brandColors = listOf(MidnightPalette.Ocean, MidnightPalette.Cyan, MidnightPalette.Ice),
+    glassFill = Color.White.copy(alpha = 0.05f),
+    glassBorder = MidnightPalette.Azure.copy(alpha = 0.18f),
+    glassStrong = MidnightPalette.Raised.copy(alpha = 0.96f),
+    textPrimary = MidnightPalette.Moon,
+    textSecondary = MidnightPalette.MoonSoft,
+    success = Color(0xFF34D399),
+    warning = PenelopePalette.Amber,
+    danger = PenelopePalette.Coral,
+    reducedMotion = reducedMotion,
+    orb = MIDNIGHT_ORB,
+    style = ColorStyle.MIDNIGHT,
+) else PenelopeTokens(
+    isDark = false,
+    background = Brush.verticalGradient(listOf(Color(0xFFFBFDFF), MidnightPalette.Pearl, Color(0xFFE6F1FA))),
+    backgroundBase = MidnightPalette.Pearl,
+    glowA = MidnightPalette.Sky.copy(alpha = 0.14f),
+    glowB = MidnightPalette.Teal.copy(alpha = 0.08f),
+    glowC = Color(0xFFDDEFFC),
+    brandGradient = Brush.linearGradient(midnightStops),
+    brandGradientColors = midnightStops,
+    brandColors = listOf(MidnightPalette.Azure, MidnightPalette.SkyDeep, MidnightPalette.OceanDeep),
+    glassFill = Color.White.copy(alpha = 0.72f),
+    glassBorder = Color(0xFFB6D9F2),
+    glassStrong = Color.White.copy(alpha = 0.94f),
+    textPrimary = MidnightPalette.Ink,
+    textSecondary = MidnightPalette.InkSoft,
+    success = Color(0xFF047857),
+    warning = Color(0xFF9A5B00),
+    danger = Color(0xFFC62A2F),
+    reducedMotion = reducedMotion,
+    orb = MIDNIGHT_ORB,
+    style = ColorStyle.MIDNIGHT,
+)
+
+private fun amethystTokens(dark: Boolean, reducedMotion: Boolean): PenelopeTokens = if (dark) PenelopeTokens(
     isDark = true,
     background = Brush.verticalGradient(listOf(Color(0xFF0B0912), PenelopePalette.Black, Color(0xFF0E0819))),
     backgroundBase = PenelopePalette.Black,
@@ -104,6 +217,8 @@ internal fun penelopeTokens(dark: Boolean, reducedMotion: Boolean): PenelopeToke
     warning = PenelopePalette.Amber,
     danger = PenelopePalette.Coral,
     reducedMotion = reducedMotion,
+    orb = AMETHYST_ORB,
+    style = ColorStyle.AMETHYST,
 ) else PenelopeTokens(
     isDark = false,
     background = Brush.verticalGradient(listOf(Color(0xFFFCFBFF), PenelopePalette.Pearl, Color(0xFFF1EBFF))),
@@ -123,9 +238,11 @@ internal fun penelopeTokens(dark: Boolean, reducedMotion: Boolean): PenelopeToke
     warning = Color(0xFF9A5B00),
     danger = Color(0xFFC62A2F),
     reducedMotion = reducedMotion,
+    orb = AMETHYST_ORB,
+    style = ColorStyle.AMETHYST,
 )
 
-private val LightColors = lightColorScheme(
+private val AmethystLight = lightColorScheme(
     primary = PenelopePalette.ElectricPurple,
     onPrimary = Color.White,
     primaryContainer = PenelopePalette.Mist,
@@ -154,7 +271,7 @@ private val LightColors = lightColorScheme(
     onErrorContainer = Color(0xFF5C0A0D),
 )
 
-private val DarkColors = darkColorScheme(
+private val AmethystDark = darkColorScheme(
     primary = PenelopePalette.Lilac,
     onPrimary = Color(0xFF1E0B4B),
     primaryContainer = PenelopePalette.DeepViolet,
@@ -182,6 +299,70 @@ private val DarkColors = darkColorScheme(
     errorContainer = Color(0xFF4A1418),
     onErrorContainer = Color(0xFFFFDADB),
 )
+
+private val MidnightLight = lightColorScheme(
+    primary = MidnightPalette.SkyDeep,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE0F2FE),
+    onPrimaryContainer = MidnightPalette.Ink,
+    secondary = MidnightPalette.Ocean,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFDDF4F8),
+    onSecondaryContainer = MidnightPalette.Ink,
+    tertiary = MidnightPalette.Royal,
+    tertiaryContainer = Color(0xFFDBEAFE),
+    onTertiaryContainer = MidnightPalette.Ink,
+    background = MidnightPalette.Pearl,
+    onBackground = MidnightPalette.Ink,
+    surface = Color(0xFFFBFDFF),
+    onSurface = MidnightPalette.Ink,
+    surfaceVariant = Color(0xFFE6EEF6),
+    onSurfaceVariant = MidnightPalette.InkSoft,
+    surfaceContainerHighest = Color(0xFFE6EEF6),
+    surfaceContainerHigh = Color(0xFFEDF3F9),
+    surfaceContainer = Color(0xFFF1F6FB),
+    surfaceContainerLow = Color(0xFFF7FAFD),
+    outline = Color(0xFFB7C6D6),
+    outlineVariant = Color(0xFFDCE6F0),
+    error = Color(0xFFC62A2F),
+    errorContainer = Color(0xFFFFE3E3),
+    onErrorContainer = Color(0xFF5C0A0D),
+)
+
+private val MidnightDark = darkColorScheme(
+    primary = Color(0xFF67E8F9),
+    onPrimary = Color(0xFF003544),
+    primaryContainer = MidnightPalette.DeepOcean,
+    onPrimaryContainer = MidnightPalette.Moon,
+    secondary = MidnightPalette.Frost,
+    onSecondary = Color(0xFF00344F),
+    secondaryContainer = Color(0xFF12304A),
+    onSecondaryContainer = MidnightPalette.Moon,
+    tertiary = MidnightPalette.Aqua,
+    tertiaryContainer = Color(0xFF0E3B3A),
+    onTertiaryContainer = MidnightPalette.Moon,
+    background = MidnightPalette.Night,
+    onBackground = MidnightPalette.Moon,
+    surface = MidnightPalette.Navy,
+    onSurface = MidnightPalette.Moon,
+    surfaceVariant = MidnightPalette.RaisedHigh,
+    onSurfaceVariant = MidnightPalette.MoonSoft,
+    surfaceContainerHighest = Color(0xFF1C2B42),
+    surfaceContainerHigh = MidnightPalette.RaisedHigh,
+    surfaceContainer = MidnightPalette.Raised,
+    surfaceContainerLow = Color(0xFF0B1424),
+    outline = Color(0xFF3D5470),
+    outlineVariant = MidnightPalette.Line,
+    error = Color(0xFFFCA5A5),
+    errorContainer = Color(0xFF4A1418),
+    onErrorContainer = Color(0xFFFFDADB),
+)
+
+/** Material color scheme for a style and brightness. Internal so contrast can be unit-tested. */
+internal fun penelopeColorScheme(dark: Boolean, style: ColorStyle) = when (style) {
+    ColorStyle.MIDNIGHT -> if (dark) MidnightDark else MidnightLight
+    ColorStyle.AMETHYST -> if (dark) AmethystDark else AmethystLight
+}
 
 /**
  * System sans-serif (One UI Sans on Galaxy phones, Roboto elsewhere) with a restrained scale:
@@ -217,6 +398,7 @@ private val PenelopeShapes = Shapes(
 fun CarCompanionTheme(
     themeMode: ThemeMode = ThemeMode.DARK,
     reduceMotion: Boolean = false,
+    colorStyle: ColorStyle = ColorStyle.MIDNIGHT,
     content: @Composable () -> Unit,
 ) {
     val dark = when (themeMode) {
@@ -230,14 +412,15 @@ fun CarCompanionTheme(
             .getOrDefault(false)
     }
     val reduced = reduceMotion || systemAnimationsOff
-    val tokens = penelopeTokens(dark, reduced)
+    val tokens = penelopeTokens(dark, reduced, colorStyle)
+    val scheme = penelopeColorScheme(dark, colorStyle)
     CompositionLocalProvider(LocalPenelope provides tokens) {
-        MaterialTheme(
-            colorScheme = if (dark) DarkColors else LightColors,
-            typography = PenelopeTypography,
-            shapes = PenelopeShapes,
-            content = content,
-        )
+        MaterialTheme(colorScheme = scheme, typography = PenelopeTypography, shapes = PenelopeShapes) {
+            // Screens draw on Penelope's own background rather than a Material Surface, so set the
+            // default text color here. Without it, text with no explicit color falls back to black,
+            // which was unreadable in dark mode (Settings, History, vehicle editing).
+            CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }
 

@@ -233,7 +233,7 @@ fun BrandWordmark(name: String, modifier: Modifier = Modifier, fontSizeSp: Int =
         modifier = modifier.semantics { heading() },
         style = TextStyle(
             brush = Brush.linearGradient(
-                if (t.isDark) listOf(Color(0xFFE9D5FF), t.brandColors[1]) else listOf(t.brandColors[1], t.brandColors[2]),
+                if (t.isDark) listOf(t.brandColors[2], t.brandColors[1]) else listOf(t.brandColors[1], t.brandColors[2]),
             ),
             fontSize = fontSizeSp.sp,
             fontWeight = FontWeight.SemiBold,
@@ -373,6 +373,10 @@ object PenelopeIcons {
     val Info = line("info", "M12,3.5 A8.5,8.5 0 1 1 11.99,3.5", "M12,11 V16.5", "M12,7.8 H12.01")
     val Check = line("check", "M5,12.5 L10,17 L19,7.5")
     val Link = line("link", "M7,12 C7,9 9,7 12,7 H13", "M17,12 C17,15 15,17 12,17 H11", "M9,12 H15")
+    val Wave = line("wave", "M5,10 V14", "M8.5,7 V17", "M12,4.5 V19.5", "M15.5,7 V17", "M19,10 V14")
+    val Wrench = line("wrench", "M15,4.5 A4.5,4.5 0 1 0 19.5,9 H17 L15,7 Z", "M12.5,11.5 L5,19")
+    val Engine = line("engine", "M4,10 H6 V8 H9 V6.5 H13 V8 H16 L18,10 H20 V15 H18 L16,17 H8 L6,15 H4 Z")
+    val Help = line("help", "M12,3.5 A8.5,8.5 0 1 1 11.99,3.5", "M9.6,9.6 A2.5,2.5 0 1 1 13,11.8 C12.3,12.2 12,12.7 12,13.5", "M12,16.8 H12.01")
     val Plug = line("plug", "M9,3.5 V8", "M15,3.5 V8", "M6.5,8 H17.5 V11 A5.5,5.5 0 0 1 6.5,11 Z", "M12,16.5 V20.5")
     val Tune = line("tune", "M4,7 H13", "M17,7 H20", "M15,5 V9", "M4,17 H7", "M11,17 H20", "M9,15 V19")
     val Gauge = line("gauge", "M4.5,16 A8,8 0 1 1 19.5,16", "M12,13 L15.5,9", "M12,13 H12.01")
