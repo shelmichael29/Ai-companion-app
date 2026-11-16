@@ -139,6 +139,9 @@ fun SettingsScreen(
 
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        // A transparent container has no matching content color, so text would fall back to
+        // black in dark mode. Use the theme's text color explicitly.
+        contentColor = MaterialTheme.colorScheme.onSurface,
         topBar = { com.aicarcompanion.app.ui.design.PenelopeTopBar("Settings", onBack) },
     ) { padding ->
         Column(
@@ -149,7 +152,7 @@ fun SettingsScreen(
             Text(
                 "Natural speed and pitch are both 1.0. If the voice sounds squeaky or rushed, tap \"Reset to natural voice\", " +
                     "or try a different voice or speech engine.",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             LabeledSlider(
                 "Speaking speed", settings.speechRate, AppSettings.RATE_RANGE, viewModel::setSpeechRate,
@@ -209,7 +212,7 @@ fun SettingsScreen(
             Text("Status: ${ai.label}", style = MaterialTheme.typography.bodyMedium)
             Text(
                 "Model: ${viewModel.aiModelName} · App Check: ${viewModel.aiAppCheckProvider}",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             com.aicarcompanion.app.ui.design.ExpandableSection("What is sent to Google?") {
                 Text(
@@ -217,17 +220,17 @@ fun SettingsScreen(
                         "what you say or type to her (speech is turned into text first), the recent conversation, your car's " +
                         "year, make, model, trim and engine details, odometer, saved warning codes with their dates, recent " +
                         "service titles and dates, problems you've described, adapter connection status and your detail level.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     "Never sent: your VIN, car nickname, photos, receipts, costs, shop names, service notes or location.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     "Google's Gemini API terms apply. On Google's free tier, Google may use conversations to improve its " +
                         "products and people may review them, so please don't share personal or sensitive information. " +
                         "Turn this off to keep conversations on your phone with built-in answers.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OutlinedButton(onClick = viewModel::resetConversation, modifier = Modifier.heightIn(min = 48.dp)) {
@@ -246,7 +249,7 @@ fun SettingsScreen(
             Heading("How much detail?")
             Text(
                 "You can also ask anytime: \"explain that more simply\" or \"give me the technical explanation\".",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             ExplanationLevel.entries.forEach { level ->
                 Row(
@@ -259,7 +262,7 @@ fun SettingsScreen(
                     RadioButton(selected = settings.explanationLevel == level, onClick = null)
                     Column(Modifier.padding(start = 12.dp)) {
                         Text(level.label + if (level == ExplanationLevel.EVERYDAY) " (recommended)" else "", style = MaterialTheme.typography.bodyLarge)
-                        Text(level.description, style = MaterialTheme.typography.bodySmall)
+                        Text(level.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -295,7 +298,7 @@ fun SettingsScreen(
                 "Vehicle lookups use free public services: FuelEconomy.gov (U.S. DOE/EPA) and NHTSA vPIC. " +
                     "Speech uses your phone's built-in recognition and text-to-speech. No accounts or paid services are used. " +
                     "Android's TalkBack screen reader works alongside ${settings.assistantName}.",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -338,7 +341,7 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = null)
     }
@@ -368,6 +371,6 @@ private fun Picker(
                 }
             }
         }
-        emptyHint?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        emptyHint?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
