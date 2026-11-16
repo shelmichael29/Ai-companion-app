@@ -12,9 +12,12 @@ import com.aicarcompanion.app.diagnostics.dtc.DtcKnowledgeSource
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DiagnosticObservation
 import com.aicarcompanion.app.domain.model.ObservationKind
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 import java.util.UUID
 
@@ -58,6 +61,11 @@ class GeminiReasoningProvider(
     private val recorder: ObservationRecorder? = null,
     private val now: () -> Instant = Instant::now,
     private val maxHistoryTurns: Int = 12,
+    /**
+     * Upper bound for one AI answer, including the client's own retries. A hung or misbehaving
+     * client can never leave Penelope silent: after this she gives her built-in answer.
+     */
+    private val aiTimeoutMillis: Long = 30_000,
 ) : ReasoningProvider {
 
     private val _status = MutableStateFlow(initialStatus())
@@ -114,7 +122,7 @@ class GeminiReasoningProvider(
         val allowedCodes = mentioned + ctx.demoCodes.map { it.code } + ctx.latestCodeRead?.codes?.map { it.code }.orEmpty()
         val system = PromptBuilder.systemInstruction(request.assistantName, request.level, ctx, knowledge, mentioned, now())
 
-        return when (val result = client.generate(system, history.toList(), request.utterance)) {
+        return when (val result = generateSafely(system, request.utterance)) {
             is AiResult.Reply -> {
                 val cleaned = ReplyGuard.clean(result.text)
                 _status.value = AiStatus.Ready(result.model)
@@ -138,6 +146,27 @@ class GeminiReasoningProvider(
             }
         }
     }
+
+    /**
+     * Calls the AI client without letting it crash or stall Penelope: any exception, or no answer
+     * within [aiTimeoutMillis], becomes an [AiResult.Failure], which falls back to the built-in answer.
+     * Cancellation of the caller (e.g. the user ending the conversation) still propagates.
+     */
+    private suspend fun generateSafely(system: String, message: String): AiResult = try {
+        withTimeoutOrNull(aiTimeoutMillis) { client.generate(system, history.toList(), message) }
+            ?: AiResult.Failure(AiFailure.TIMEOUT, "No AI answer within ${aiTimeoutMillis / 1000} s")
+    } catch (e: TimeoutCancellationException) {
+        AiResult.Failure(AiFailure.TIMEOUT, "AI client timed out")
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AiResult.Failure(AiErrorClassifier.classify(e.javaClass.simpleName, e.message, e.hasNetworkCause()), "Unexpected AI error: ${e.javaClass.simpleName}")
+    } catch (e: LinkageError) {
+        // e.g. a missing or mismatched AI SDK class; the rest of the app keeps working.
+        AiResult.Failure(AiFailure.OTHER, "AI library unavailable: ${e.javaClass.simpleName}")
+    }
+
+    private fun Throwable.hasNetworkCause(): Boolean = generateSequence(this) { it.cause }.take(8).any { it is java.io.IOException }
 
     /** Keeps both AI and deterministic turns in the AI history so follow-ups have full context. */
     private fun remember(userText: String, reply: AssistantReply): AssistantReply {
