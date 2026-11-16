@@ -90,3 +90,6 @@ policy.
 | Unavailable: usage limit reached | Free-tier quota; wait or move to Blaze. |
 | Unavailable: no internet / took too long | Network; Penelope uses built-in answers meanwhile. |
 | Off | You turned it off in Settings. |
+
+
+For how CI uses the `GOOGLE_SERVICES_JSON` secret, see `docs/CI.md`.
