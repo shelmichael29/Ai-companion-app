@@ -124,9 +124,8 @@ class PenelopeSafetyRegressionTest {
     }
 
     @Test fun `can I still drive is always answered by the app`() = runTest {
-        // Phrases the parser recognizes today. Known gap (reported, not changed here): "can I keep
-        // driving" is not yet recognized as this question, so it goes to Gemini's general answer.
-        for (phrase in listOf("Can I still drive my car?", "is it safe to drive", "is it okay to drive", "should I drive it")) {
+        // More variations ("can I keep driving", "should I pull over"...) are covered in SafetyQuestionAndAiGuardTest.
+        for (phrase in listOf("Can I still drive my car?", "is it safe to drive", "is it okay to drive", "should I drive it", "can I keep driving")) {
             val gemini = MockGemini()
             val reply = penelope(gemini).respond(request(phrase))
             assertTrue("Gemini was asked \"$phrase\"", gemini.calls.isEmpty())
