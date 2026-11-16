@@ -22,3 +22,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "AiCarCompanion"
 include(":app")
+// Experimental, isolated BMW ENET connection tester (separate app; does not affect Penelope).
+include(":enet-core")
+include(":enet-tester")
