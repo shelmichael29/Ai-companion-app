@@ -62,6 +62,10 @@ import com.aicarcompanion.app.ui.history.HistoryScreen
 import com.aicarcompanion.app.ui.home.HomeScreen
 import com.aicarcompanion.app.ui.results.ResultsScreen
 import com.aicarcompanion.app.ui.settings.SettingsScreen
+import com.aicarcompanion.app.ui.settings.SettingsViewModel
+import com.aicarcompanion.app.ui.dashboard.ExtrasContent
+import com.aicarcompanion.app.dashboard.ExtraTool
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aicarcompanion.app.ui.theme.Penelope
 import com.aicarcompanion.app.ui.vehicles.VehicleEditScreen
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
@@ -76,6 +80,7 @@ private object Routes {
     const val ADAPTER = "adapter"
     const val ADAPTER_ADVANCED = "adapter/advanced"
     const val RESULTS = "results"
+    const val EXTRAS = "extras"
     const val VEHICLE_EDIT = "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}={${VehicleEditViewModel.VEHICLE_ID_ARG}}"
 
     fun vehicleEdit(id: String?) = if (id == null) "vehicle/edit" else "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}=$id"
@@ -127,6 +132,8 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                     onOpenResults = { navController.navigate(Routes.RESULTS) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
                     onOpenHistory = { navController.navigateTab(Routes.HISTORY) },
+                    onOpenExtras = { navController.navigate(Routes.EXTRAS) },
+                    onOpenConnectionSettings = { navController.navigate(Routes.ADAPTER_ADVANCED) },
                 )
             }
             composable(Routes.GARAGE) {
@@ -163,6 +170,26 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                 Column {
                     PenelopeTopBar("Advanced connection", onBack = { navController.popBackStack() })
                     AdvancedConnectionScreen(contentPadding = PaddingValues(bottom = navBottom))
+                }
+            }
+            composable(Routes.EXTRAS) {
+                val vm: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory)
+                val s by vm.settings.collectAsStateWithLifecycle()
+                Column {
+                    PenelopeTopBar("Extras", onBack = { navController.popBackStack() })
+                    ExtrasContent(
+                        level = s.explanationLevel,
+                        dashboard = s.dashboard,
+                        onChangeDashboard = vm::setDashboard,
+                        onOpenTool = { tool ->
+                            when (tool) {
+                                ExtraTool.MILEAGE_LOG, ExtraTool.SERVICE_RECORDS -> navController.navigateTab(Routes.HISTORY)
+                                ExtraTool.SAMPLE_DATA -> navController.navigate(Routes.SETTINGS)
+                                else -> Unit // Planned tools aren't clickable.
+                            }
+                        },
+                        contentPadding = PaddingValues(bottom = navBottom),
+                    )
                 }
             }
             composable(Routes.SETTINGS) {

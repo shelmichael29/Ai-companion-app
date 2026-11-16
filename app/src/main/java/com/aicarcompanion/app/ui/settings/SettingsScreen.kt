@@ -103,6 +103,7 @@ class SettingsViewModel(
     fun setSpeechPitch(pitch: Float) = store.update { it.copy(speechPitch = pitch) }
     fun setContinuous(enabled: Boolean) = store.update { it.copy(continuousConversation = enabled) }
     fun setLevel(level: ExplanationLevel) = store.update { it.copy(explanationLevel = level) }
+    fun setDashboard(dashboard: com.aicarcompanion.app.dashboard.DashboardSettings) = store.update { it.copy(dashboard = dashboard) }
     fun setVoice(id: String?) = store.update { it.copy(ttsVoice = id) }
     fun setTheme(mode: ThemeMode) = store.update { it.copy(themeMode = mode) }
     fun setReduceMotion(enabled: Boolean) = store.update { it.copy(reduceMotion = enabled) }
@@ -263,6 +264,13 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            Heading("Home screen")
+            com.aicarcompanion.app.ui.dashboard.HomeLayoutEditor(
+                level = settings.explanationLevel,
+                dashboard = settings.dashboard,
+                onChange = viewModel::setDashboard,
+            )
 
             Heading("Assistant name")
             OutlinedTextField(

@@ -64,6 +64,14 @@ Also note:
 
 The experimental ENET tester (`:enet-tester`, `:enet-core`) is built, tested and linted in the same run. Its APK is saved as `enet-tester-debug-<commit>` (see `docs/ENET_TESTER.md`).
 
+## Compose UI tests (Robolectric)
+
+UI tests such as `DashboardUiTest` render real screens on the JVM with Robolectric, inside the normal
+`testDebugUnitTest` step.
+- **No emulator, device or paid service** is needed.
+- **The app's own `Application` isn't started:** tests use `@Config(application = Application::class)`, so Firebase, Bluetooth and the database stay out of them.
+- **First run:** Robolectric downloads its Android runtime jar from Maven Central once; CI then caches it.
+
 ## Running the same checks locally
 ```
 ./gradlew assembleDebug testDebugUnitTest :enet-core:test lintDebug
