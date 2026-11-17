@@ -18,7 +18,7 @@ Feature branches are checked through their pull request, so each push isn't test
 | Security scan | `scripts/secret_scan.py --history` | A secret, key file, `.logcat` or VIN is committed |
 | Debug build | `./gradlew assembleDebug` | The code doesn't compile |
 | Detekt | `./gradlew detekt` | A likely bug is found (`config/detekt/detekt.yml`) |
-| Tests | `./gradlew testDebugUnitTest :enet-core:test` (+ Kover coverage) | Any unit, integration, regression or accessibility test fails |
+| Tests | `./gradlew testDebugUnitTest` (+ Kover coverage) | Any unit, integration, regression or accessibility test fails |
 | Android Lint | `./gradlew lintDebug` | Lint finds an error (warnings are reported but allowed) |
 | Release build | `./gradlew :app:assembleRelease` | Release tags and releases only |
 | Quality report | `scripts/quality_report.py` | Always written; it appears in the run summary |
@@ -70,7 +70,7 @@ Also note:
 - **Every Gemini failure type** falls back to the built-in answer, with a one-time notice and the correct status. Penelope recovers when Gemini comes back.
 - **AI replies that invent trouble codes or live readings** are replaced with the verified answer.
 
-The experimental ENET tester (`:enet-tester`, `:enet-core`) is built, tested and linted in the same run. Its APK is saved as `enet-tester-debug-<commit>` (see `docs/ENET_TESTER.md`).
+The experimental BMW ENET tester is not in `main`: it lives on the `experiment/*` branches and isn't part of this workflow's checks.
 
 ## Compose UI tests (Robolectric)
 
@@ -82,5 +82,5 @@ UI tests such as `DashboardUiTest` render real screens on the JVM with Robolectr
 
 ## Running the same checks locally
 ```
-./gradlew assembleDebug testDebugUnitTest :enet-core:test lintDebug
+./gradlew assembleDebug testDebugUnitTest lintDebug
 ```

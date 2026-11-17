@@ -11,7 +11,7 @@ This document states the policy. Enforcement comes from GitHub Actions and branc
 | 1 | **Compile** the app (all modules) | `./gradlew assembleDebug` | Yes |
 | 2 | **Static analysis**: Detekt | `./gradlew detekt` | Yes |
 | 3 | **Static analysis**: Android Lint, including accessibility, security and lifecycle checks | `./gradlew lintDebug` | Yes (errors) |
-| 4 | **Unit tests** | `./gradlew testDebugUnitTest :enet-core:test` | Yes |
+| 4 | **Unit tests** | `./gradlew testDebugUnitTest` | Yes |
 | 5 | **Integration and regression tests** | same command; see categories below | Yes |
 | 6 | **Security**: secret scan of files and git history; Dependabot alerts | `python3 scripts/secret_scan.py --history` | Yes |
 | 7 | **Accessibility**: TalkBack labels, 48 dp targets, contrast, 200% font | `AccessibilityAuditTest`, `UiPolishTest`, `SettingsThemeTextTest`, Lint | Yes |
@@ -128,7 +128,6 @@ Record manual results in the stage report as PASS, FAIL or NOT RUN.
 | Gemini | Phone + Firebase build + registered App Check token | Status "Working", a real answer |
 | Crashlytics | Phone + Firebase build | Settings → About → "Send test crash report" (debug only), reopen the app, report appears in Firebase within minutes |
 | OBD-II | Adapter + 2011 528i | Pair, connect, protocol, live data, read codes |
-| ENET | USB Ethernet + F10 | See `docs/ENET_TESTER.md` |
 
 ### Crashlytics
 **Setup:**

@@ -117,11 +117,11 @@ jobs:
         run: ./gradlew detekt
 
       # Unit, integration (Robolectric UI, simulated adapters), regression and accessibility tests,
-      # with line coverage. testDebugUnitTest covers Android modules; :enet-core:test the ENET library.
+      # with line coverage.
       - name: Tests
         id: tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./gradlew testDebugUnitTest :enet-core:test :app:koverXmlReportDebug :enet-core:koverXmlReport
+        run: ./gradlew testDebugUnitTest :app:koverXmlReportDebug
 
       # Lint errors (including accessibility, security and lifecycle checks) fail the job.
       - name: Android Lint
@@ -187,15 +187,6 @@ jobs:
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
-
-      - name: Upload ENET tester APK (experimental)
-        if: success()
-        uses: actions/upload-artifact@v6
-        with:
-          name: enet-tester-debug-${{ steps.apk.outputs.sha }}
-          path: enet-tester/build/outputs/apk/debug/*.apk
-          if-no-files-found: ignore
-          retention-days: 14
 
       # The quality report plus the raw reports it was built from.
       - name: Upload quality report and test, lint, Detekt and coverage reports
