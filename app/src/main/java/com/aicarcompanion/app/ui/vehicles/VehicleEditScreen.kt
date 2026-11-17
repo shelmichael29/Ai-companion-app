@@ -283,7 +283,7 @@ private fun DetailsForm(viewModel: VehicleEditViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        FormField("Year *", form.year, errors[VehicleField.YEAR], KeyboardType.Number) { v ->
+        FormField("Year *", form.year, errors[VehicleField.YEAR], keyboardType = KeyboardType.Number) { v ->
             viewModel.update { it.copy(year = v.filter(Char::isDigit).take(4)) }
         }
         FormField("Make *", form.make, errors[VehicleField.MAKE], capitalize = true) { v ->
@@ -304,11 +304,11 @@ private fun DetailsForm(viewModel: VehicleEditViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FormField(
                     "Displacement (L)", form.displacementLiters, errors[VehicleField.DISPLACEMENT],
-                    KeyboardType.Decimal, Modifier.weight(1f),
+                    Modifier.weight(1f), KeyboardType.Decimal,
                 ) { v -> viewModel.update { it.copy(displacementLiters = v) } }
                 FormField(
                     "Cylinders", form.cylinders, errors[VehicleField.CYLINDERS],
-                    KeyboardType.Number, Modifier.weight(1f),
+                    Modifier.weight(1f), KeyboardType.Number,
                 ) { v -> viewModel.update { it.copy(cylinders = v.filter(Char::isDigit).take(2)) } }
             }
             EnumDropdown("Cylinder layout", form.layout, EngineLayout.entries, { it.label }) { v ->
@@ -345,7 +345,7 @@ private fun DetailsForm(viewModel: VehicleEditViewModel) {
         FormField("VIN", form.vin, errors[VehicleField.VIN], allCaps = true) { v ->
             viewModel.update { it.copy(vin = v.uppercase().take(17)) }
         }
-        FormField("Odometer (miles)", form.odometerMiles, errors[VehicleField.ODOMETER], KeyboardType.Number) { v ->
+        FormField("Odometer (miles)", form.odometerMiles, errors[VehicleField.ODOMETER], keyboardType = KeyboardType.Number) { v ->
             viewModel.update { it.copy(odometerMiles = v.filter(Char::isDigit).take(7)) }
         }
         FormField("Nickname", form.nickname, errors[VehicleField.NICKNAME], capitalize = true) { v ->
@@ -374,8 +374,8 @@ private fun FormField(
     label: String,
     value: String,
     error: String?,
+    modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text,
-    modifier: Modifier = Modifier.fillMaxWidth(),
     capitalize: Boolean = false,
     allCaps: Boolean = false,
     onValueChange: (String) -> Unit,
@@ -395,7 +395,8 @@ private fun FormField(
                 else -> KeyboardCapitalization.None
             },
         ),
-        modifier = modifier,
+        // Full width by default; callers can still size it, e.g. with weight in a Row.
+        modifier = Modifier.fillMaxWidth().then(modifier),
     )
 }
 

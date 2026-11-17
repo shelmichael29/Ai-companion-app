@@ -26,7 +26,7 @@ Feature branches are checked through their pull request, so each push isn't test
 After a failure the later steps still run, so one run shows every result.
 
 ## Versions
-The workflow uses the versions the project needs. Java 17, from `app/build.gradle.kts` (`JavaVersion.VERSION_17`, `jvmTarget = "17"`). Android SDK platform 35 (`compileSdk`/`targetSdk = 35`), build-tools 34.0.0 (the AGP 8.7.3 default). Gradle 8.14.3, from the wrapper.
+The workflow uses the versions the project needs. Java 17, from `app/build.gradle.kts` (`JavaVersion.VERSION_17`, `jvmTarget = "17"`). Android SDK platform 37 (`compileSdk = 37`; `targetSdk` stays 35), build-tools 36.0.0 (the AGP 9.5 default). Gradle 9.6.0, from the wrapper. Kotlin is compiled by AGP itself (AGP 9 built-in Kotlin), so there is no separate Kotlin Android plugin.
 
 ## Caching
 `gradle/actions/setup-gradle` caches the Gradle distribution and downloaded dependencies, and also checks the Gradle wrapper is genuine. Only runs on `main` save to the cache; other branches and pull requests reuse it.

@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kover) // test coverage report (informational; not a gate)
     alias(libs.plugins.ksp)
@@ -20,7 +19,7 @@ if (firebaseConfigured) {
 
 android {
     namespace = "com.aicarcompanion.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.aicarcompanion.app"
@@ -53,9 +52,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     lint {
         // Lint errors fail the build. Accessibility (e.g. missing content descriptions, small touch
@@ -95,6 +91,8 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    // Material 3 stopped bundling the standard icons; the app uses a few from the core set.
+    implementation(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.room.runtime)
@@ -116,4 +114,11 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
     testImplementation(libs.robolectric)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// AGP 9 compiles Kotlin itself (no separate Kotlin Android plugin).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
