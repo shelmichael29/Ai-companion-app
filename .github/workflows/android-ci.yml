@@ -59,7 +59,7 @@ jobs:
           persist-credentials: false
 
       # app/build.gradle.kts: sourceCompatibility/targetCompatibility/jvmTarget = 17.
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
