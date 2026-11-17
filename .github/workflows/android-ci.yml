@@ -1,13 +1,26 @@
 name: Android CI
 
-# Builds the debug APK, runs all JVM unit tests and Android lint on every push and pull request.
-# Any compile error, failing test or lint error fails the run.
+# Penelope's quality gate (see docs/DEVELOPMENT_QUALITY_GATES.md). Two jobs:
+#   1. Security scan: committed secrets in files and git history (fast, no Android SDK).
+#   2. Build, analysis and tests: debug build, Detekt, unit/integration/regression/accessibility
+#      tests with coverage, Android Lint, optional release build, and the quality report.
+# Any critical failure fails the run; the report says exactly which check failed.
 
 on:
+  # Feature branches are checked through their pull request; pushes to main and release tags run
+  # directly. This avoids running the same checks twice for every PR push.
   push:
-    branches: ["**"]
+    branches: [main]
+    tags: ["v*"]
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      release_build:
+        description: "Also build the release APK"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,8 +31,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build, unit tests and lint
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # full history, so the scan covers every commit
+
+      # Prints file, line and kind only; never the matched value.
+      - name: Scan for committed secrets (files and history)
+        run: |
+          python3 scripts/test_secret_scan.py
+          python3 scripts/secret_scan.py --history
+
+  quality:
+    name: Build, analysis and tests
+    needs: security
+    if: ${{ !cancelled() }} # still build and test when the scan fails, so the report is complete
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -41,12 +72,20 @@ jobs:
           echo "Android SDK ready: platforms;android-35, build-tools;34.0.0"
 
       # Caches the Gradle distribution and dependencies, and validates the Gradle wrapper.
-      # Only runs on main write to the cache; other branches and pull requests read from it.
+      # Only main writes to the cache; other branches and pull requests read from it.
       - uses: gradle/actions/setup-gradle@v5
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Firebase config is optional: without it the app builds with Gemini answers disabled.
+      # Robolectric (Compose UI tests on the JVM) downloads an Android runtime jar once; cache it.
+      - name: Cache Robolectric runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
+          restore-keys: robolectric-
+
+      # Firebase config is optional: without it the app builds with Gemini and crash reporting off.
       # The file is written from an encrypted repository secret, never printed, and deleted at the end.
       # Secrets are not available to pull requests from forks, so those build without Firebase.
       - name: Add Firebase config from repository secret (if set)
@@ -71,51 +110,54 @@ jobs:
         id: build
         run: ./gradlew assembleDebug
 
-      # testDebugUnitTest covers the Android modules; :enet-core:test the pure-Kotlin ENET library.
-      - name: Run unit tests
+      # Kotlin static analysis (likely bugs, coroutine misuse); rules in config/detekt/detekt.yml.
+      - name: Detekt
+        id: detekt
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: ./gradlew detekt
+
+      # Unit, integration (Robolectric UI, simulated adapters), regression and accessibility tests,
+      # with line coverage. testDebugUnitTest covers Android modules; :enet-core:test the ENET library.
+      - name: Tests
         id: tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./gradlew testDebugUnitTest :enet-core:test
+        run: ./gradlew testDebugUnitTest :enet-core:test :app:koverXmlReportDebug :enet-core:koverXmlReport
 
-      # Runs even if tests failed, so both results are reported in one run. Lint errors fail the job.
-      - name: Run Android lint
+      # Lint errors (including accessibility, security and lifecycle checks) fail the job.
+      - name: Android Lint
         id: lint
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: ./gradlew lintDebug
 
-      - name: Write results summary
+      # Release builds: on release tags, published releases, or when asked in a manual run.
+      # The APK is unsigned; Play uploads are signed separately.
+      - name: Build release APK
+        id: release
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release' || inputs.release_build) }}
+        run: ./gradlew :app:assembleRelease
+
+      - name: Quality report
+        id: report
         if: ${{ !cancelled() }}
         env:
-          BUILD: ${{ steps.build.outcome }}
-          TESTS: ${{ steps.tests.outcome }}
-          LINT: ${{ steps.lint.outcome }}
+          STAGE: ${{ github.event.pull_request.title || github.event.head_commit.message || github.workflow }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          SECURITY: ${{ needs.security.result }}
         run: |
-          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import glob, os, xml.etree.ElementTree as ET
-          icon = {"success": "✅", "failure": "❌", "skipped": "⏭️", "cancelled": "⏹️"}
-          print("## Android CI results\n")
-          print("| Check | Result |\n|---|---|")
-          for name, key in (("Debug build", "BUILD"), ("Unit tests", "TESTS"), ("Android lint", "LINT")):
-              outcome = os.environ.get(key) or "skipped"
-              print(f"| {name} | {icon.get(outcome, '')} {outcome} |")
-          total = failed = skipped = 0
-          failures = []
-          for path in glob.glob("*/build/test-results/**/*.xml", recursive=True):
-              suite = ET.parse(path).getroot()
-              total += int(suite.get("tests", 0)); skipped += int(suite.get("skipped", 0))
-              for case in suite.iter("testcase"):
-                  if case.find("failure") is not None or case.find("error") is not None:
-                      failed += 1
-                      failures.append(f"{case.get('classname', '').split('.')[-1]} › {case.get('name')}")
-          if total:
-              print(f"\n**Unit tests:** {total - failed - skipped} passed, {failed} failed, {skipped} skipped (of {total}).")
-          for f in failures[:30]:
-              print(f"- ❌ {f}")
-          for lint in sorted(glob.glob("*/build/reports/lint-results-debug.xml")):
-              issues = list(ET.parse(lint).getroot().iter("issue"))
-              errors = sum(1 for i in issues if i.get("severity") in ("Error", "Fatal"))
-              print(f"\n**Lint ({lint.split('/')[0]}):** {errors} errors, {len(issues) - errors} warnings.")
-          PY
+          python3 scripts/quality_report.py \
+            --stage "$(printf '%s' "$STAGE" | head -n 1)" --branch "$BRANCH" --commit "$COMMIT" \
+            --build "${{ steps.build.outcome }}" --detekt "${{ steps.detekt.outcome }}" \
+            --tests "${{ steps.tests.outcome }}" --lint "${{ steps.lint.outcome }}" \
+            --security "$SECURITY" --release "${{ steps.release.outcome }}" \
+            --out build/quality/QUALITY_REPORT.md > /dev/null || true
+          cat build/quality/QUALITY_REPORT.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if the security scan failed
+        if: ${{ !cancelled() && needs.security.result != 'success' }}
+        run: |
+          echo "::error::Security scan failed: see the 'Security scan' job."
+          exit 1
 
       - name: Name the APK artifact
         if: success()
@@ -137,6 +179,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload release APK (unsigned)
+        if: ${{ success() && steps.release.outcome == 'success' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ai-car-companion-release-unsigned-${{ steps.apk.outputs.sha }}
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Upload ENET tester APK (experimental)
         if: success()
         uses: actions/upload-artifact@v6
@@ -146,17 +197,21 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Upload test and lint reports
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      # The quality report plus the raw reports it was built from.
+      - name: Upload quality report and test, lint, Detekt and coverage reports
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v6
         with:
-          name: reports-${{ github.event.pull_request.head.sha || github.sha }}
+          name: quality-report-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
+            build/quality/QUALITY_REPORT.md
             */build/reports/tests/
             */build/reports/lint-results-debug.*
+            */build/reports/detekt/
+            */build/reports/kover/
             */build/test-results/
           if-no-files-found: ignore
-          retention-days: 14
+          retention-days: 30
 
       - name: Upload build reports on failure
         if: failure() && steps.build.outcome == 'failure'

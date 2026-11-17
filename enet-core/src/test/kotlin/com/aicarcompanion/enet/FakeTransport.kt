@@ -49,7 +49,7 @@ class FakeTransport(private val now: () -> Long) : EnetTransport {
                 return next.payload as Datagram
             }
 
-            override fun close() {}
+            override fun close() = Unit // Nothing to release in the fake.
         }
     }
 

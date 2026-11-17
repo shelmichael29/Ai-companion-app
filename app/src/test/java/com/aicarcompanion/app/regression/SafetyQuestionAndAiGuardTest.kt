@@ -178,7 +178,9 @@ class SafetyQuestionAndAiGuardTest {
             IllegalStateException("unexpected SDK state") to AiFailure.OTHER,
             RuntimeException("wrapped", UnknownHostException("firebasevertexai.googleapis.com")) to AiFailure.OFFLINE,
             IOException("socket closed") to AiFailure.OFFLINE,
-            RuntimeException("429 RESOURCE_EXHAUSTED: quota") to AiFailure.QUOTA,
+            // A 429 without a daily-quota marker is a temporary rate limit (TemporaryAiErrorsRegressionTest).
+            RuntimeException("429 RESOURCE_EXHAUSTED: quota") to AiFailure.BUSY,
+            RuntimeException("429 RESOURCE_EXHAUSTED: quotaId GenerateRequestsPerDayPerProjectPerModel") to AiFailure.QUOTA,
             NullPointerException() to AiFailure.OTHER,
             NoClassDefFoundError("com/google/firebase/ai/GenerativeModel") to AiFailure.OTHER,
         )
@@ -209,7 +211,7 @@ class SafetyQuestionAndAiGuardTest {
     @Test fun `Penelope keeps working normally after an AI exception`() = runTest {
         var fail = true
         val gemini = MockGemini().apply {
-            behavior = { if (fail) throw IllegalStateException("boom") else AiResult.Reply("Glad to help.", "gemini-3.8-flash") }
+            behavior = { if (fail) error("boom") else AiResult.Reply("Glad to help.", "gemini-3.8-flash") }
         }
         val p = penelope(gemini)
         assertFallsBack(p, "Tell me about my car", ExplanationLevel.ADVANCED, AiFailure.OTHER)

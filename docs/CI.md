@@ -2,21 +2,28 @@
 
 Workflow: `.github/workflows/android-ci.yml`, named **Android CI**.
 
-## When it runs
-- **Every push to any branch.**
-- **Every pull request**, run against the result of merging it into `main`.
-- **Manually:** Actions → Android CI → **Run workflow**.
+> The full quality-gate policy (what must pass after every stage, how to read the report, and how
+> to turn on branch protection) is in `docs/DEVELOPMENT_QUALITY_GATES.md`.
 
-If you push again before a run finishes, the older run is cancelled.
+## When it runs
+- **Every pull request**, run against the result of merging it into `main`.
+- **Pushes to `main`**, plus release tags (`v*`) and published releases, which also build the release APK.
+- **Manually:** Actions → Android CI → **Run workflow**. Tick "Also build the release APK" if needed.
+
+Feature branches are checked through their pull request, so each push isn't tested twice. If you push again before a run finishes, the older run is cancelled.
 
 ## What it checks
-| Step | Command | Fails the run when |
+| Job / step | Command | Fails the run when |
 |---|---|---|
+| Security scan | `scripts/secret_scan.py --history` | A secret, key file, `.logcat` or VIN is committed |
 | Debug build | `./gradlew assembleDebug` | The code doesn't compile |
-| Unit tests | `./gradlew testDebugUnitTest :enet-core:test` | Any test fails |
-| Android lint | `./gradlew lintDebug` | Lint finds an error (warnings are reported but allowed) |
+| Detekt | `./gradlew detekt` | A likely bug is found (`config/detekt/detekt.yml`) |
+| Tests | `./gradlew testDebugUnitTest :enet-core:test` (+ Kover coverage) | Any unit, integration, regression or accessibility test fails |
+| Android Lint | `./gradlew lintDebug` | Lint finds an error (warnings are reported but allowed) |
+| Release build | `./gradlew :app:assembleRelease` | Release tags and releases only |
+| Quality report | `scripts/quality_report.py` | Always written; it appears in the run summary |
 
-Lint runs even when tests fail, so one run shows both results.
+After a failure the later steps still run, so one run shows every result.
 
 ## Versions
 The workflow uses the versions the project needs. Java 17, from `app/build.gradle.kts` (`JavaVersion.VERSION_17`, `jvmTarget = "17"`). Android SDK platform 35 (`compileSdk`/`targetSdk = 35`), build-tools 34.0.0 (the AGP 8.7.3 default). Gradle 8.14.3, from the wrapper.
@@ -25,10 +32,11 @@ The workflow uses the versions the project needs. Java 17, from `app/build.gradl
 `gradle/actions/setup-gradle` caches the Gradle distribution and downloaded dependencies, and also checks the Gradle wrapper is genuine. Only runs on `main` save to the cache; other branches and pull requests reuse it.
 
 ## Results
-- **Summary:** each run's page shows a table with the build, test and lint results, the test counts, and the names of any failing tests.
+- **Summary:** each run's page shows the **Penelope Development Quality Report**: every check as PASS, FAIL or NOT RUN; test counts by category; Lint, Detekt and coverage; and the checks that still need a phone, adapter or car.
 - **Artifacts:**
   - `ai-car-companion-<version>-debug-<commit>`: the debug APK, kept 30 days.
-  - `reports-<commit>`: HTML and XML test and lint reports, kept 14 days.
+  - `quality-report-<commit>`: the quality report plus HTML and XML test, Lint, Detekt and coverage reports, kept 30 days.
+  - `ai-car-companion-release-unsigned-<commit>`: release builds only.
   - `build-reports-<commit>`: added only if the build itself fails.
 
 ## Firebase configuration (`google-services.json`)

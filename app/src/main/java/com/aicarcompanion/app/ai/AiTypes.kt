@@ -11,7 +11,10 @@ enum class AiFailure(val userMessage: String) {
     OFFLINE("No internet connection."),
     TIMEOUT("The AI took too long to answer."),
     APP_CHECK("This app copy isn't verified with Firebase App Check yet."),
-    QUOTA("The AI's usage limit was reached. Try again later."),
+    /** The daily quota is used up. Only for errors that say so; see [AiErrorClassifier]. */
+    QUOTA("Today's AI usage limit was reached; it resets within a day."),
+    /** Temporary: per-minute rate limit or an overloaded model. Usually clears within a minute. */
+    BUSY("Too many requests at the moment; it should work again in a minute."),
     SERVICE_DISABLED("Firebase AI Logic isn't enabled for this project."),
     MODEL_UNAVAILABLE("The selected AI model isn't available."),
     BLOCKED("The AI declined to answer that."),
@@ -76,15 +79,22 @@ object ModelSelection {
 object AiErrorClassifier {
     fun classify(typeName: String, message: String?, causeIsNetwork: Boolean): AiFailure {
         val m = message.orEmpty().lowercase()
+        val compact = m.replace("_", "").replace(" ", "").replace("-", "")
+        val limited = typeName == "QuotaExceededException" || "quota" in m || "429" in m || "resource_exhausted" in m || "rate limit" in m
+        // HTTP 429 covers both a short per-minute rate limit and the daily quota. Only call it the
+        // daily quota when the error says so (e.g. quotaId "...PerDay..."); otherwise it's temporary.
+        val daily = "perday" in compact || "daily" in m
         return when {
-            typeName == "QuotaExceededException" || "quota" in m || "429" in m || "resource_exhausted" in m -> AiFailure.QUOTA
-            typeName == "RequestTimeoutException" -> AiFailure.TIMEOUT
+            limited && daily -> AiFailure.QUOTA
+            limited -> AiFailure.BUSY
+            typeName == "RequestTimeoutException" || "timeout" in typeName.lowercase() || "timed out" in m || "timeout" in m -> AiFailure.TIMEOUT
             typeName == "ServiceDisabledException" || typeName == "APINotConfiguredException" ||
                 "has not been used in project" in m || "is disabled" in m -> AiFailure.SERVICE_DISABLED
             "app check" in m || "appcheck" in m || "app_check" in m -> AiFailure.APP_CHECK
             typeName == "PromptBlockedException" || typeName == "ContentBlockedException" -> AiFailure.BLOCKED
             typeName == "InvalidAPIKeyException" -> AiFailure.NOT_CONFIGURED
             ("not found" in m || "404" in m || "is not supported" in m) && "model" in m -> AiFailure.MODEL_UNAVAILABLE
+            "503" in m || "overloaded" in m || "service unavailable" in m -> AiFailure.BUSY
             "401" in m || "403" in m || "permission_denied" in m || "unauthenticated" in m -> AiFailure.APP_CHECK
             causeIsNetwork || "unable to resolve host" in m || "failed to connect" in m -> AiFailure.OFFLINE
             else -> AiFailure.OTHER
