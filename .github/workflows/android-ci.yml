@@ -106,6 +106,30 @@ jobs:
             echo "GOOGLE_SERVICES_JSON secret not set: building without Firebase; Gemini answers disabled."
           fi
 
+      # Fixed debug signing key: without it every CI run makes a new random key, so each new APK
+      # needs a new App Check debug token and can't update the previous install. The secret holds
+      # the base64 of a debug.keystore (standard debug passwords); it's never printed, and the
+      # file is deleted at the end. Without the secret, builds use a temporary key as before.
+      - name: Add fixed debug signing key from repository secret (if set)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            umask 077
+            KEYSTORE="${ANDROID_USER_HOME:-$HOME/.android}/debug.keystore"
+            mkdir -p "$(dirname "$KEYSTORE")"
+            if printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE" 2>/dev/null &&
+              keytool -list -keystore "$KEYSTORE" -storepass android -alias androiddebugkey > /dev/null 2>&1; then
+              echo "Fixed debug signing key installed (contents not shown)."
+            else
+              rm -f "$KEYSTORE"
+              echo "::error::DEBUG_KEYSTORE_BASE64 isn't a valid debug keystore (store password 'android', alias 'androiddebugkey'). See docs/CI.md."
+              exit 1
+            fi
+          else
+            echo "DEBUG_KEYSTORE_BASE64 secret not set: using a temporary debug key (App Check token changes every build)."
+          fi
+
       - name: Build debug APK
         id: build
         run: ./gradlew assembleDebug
@@ -213,6 +237,6 @@ jobs:
             */build/reports
           if-no-files-found: ignore
 
-      - name: Remove Firebase config
+      - name: Remove Firebase config and signing key
         if: always()
-        run: rm -f app/google-services.json
+        run: rm -f app/google-services.json "${ANDROID_USER_HOME:-$HOME/.android}/debug.keystore"
