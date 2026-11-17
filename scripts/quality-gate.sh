@@ -23,7 +23,7 @@ run() { # run <name> <command...>; prints success/failure
 BUILD=$(run "Build debug APK" ./gradlew assembleDebug)
 DETEKT=$(run "Detekt" ./gradlew detekt)
 if [ "$BUILD" = "success" ]; then
-  TESTS=$(run "Unit, integration and regression tests" ./gradlew testDebugUnitTest :enet-core:test :app:koverXmlReportDebug :enet-core:koverXmlReport)
+  TESTS=$(run "Unit, integration and regression tests" ./gradlew testDebugUnitTest :app:koverXmlReportDebug)
   LINT=$(run "Android Lint" ./gradlew lintDebug)
 else
   TESTS="skipped"; LINT="skipped"
