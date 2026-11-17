@@ -111,6 +111,7 @@ class ObdManager(
             _state.value = ObdConnectionState.Failed(
                 "${device.name} is a Bluetooth Low Energy-only device. This version supports Bluetooth Classic " +
                     "ELM327 adapters; BLE support is planned.",
+                com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailure.UNSUPPORTED_ADAPTER,
             )
             return
         }
@@ -118,6 +119,8 @@ class ObdManager(
         cancelRecovery()
         closeLink()
         this.device = device
+        // Set right away so callers never mistake an earlier failure for this attempt's result.
+        _state.value = ObdConnectionState.Connecting(transport, device.name)
         connectionJob = scope.launch {
             _state.value = ObdConnectionState.Connecting(transport, device.name)
             vlog("Connecting", "adapter" to device.name)
@@ -127,9 +130,13 @@ class ObdManager(
                 throw e
             } catch (e: Exception) {
                 closeLink()
+                val reason = com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailureClassifier.classify(e)
+                vlog("Connection failed", "reason" to reason, "detail" to (e.message ?: e.javaClass.simpleName))
+                // Plain words for everyone; the raw Android error only goes into `detail`.
                 _state.value = ObdConnectionState.Failed(
-                    "Couldn't connect to ${device.name}. Make sure the adapter is plugged in, powered (ignition on " +
-                        "or accessory), and not connected to another app. (${e.message ?: e.javaClass.simpleName})",
+                    "Couldn't connect to ${device.name}. ${reason.everydayMessage}",
+                    reason,
+                    e.message ?: e.javaClass.simpleName,
                 )
             }
         }

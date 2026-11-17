@@ -81,6 +81,7 @@ class VoiceSession(
     private var holdsFocus = false
     /** Set while paused because the internet dropped; cleared by any user action or resume. */
     private var waitingForNetwork: Job? = null
+    private var pendingStatusNotice: String? = null
     /** Automatic resumes since the last successful turn; bounded so a flaky network can't loop. */
     private var networkResumes = 0
 
@@ -136,6 +137,9 @@ class VoiceSession(
         _inputLevel.value = 0f
         output.stop()
         _conversationActive.value = false
+        // A status notice still waiting for a gap isn't lost: it's shown on screen instead.
+        pendingStatusNotice?.let { conversation.addNotice(it) }
+        pendingStatusNotice = null
         releaseFocus()
         _state.value = VoiceState.Idle
     }
@@ -158,6 +162,17 @@ class VoiceSession(
                 pause("Paused while the app was in the background. Tap the microphone to continue.")
             else -> if (_conversationActive.value) pause("Paused while the app was in the background.")
         }
+    }
+
+    /**
+     * A short status message (e.g. "Your adapter disconnected. I'm reconnecting."), delivered
+     * without interrupting anyone:
+     * - **In a hands-free conversation:** it's spoken between turns, after Penelope finishes her
+     *   current reply and before she listens again. Only the latest one is kept.
+     * - **Otherwise:** it's added to the conversation on screen without speaking.
+     */
+    fun queueStatusNotice(text: String) {
+        if (_conversationActive.value) pendingStatusNotice = text else conversation.addNotice(text)
     }
 
     /** Typed input: same pipeline, without the microphone. Continues the conversation if one is active. */
@@ -246,6 +261,11 @@ class VoiceSession(
     /** Either listen again (conversation) or go idle (single turn). */
     private suspend fun afterTurn() {
         if (_conversationActive.value) {
+            pendingStatusNotice?.let { notice ->
+                pendingStatusNotice = null
+                conversation.addNotice(notice)
+                speakNotice(notice) // a safe moment: Penelope just finished, the mic is still off
+            }
             delay(resumeDelayMillis) // Let speaker audio die away before opening the mic.
             if (_conversationActive.value) listen()
         } else {

@@ -27,7 +27,6 @@ import com.aicarcompanion.app.data.vehicledb.UrlConnectionHttpClient
 import com.aicarcompanion.app.data.vehicledb.VehicleCatalogProvider
 import com.aicarcompanion.app.data.vehicledb.VinDecoder
 import com.aicarcompanion.app.diagnostics.dtc.GenericDtcCatalog
-import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothGateway
 import com.aicarcompanion.app.diagnostics.obd.ObdConnection
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
@@ -66,6 +65,8 @@ interface AppContainer {
     val obdConnection: ObdConnection
     val diagnosticCommands: DiagnosticCommandHandler
     val bluetooth: BluetoothGateway
+    /** Beginner-friendly adapter search and connection with bounded retries. */
+    val adapterSetup: com.aicarcompanion.app.connectivity.AdapterConnectionManager
     /** Saved OBD-II connection settings (applied only at the Advanced level). */
     val obdConfig: ObdConfigStore
     val obdControls: ObdAdvancedControls
@@ -145,11 +146,27 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val obdConnection: ObdConnection get() = obdManager
     override val diagnosticCommands: DiagnosticCommandHandler get() = obdManager
 
+    override val adapterSetup by lazy {
+        com.aicarcompanion.app.connectivity.AdapterConnectionManager(
+            scope = appScope,
+            transport = bluetooth,
+            obd = obdManager,
+            lastAdapterAddress = { settings.settings.value.lastAdapterAddress },
+            rememberAdapter = { device -> settings.update { it.copy(lastAdapterAddress = device.address) } },
+            log = connectionLog,
+        )
+    }
+
+    /** Reconnects quietly to the adapter that last worked; never searches or prompts. */
     override fun autoConnectAdapter() {
-        val address = settings.settings.value.lastAdapterAddress ?: return
-        if (obdManager.state.value != ObdConnectionState.Disconnected) return
-        if (bluetooth.availability() != BluetoothAvailability.READY) return
-        bluetooth.findPaired(address)?.let(obdManager::connect)
+        adapterSetup.reconnectLastAdapter()
+    }
+
+    /** Connection changes Penelope may mention, spoken only between conversation turns. */
+    private val announcer by lazy {
+        com.aicarcompanion.app.connectivity.ConnectionAnnouncer(appScope) { text ->
+            if (voiceSessionLazy.isInitialized()) voiceSession.queueStatusNotice(text)
+        }
     }
 
     override val diagnosticsRepository: DiagnosticsRepository by lazy {
@@ -238,6 +255,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     init {
+        announcer.watch(obdManager.state)
         // Live polling covers only the readings the user's detail level shows.
         appScope.launch {
             settings.settings.map { it.explanationLevel }.distinctUntilChanged().collect { obdConnection.setLiveDetail(it) }
