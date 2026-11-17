@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.data.local
 
+import androidx.core.content.edit
 import android.content.Context
 import android.content.SharedPreferences
 import com.aicarcompanion.app.dashboard.DashboardItem
@@ -96,17 +97,17 @@ class SharedPreferencesKeyValueStore(private val prefs: SharedPreferences) : Key
     override fun getFloat(key: String) = if (prefs.contains(key)) prefs.getFloat(key, 0f) else null
     override fun getBoolean(key: String) = if (prefs.contains(key)) prefs.getBoolean(key, false) else null
     override fun write(values: Map<String, Any?>) {
-        val editor = prefs.edit()
-        values.forEach { (k, v) ->
-            when (v) {
-                null -> editor.remove(k)
-                is String -> editor.putString(k, v)
-                is Float -> editor.putFloat(k, v)
-                is Boolean -> editor.putBoolean(k, v)
-                else -> error("Unsupported type for $k")
+        prefs.edit {
+            values.forEach { (k, v) ->
+                when (v) {
+                    null -> remove(k)
+                    is String -> putString(k, v)
+                    is Float -> putFloat(k, v)
+                    is Boolean -> putBoolean(k, v)
+                    else -> error("Unsupported type for $k")
+                }
             }
         }
-        editor.apply()
     }
 }
 

@@ -64,12 +64,12 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # app/build.gradle.kts: compileSdk = 35, targetSdk = 35 (AGP 8.7.3 uses build-tools 34.0.0).
+      # app/build.gradle.kts: compileSdk = 37, targetSdk = 35 (AGP 9.5 uses build-tools 36.0.0).
       - name: Install Android SDK packages
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-35" "build-tools;34.0.0" "platform-tools" > /dev/null
-          echo "Android SDK ready: platforms;android-35, build-tools;34.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-37.0" "build-tools;36.0.0" "platform-tools" > /dev/null
+          echo "Android SDK ready: platforms;android-37.0, build-tools;36.0.0"
 
       # Caches the Gradle distribution and dependencies, and validates the Gradle wrapper.
       # Only main writes to the cache; other branches and pull requests read from it.
