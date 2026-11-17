@@ -55,7 +55,16 @@ sealed interface ObdConnectionState {
 
     data class Reconnecting(val adapterName: String, val attempt: Int, val maxAttempts: Int) : ObdConnectionState
     data class Unavailable(val reason: String) : ObdConnectionState
-    data class Failed(val message: String) : ObdConnectionState
+    /**
+     * @param message plain words (no addresses or error codes), safe for every user.
+     * @param reason why, for Easy Mode wording and retry decisions.
+     * @param detail technical detail (e.g. the Android error), shown only to DIY/Advanced users.
+     */
+    data class Failed(
+        val message: String,
+        val reason: com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailure = com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailure.UNKNOWN,
+        val detail: String? = null,
+    ) : ObdConnectionState
 }
 
 /** Read-only access to a vehicle through an OBD-II adapter. UI and assistant depend on this. */

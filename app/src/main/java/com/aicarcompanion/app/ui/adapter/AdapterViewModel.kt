@@ -11,7 +11,6 @@ import com.aicarcompanion.app.data.local.SettingsStore
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothGateway
 import com.aicarcompanion.app.diagnostics.obd.AdapterDevice
-import com.aicarcompanion.app.diagnostics.obd.AdapterAutoSelector
 import com.aicarcompanion.app.diagnostics.obd.ObdAdvancedControls
 import com.aicarcompanion.app.diagnostics.obd.ObdConnection
 import com.aicarcompanion.app.domain.model.RecordedSensorReading
@@ -29,6 +28,8 @@ class AdapterViewModel(
     private val settings: SettingsStore,
     private val vehicles: VehicleRepository,
     private val history: VehicleHistoryRepository,
+    /** Beginner flow: search, connect with bounded retries, remember only adapters that worked. */
+    val setup: com.aicarcompanion.app.connectivity.AdapterConnectionManager,
 ) : ViewModel() {
 
     var availability by mutableStateOf(gateway.availability())
@@ -41,6 +42,11 @@ class AdapterViewModel(
         private set
 
     val requiredPermission: String? get() = gateway.requiredPermission
+    /** Everything needed to connect and to search for nearby adapters on this Android version. */
+    val requiredPermissions: List<String> get() = gateway.requiredPermissions
+    /** Adapters found by the last nearby search (DIY/Advanced list). */
+    var nearby by mutableStateOf<List<AdapterDevice>>(emptyList())
+        private set
     val level get() = settings.settings.value.explanationLevel
     val lastAdapterAddress: String? get() = settings.settings.value.lastAdapterAddress
 
@@ -49,21 +55,27 @@ class AdapterViewModel(
         devices = gateway.pairedDevices()
     }
 
+    /** Connects to a chosen adapter; it's remembered only once it really connects. */
     fun connect(device: AdapterDevice) {
         message = null
-        settings.update { it.copy(lastAdapterAddress = device.address) }
-        obd.connect(device)
+        setup.connect(device)
     }
 
-    /** Everyday level: pick the adapter automatically when the choice is unambiguous. */
+    /**
+     * One tap: the adapter that worked last time, else the only paired OBD-II-looking adapter,
+     * else a short search for a nearby one. Asks only when there's more than one candidate.
+     */
     fun connectAutomatically() {
+        message = null
         refresh()
-        when (val choice = AdapterAutoSelector.choose(devices, lastAdapterAddress)) {
-            is AdapterAutoSelector.Choice.Selected -> connect(choice.device)
-            is AdapterAutoSelector.Choice.NeedsUser -> message = "I found more than one possible adapter. Tap the one plugged into your car."
-            AdapterAutoSelector.Choice.NoneFound -> message =
-                "I couldn't find a paired adapter. Plug it in, turn the ignition on, and pair it in Bluetooth settings first."
-        }
+        setup.connectAutomatically()
+    }
+
+    /** Searches nearby for about 12 seconds and lists what it finds. */
+    fun searchNearby() {
+        message = null
+        nearby = emptyList()
+        setup.search { found -> nearby = found.filter { d -> devices.none { it.address == d.address } } }
     }
 
     fun reconnect() { message = null; controls.reconnect() }
@@ -77,7 +89,8 @@ class AdapterViewModel(
         }
     }
 
-    fun disconnect() = obd.disconnect()
+    /** Disconnects and stops any search or retries. */
+    fun disconnect() = setup.cancel()
     fun retryVehicle() = obd.retryVehicle()
 
     fun readCodes() {
