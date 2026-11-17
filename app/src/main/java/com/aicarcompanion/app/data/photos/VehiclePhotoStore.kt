@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.data.photos
 
+import androidx.core.graphics.scale
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -37,7 +38,7 @@ class VehiclePhotoStore(context: Context) {
                 BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
             } ?: return@runCatching false
             val scale = minOf(1f, MAX_EDGE.toFloat() / maxOf(bitmap.width, bitmap.height))
-            val scaled = if (scale < 1f) Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true) else bitmap
+            val scaled = if (scale < 1f) bitmap.scale((bitmap.width * scale).toInt(), (bitmap.height * scale).toInt()) else bitmap
             file(vehicleId).outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 88, it) }
             _versions.update { it + (vehicleId to (it[vehicleId] ?: 0) + 1) }
             true

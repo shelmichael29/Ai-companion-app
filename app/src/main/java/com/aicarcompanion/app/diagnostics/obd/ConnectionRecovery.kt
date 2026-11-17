@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.diagnostics.obd
 
+import androidx.core.content.edit
 import android.content.SharedPreferences
 import com.aicarcompanion.app.domain.model.Vehicle
 
@@ -109,7 +110,7 @@ class InMemoryProtocolMemory : ProtocolMemory {
 class SharedPreferencesProtocolMemory(private val prefs: SharedPreferences) : ProtocolMemory {
     override fun lastWorking(vehicleId: String): ObdProtocol? =
         prefs.getString(key(vehicleId), null)?.let { code -> ObdProtocol.entries.firstOrNull { it.name == code } }
-    override fun remember(vehicleId: String, protocol: ObdProtocol) { prefs.edit().putString(key(vehicleId), protocol.name).apply() }
+    override fun remember(vehicleId: String, protocol: ObdProtocol) { prefs.edit { putString(key(vehicleId), protocol.name) } }
     private fun key(vehicleId: String) = "protocol_for_$vehicleId"
 }
 
