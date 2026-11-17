@@ -16,14 +16,20 @@ updates:
       firebase:
         patterns: ["com.google.firebase*", "com.google.gms*"]
       kotlin-and-build:
-        patterns: ["org.jetbrains.kotlin*", "org.jetbrains.kotlinx*", "com.android.tools.build*", "com.google.devtools.ksp*"]
+        patterns: ["org.jetbrains.kotlin*", "org.jetbrains.kotlinx*", "com.android.tools.build*", "com.android.application", "com.android.library", "com.google.devtools.ksp*"]
       testing-and-analysis:
         patterns: ["junit*", "org.robolectric*", "androidx.compose.ui:ui-test*", "io.gitlab.arturbosch.detekt*", "org.jetbrains.kotlinx.kover*"]
     ignore:
       # Major Kotlin/AGP upgrades need a planned migration, not an automatic PR.
       - dependency-name: "org.jetbrains.kotlin*"
         update-types: ["version-update:semver-major"]
+      # AGP is declared as the "com.android.application" plugin, so it's matched by that name
+      # too (the AGP 9 PR #23 slipped through when only com.android.tools.build was listed).
       - dependency-name: "com.android.tools.build*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.application"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.library"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
