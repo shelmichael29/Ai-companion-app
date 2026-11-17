@@ -63,6 +63,32 @@ Also note:
 - **The Gemini API key lives only in Firebase.** The app never contains it.
 - **APK artifacts include the Firebase config values.** That's normal for any Android app built with Firebase. This repository is private, so only people with access can download them.
 
+## Fixed debug signing key (`DEBUG_KEYSTORE_BASE64`)
+
+Without this secret, every CI run signs the debug APK with a new temporary key. Each new APK then:
+- can't install over the previous one without uninstalling first, and
+- gets a new App Check debug token, which has to be registered in Firebase again.
+
+With the secret, every CI APK is signed with the same key. If you use the debug key from your own Android Studio, CI APKs and Android Studio builds match too.
+
+**One-time setup**
+1. Find your Android Studio debug key (created automatically the first time you built an app):
+   - Windows: `C:\Users\<you>\.android\debug.keystore`
+   - Mac: `~/.android/debug.keystore`
+2. Turn it into text (base64):
+   - Windows (PowerShell): `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\.android\debug.keystore")) | Set-Clipboard`
+   - Mac (Terminal): `base64 -i ~/.android/debug.keystore | pbcopy`
+
+   Either command copies the text to the clipboard.
+3. On GitHub: **Settings → Secrets and variables → Actions → New repository secret**. Name it `DEBUG_KEYSTORE_BASE64` and paste.
+4. Run CI once, install that APK, and register its App Check debug token one last time. Later APKs keep the same token, as long as you don't uninstall the app or clear its data.
+
+**Notes**
+- The key must be a standard debug key: store password `android`, alias `androiddebugkey`. Android Studio's is.
+- CI checks the key, never prints it, and deletes it at the end of the run. It's only used for **debug** builds; release signing is separate and not set up yet.
+- The first APK signed with the fixed key can't update an older CI install. Uninstall once, then install.
+- Never commit the keystore. `*.keystore` and `*.jks` are in `.gitignore`, and the secret scan checks for them.
+
 ## Tests that guard Penelope's safety (no live AI)
 `app/src/test/java/com/aicarcompanion/app/regression/PenelopeSafetyRegressionTest.kt` replaces Gemini with a mock that deliberately gives unsafe advice. It checks that:
 - **Urgent symptoms** (smoke or burning, fuel smell, flashing check-engine light, oil pressure, overheating, brakes) are always answered by the built-in safety guidance, at every detail level. Gemini is never asked, including when it's failing, off or not configured.

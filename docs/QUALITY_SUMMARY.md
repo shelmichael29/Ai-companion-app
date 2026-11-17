@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-17 | Fixed CI debug signing key | PASS (local) | 364 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | Bluetooth connection foundation | PASS (local) | 364 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | Phase 7: connection recovery and Gemini reliability | PASS (local) | 333 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | Move ENET tester out of main | PASS (local) | 293 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
