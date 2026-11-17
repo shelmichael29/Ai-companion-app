@@ -2,6 +2,7 @@ package com.aicarcompanion.app.regression
 
 import com.aicarcompanion.app.ai.AiChatClient
 import com.aicarcompanion.app.ai.AiFailure
+import com.aicarcompanion.app.ai.AiNotices
 import com.aicarcompanion.app.ai.AiResult
 import com.aicarcompanion.app.ai.AiStatus
 import com.aicarcompanion.app.ai.AiTurn
@@ -146,7 +147,7 @@ class SafetyQuestionAndAiGuardTest {
                     val reply = p.respond(request(q, level))
                     assertEquals("[$label/$level] \"$q\" must not wait for the AI", start, currentTime)
                     assertTrue("[$label/$level] \"$q\"", reply.text.contains(PULL_OVER_GUIDANCE))
-                    assertFalse("[$label/$level] no outage note on safety answers", reply.text.startsWith("I can't reach"))
+                    assertFalse("[$label/$level] no outage note on safety answers", AiNotices.startsWithNotice(reply.text))
                 }
                 assertTrue("[$label] Gemini must not be called", gemini.calls.isEmpty())
             }
@@ -166,7 +167,7 @@ class SafetyQuestionAndAiGuardTest {
 
     private suspend fun assertFallsBack(p: GeminiReasoningProvider, question: String, level: ExplanationLevel, expected: AiFailure) {
         val reply = p.respond(request(question, level))
-        assertTrue("[$expected/$level] notice missing: ${reply.text}", reply.text.startsWith("I can't reach my smarter answers right now"))
+        assertTrue("[$expected/$level] notice missing: ${reply.text}", reply.text.startsWith(AiNotices.outage(expected)))
         assertTrue("[$expected/$level] built-in answer missing", reply.text.endsWith(builtIn(question, level).text))
         assertNotEquals(ReplyBasis.AI_EXPLANATION, reply.basis)
         assertEquals(AiStatus.Unavailable(expected), p.status.value)

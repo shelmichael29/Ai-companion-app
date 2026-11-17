@@ -15,6 +15,7 @@ import com.aicarcompanion.app.domain.model.ObservationKind
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withTimeoutOrNull
@@ -66,6 +67,17 @@ class GeminiReasoningProvider(
      * client can never leave Penelope silent: after this she gives her built-in answer.
      */
     private val aiTimeoutMillis: Long = 30_000,
+    /** Whether the phone currently has validated internet. When false, Gemini isn't contacted at all. */
+    private val internetAvailable: () -> Boolean = { true },
+    /** Structured diagnostics (categories and status codes only, never conversation text). */
+    private val log: com.aicarcompanion.app.connectivity.ConnectionLog? = null,
+    /** Waits used when the provider gives none. */
+    private val busyCooldownSeconds: Long = 30,
+    private val dailyLimitCooldownSeconds: Long = 3_600,
+    private val configCooldownSeconds: Long = 300,
+    /** A rate-limit wait up to this long is waited out once, so the user still gets the AI answer. */
+    private val maxInlineRetrySeconds: Long = 3,
+    private val sleep: suspend (Long) -> Unit = { kotlinx.coroutines.delay(it) },
 ) : ReasoningProvider {
 
     private val _status = MutableStateFlow(initialStatus())
@@ -74,6 +86,12 @@ class GeminiReasoningProvider(
     private val history = ArrayDeque<AiTurn>()
     private var lastReply: AssistantReply? = null
     private var announcedOutage = false
+    /** No Gemini requests before this time (server-requested wait, daily limit, configuration problem). */
+    private var blockedUntil: Instant? = null
+    private var blockedReason: AiFailure? = null
+    private var consecutiveUnexplained = 0
+    /** Only one Gemini request at a time; a newer question waits rather than piling on. */
+    private val inFlight = kotlinx.coroutines.sync.Mutex()
 
     private fun initialStatus(): AiStatus = when {
         !aiEnabled() -> AiStatus.Off
@@ -96,6 +114,10 @@ class GeminiReasoningProvider(
         history.clear()
         lastReply = null
         announcedOutage = false
+        // "Reset conversation" is also the user's way to retry the AI right away.
+        blockedUntil = null
+        blockedReason = null
+        consecutiveUnexplained = 0
         deterministic.resetContext()
     }
 
@@ -122,30 +144,97 @@ class GeminiReasoningProvider(
         val allowedCodes = mentioned + ctx.demoCodes.map { it.code } + ctx.latestCodeRead?.codes?.map { it.code }.orEmpty()
         val system = PromptBuilder.systemInstruction(request.assistantName, request.level, ctx, knowledge, mentioned, now())
 
-        return when (val result = generateSafely(system, request.utterance)) {
+        val result = nextResult(system, request.utterance)
+        return when (result) {
             is AiResult.Reply -> {
                 val cleaned = ReplyGuard.clean(result.text)
                 _status.value = AiStatus.Ready(result.model)
+                consecutiveUnexplained = 0
+                val restored = announcedOutage
                 announcedOutage = false
-                if (ReplyGuard.check(cleaned, allowedCodes) != null) {
+                if (restored) log?.record(com.aicarcompanion.app.connectivity.LogArea.AI, "Recovered", mapOf("model" to result.model))
+                val answer = if (ReplyGuard.check(cleaned, allowedCodes) != null) {
                     // The model stated something the app can't verify; answer with verified logic instead.
-                    remember(request.utterance, deterministic.respond(request))
+                    deterministic.respond(request)
                 } else {
-                    remember(request.utterance, AssistantReply(cleaned, ReplyBasis.AI_EXPLANATION))
+                    AssistantReply(cleaned, ReplyBasis.AI_EXPLANATION)
                 }
+                // Only claim recovery after a real successful reply. The notice isn't kept in history.
+                remember(request.utterance, if (restored) answer.withNotice(AiNotices.RESTORED) else answer, historyText = answer.text)
             }
             is AiResult.Failure -> {
                 _status.value = if (result.reason == AiFailure.NOT_CONFIGURED) AiStatus.NotConfigured else AiStatus.Unavailable(result.reason)
                 val fallback = deterministic.respond(request)
                 val reply = if (!announcedOutage) {
                     announcedOutage = true
-                    val note = "I can't reach my smarter answers right now (${result.reason.userMessage.trimEnd('.').lowercase()}), so here's my basic answer. "
-                    fallback.copy(text = note + fallback.text, spokenText = note + fallback.spokenText)
+                    fallback.withNotice(AiNotices.outage(result.reason))
                 } else fallback
-                remember(request.utterance, reply)
+                // The notice is for the user only: Gemini must never see itself "saying" it's unavailable.
+                remember(request.utterance, reply, historyText = fallback.text)
             }
         }
     }
+
+    /**
+     * Decides whether to ask Gemini at all, asks at most twice (once more only for a very short
+     * server-requested wait), and records why it didn't.
+     */
+    private suspend fun nextResult(system: String, message: String): AiResult {
+        val area = com.aicarcompanion.app.connectivity.LogArea.AI
+        if (!internetAvailable()) {
+            log?.record(area, "Skipped: no internet", mapOf("category" to AiFailure.OFFLINE))
+            return AiResult.Failure(AiFailure.OFFLINE, "No validated internet connection")
+        }
+        val until = blockedUntil
+        if (until != null && now().isBefore(until)) {
+            log?.record(area, "Skipped: waiting before retrying", mapOf("category" to blockedReason, "secondsLeft" to java.time.Duration.between(now(), until).seconds))
+            return AiResult.Failure(blockedReason ?: AiFailure.BUSY, "Waiting before retrying")
+        }
+        blockedUntil = null
+        blockedReason = null
+        var result = inFlight.withLock { generateSafely(system, message) }
+        if (result is AiResult.Failure && result.reason == AiFailure.BUSY) {
+            val wait = result.retryAfterSeconds
+            if (wait != null && wait in 1..maxInlineRetrySeconds) {
+                logFailure(result, retry = "once after ${wait}s")
+                sleep(wait * 1_000)
+                result = inFlight.withLock { generateSafely(system, message) }
+            }
+        }
+        if (result is AiResult.Failure) onFailure(result)
+        return result
+    }
+
+    private fun onFailure(f: AiResult.Failure) {
+        val cooldown: Long? = when (f.reason) {
+            AiFailure.BUSY -> f.retryAfterSeconds ?: busyCooldownSeconds
+            AiFailure.QUOTA -> f.retryAfterSeconds ?: dailyLimitCooldownSeconds
+            AiFailure.APP_CHECK, AiFailure.SERVICE_DISABLED, AiFailure.MODEL_UNAVAILABLE, AiFailure.NOT_CONFIGURED -> configCooldownSeconds
+            // A dropped network or a slow answer: the next question may simply work.
+            AiFailure.OFFLINE, AiFailure.TIMEOUT, AiFailure.BLOCKED, AiFailure.EMPTY, AiFailure.OTHER -> null
+        }
+        if (cooldown != null) {
+            blockedUntil = now().plusSeconds(cooldown)
+            blockedReason = f.reason
+        }
+        if (f.reason == AiFailure.OTHER || f.reason == AiFailure.EMPTY) {
+            if (++consecutiveUnexplained >= 2) {
+                client.reset()
+                consecutiveUnexplained = 0
+                log?.record(com.aicarcompanion.app.connectivity.LogArea.AI, "AI client reset after repeated unexplained failures")
+            }
+        }
+        logFailure(f, retry = cooldown?.let { "not before ${it}s" } ?: "next question")
+    }
+
+    private fun logFailure(f: AiResult.Failure, retry: String) {
+        log?.record(
+            com.aicarcompanion.app.connectivity.LogArea.AI, "Request failed",
+            mapOf("category" to f.reason, "httpStatus" to f.httpStatus, "retryAfterSeconds" to f.retryAfterSeconds, "nextAttempt" to retry),
+        )
+    }
+
+    private fun AssistantReply.withNotice(notice: String) = copy(text = "$notice $text", spokenText = "$notice $spokenText")
 
     /**
      * Calls the AI client without letting it crash or stall Penelope: any exception, or no answer
@@ -169,10 +258,10 @@ class GeminiReasoningProvider(
     private fun Throwable.hasNetworkCause(): Boolean = generateSequence(this) { it.cause }.take(8).any { it is java.io.IOException }
 
     /** Keeps both AI and deterministic turns in the AI history so follow-ups have full context. */
-    private fun remember(userText: String, reply: AssistantReply): AssistantReply {
+    private fun remember(userText: String, reply: AssistantReply, historyText: String = reply.text): AssistantReply {
         if (reply.action == null) {
             history.addLast(AiTurn(AiTurn.Role.USER, userText.trim()))
-            history.addLast(AiTurn(AiTurn.Role.MODEL, reply.text))
+            history.addLast(AiTurn(AiTurn.Role.MODEL, historyText))
             while (history.size > maxHistoryTurns * 2) history.removeFirst()
             lastReply = reply
         }

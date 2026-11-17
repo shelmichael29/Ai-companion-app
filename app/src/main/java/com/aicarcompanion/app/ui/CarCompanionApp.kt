@@ -194,7 +194,10 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                 }
             }
             composable(Routes.SETTINGS) {
-                SettingsScreen(onBack = { navController.popBackStack() })
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    connectionStatus = viewModel(factory = AppViewModelProvider.Factory),
+                )
             }
             composable(
                 Routes.VEHICLE_EDIT,

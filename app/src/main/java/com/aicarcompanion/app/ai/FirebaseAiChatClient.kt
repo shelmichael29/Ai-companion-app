@@ -39,6 +39,14 @@ class FirebaseAiChatClient(
             ModelSelection.choose(FirebaseRemoteConfig.getInstance().getString(ModelSelection.REMOTE_CONFIG_KEY))
         }.getOrDefault(ModelSelection.DEFAULT_MODEL)
 
+    /**
+     * A new Gemini model object is created for every request, so no session state can go stale;
+     * reset only re-enables optional features that an earlier error turned off.
+     */
+    override fun reset() {
+        thinkingSupported = true
+    }
+
     /** Installs App Check and fetches Remote Config. Safe to call when Firebase isn't configured. */
     fun initialize() {
         if (!isConfigured) return
@@ -95,9 +103,11 @@ class FirebaseAiChatClient(
         throw e
     } catch (e: Exception) {
         val reason = AiErrorClassifier.classify(e.javaClass.simpleName, e.message, e.isNetworkFailure())
-        // Log only the category and type; never request content, tokens or keys.
-        Log.w(TAG, "Gemini request failed: $reason (${e.javaClass.simpleName})")
-        AiResult.Failure(reason, e.message?.take(300))
+        val status = AiErrorClassifier.httpStatus(e.message)
+        val retryAfter = AiErrorClassifier.retryAfterSeconds(e.message)
+        // Log only the category, type and status code; never request content, tokens or keys.
+        Log.w(TAG, "Gemini request failed: $reason (${e.javaClass.simpleName}, status=${status ?: "?"}, retryAfter=${retryAfter ?: "-"}s)")
+        AiResult.Failure(reason, e.message?.take(300), retryAfterSeconds = retryAfter, httpStatus = status)
     }
 
     /** True if any cause in the chain is a network I/O failure (no connection, DNS, socket). */
