@@ -3,6 +3,8 @@
 
     <!-- Vehicle lookups (FuelEconomy.gov, NHTSA vPIC). Normal permission; no prompt. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Read-only: lets Penelope tell "no internet" apart from AI errors. No permission prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Push-to-talk with Penelope. Requested at runtime the first time the mic is tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 

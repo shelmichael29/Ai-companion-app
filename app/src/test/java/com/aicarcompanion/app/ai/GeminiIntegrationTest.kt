@@ -195,12 +195,15 @@ class GeminiIntegrationTest {
         val client = FakeClient().apply { next = { AiResult.Failure(AiFailure.OFFLINE) } }
         val p = provider(client)
         val first = p.ask("Is premium fuel really necessary?")
-        assertTrue(first.text.startsWith("I can't reach my smarter answers right now (no internet connection)"))
+        assertTrue(first.text.startsWith(AiNotices.OFFLINE))
         assertEquals(AiStatus.Unavailable(AiFailure.OFFLINE), p.status.value)
         val second = p.ask("What about synthetic oil?")
-        assertFalse(second.text.contains("can't reach"))
+        assertFalse(AiNotices.startsWithNotice(second.text))
         client.next = { AiResult.Reply("Synthetic oil is fine.", "gemini-3.8-flash") }
-        assertEquals("Synthetic oil is fine.", p.ask("And synthetic oil?").text)
+        // Recovery is announced once, only after a real successful reply.
+        assertEquals("${AiNotices.RESTORED} Synthetic oil is fine.", p.ask("And synthetic oil?").text)
+        client.next = { AiResult.Reply("Fine again.", "gemini-3.8-flash") }
+        assertEquals("only announced once", "Fine again.", p.ask("One more?").text)
         assertEquals(AiStatus.Ready("gemini-3.8-flash"), p.status.value)
     }
 

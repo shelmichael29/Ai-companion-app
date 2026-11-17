@@ -90,9 +90,16 @@ fun healthSummary(codes: List<DiagnosticTroubleCode>, lastRead: TroubleCodeRead?
 }
 
 /** Connection wording: "Connected" only when the adapter link is confirmed. */
-fun connectionSummary(state: ObdConnectionState): Pair<String, Boolean> = when (state) {
-    is ObdConnectionState.Connected -> (if (state.vehicleProtocol != null) "Connected to your car" else "Adapter connected · car not responding") to true
-    is ObdConnectionState.Connecting -> "Connecting…" to false
-    is ObdConnectionState.Reconnecting -> "Reconnecting…" to false
-    else -> "Not connected" to false
+fun connectionSummary(state: ObdConnectionState): Pair<String, Boolean> {
+    val stage = com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(state)
+    return when (stage) {
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_CONNECTED -> "Connected to your car"
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_PENDING -> "Adapter connected · car not responding"
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.DEGRADED,
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.RECOVERING -> "Reconnecting to your car…"
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.FAILED, com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.ADAPTER_NOT_FOUND,
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.ADAPTER_DISCOVERED, com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.PAIRING_REQUIRED ->
+            if (state is ObdConnectionState.Connecting) "Connecting…" else "Not connected"
+        else -> "Connecting…"
+    } to (state is ObdConnectionState.Connected)
 }

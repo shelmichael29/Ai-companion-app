@@ -45,7 +45,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -71,6 +73,11 @@ interface AppContainer {
     val speechOutput: SpeechOutput
     val vehiclePhotos: com.aicarcompanion.app.data.photos.VehiclePhotoStore
 
+    /** Structured, redacted diagnostics for the vehicle, internet and AI connections (in memory only). */
+    val connectionLog: com.aicarcompanion.app.connectivity.ConnectionLog
+    /** Validated internet availability from Android's default network. */
+    val internet: com.aicarcompanion.app.connectivity.InternetMonitor
+
     /** Gemini availability, for Settings and the chat screen. */
     val aiStatus: kotlinx.coroutines.flow.StateFlow<com.aicarcompanion.app.ai.AiStatus>
     val aiModelName: String
@@ -95,6 +102,13 @@ class DefaultAppContainer(context: Context) : AppContainer {
     private val roomHistory by lazy { RoomHistoryRepository(database.serviceRecordDao(), database.diagnosticHistoryDao()) }
 
     override val settings: SettingsStore = SharedPreferencesSettingsStore(appContext)
+    override val connectionLog = com.aicarcompanion.app.connectivity.ConnectionLog()
+    override val internet: com.aicarcompanion.app.connectivity.InternetMonitor by lazy {
+        com.aicarcompanion.app.connectivity.AndroidInternetMonitor(appContext, connectionLog)
+    }
+    private val internetOnline by lazy {
+        internet.state.map { it.online }.stateIn(appScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, internet.state.value.online)
+    }
     override val vehicleRepository: VehicleRepository by lazy { RoomVehicleRepository(database.vehicleDao(), settings) }
     override val historyRepository: VehicleHistoryRepository get() = roomHistory
     override val maintenanceRepository: MaintenanceRepository get() = roomHistory
@@ -108,12 +122,24 @@ class DefaultAppContainer(context: Context) : AppContainer {
             appContext.getSharedPreferences("obd_settings", Context.MODE_PRIVATE),
         ),
     )
+    /** The selected car, kept current for protocol choices. Its VIN is never sent to the adapter. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val activeVehicle by lazy {
+        vehicleRepository.activeVehicleId
+            .flatMapLatest { id -> id?.let { vehicleRepository.observeVehicle(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
+            .stateIn(appScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
+    }
+
     private val obdManager by lazy {
-        ObdManager(appScope, bluetooth, historyRepository, config = {
-            ObdConnectionConfig.effectiveFor(
-                settings.settings.value.explanationLevel, obdConfig.config.value,
-            )
-        })
+        ObdManager(
+            appScope, bluetooth, historyRepository,
+            config = { ObdConnectionConfig.effectiveFor(settings.settings.value.explanationLevel, obdConfig.config.value) },
+            activeVehicle = { activeVehicle.value },
+            protocolMemory = com.aicarcompanion.app.diagnostics.obd.SharedPreferencesProtocolMemory(
+                appContext.getSharedPreferences("obd_settings", Context.MODE_PRIVATE),
+            ),
+            log = connectionLog,
+        )
     }
     override val obdControls: ObdAdvancedControls get() = obdManager
     override val obdConnection: ObdConnection get() = obdManager
@@ -168,11 +194,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val reasoning = geminiProvider(parser, ruleBased, recorder)
         VoiceSession(
             scope = appScope,
-            input = AndroidSpeechInput(appContext),
+            input = AndroidSpeechInput(appContext).apply { preferOffline = { !internetOnline.value } },
             output = speechOutput,
             conversation = ConversationManager(reasoning, assistantName, { settings.settings.value.explanationLevel }),
             focus = audioFocus,
             continuousEnabled = { settings.settings.value.continuousConversation },
+            internetOnline = internetOnline,
         )
     }
     override val voiceSession: VoiceSession by voiceSessionLazy
@@ -193,6 +220,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
         knowledge = GenericDtcCatalog,
         aiEnabled = { settings.settings.value.aiEnabled },
         recorder = recorder,
+        internetAvailable = { internetOnline.value },
+        log = connectionLog,
     ).also { provider ->
         gemini = provider
         appScope.launch { settings.settings.map { it.aiEnabled }.distinctUntilChanged().collect { provider.refreshStatus() } }

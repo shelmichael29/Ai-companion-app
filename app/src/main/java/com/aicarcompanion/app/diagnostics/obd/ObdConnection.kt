@@ -34,7 +34,11 @@ data class AdapterDevice(val name: String, val address: String, val radio: Adapt
 
 sealed interface ObdConnectionState {
     data object Disconnected : ObdConnectionState
-    data class Connecting(val transport: ObdTransport, val adapterName: String? = null) : ObdConnectionState
+    data class Connecting(
+        val transport: ObdTransport,
+        val adapterName: String? = null,
+        val phase: ConnectPhase = ConnectPhase.OPENING_LINK,
+    ) : ObdConnectionState
 
     /**
      * The adapter link is up. [vehicleProtocol] is the OBD-II protocol the vehicle answered on,
@@ -45,6 +49,8 @@ sealed interface ObdConnectionState {
         val adapterName: String,
         val vehicleProtocol: String? = null,
         val adapterVersion: String? = null,
+        /** Whether the vehicle is still answering reliably (see [VehicleLinkStage]). */
+        val health: LinkHealth = LinkHealth.OK,
     ) : ObdConnectionState
 
     data class Reconnecting(val adapterName: String, val attempt: Int, val maxAttempts: Int) : ObdConnectionState

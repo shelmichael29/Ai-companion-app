@@ -198,10 +198,15 @@ private fun StatusCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
 
 fun describe(state: ObdConnectionState): Pair<String, String> = when (state) {
     ObdConnectionState.Disconnected -> "Not connected" to "Choose your paired adapter below."
-    is ObdConnectionState.Connecting -> "Connecting…" to "Connecting to ${state.adapterName ?: "adapter"} and initializing."
-    is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to
-        if (state.vehicleProtocol != null) "Your car is responding." else
-            "The adapter is connected, but your car isn't responding. Turn the ignition on, then tap \"Check vehicle again\"."
+    is ObdConnectionState.Connecting -> com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(state).label + "…" to
+        "Connecting to ${state.adapterName ?: "adapter"} and checking that your car answers."
+    is ObdConnectionState.Connected -> when (com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(state)) {
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_CONNECTED -> "Vehicle connected" to "${state.adapterName} is connected and your car is responding."
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.DEGRADED, com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.RECOVERING ->
+            "Recovering connection" to "Your car stopped answering for a moment. Penelope is re-checking it automatically."
+        else -> "Adapter connected" to
+            "${state.adapterName} is connected, but your car isn't responding. Turn the ignition on, then tap \"Check vehicle again\"."
+    }
     is ObdConnectionState.Reconnecting -> "Reconnecting (${state.attempt} of ${state.maxAttempts})…" to "Lost connection to ${state.adapterName}."
     is ObdConnectionState.Unavailable -> "Unavailable" to state.reason
     is ObdConnectionState.Failed -> "Not connected" to state.message

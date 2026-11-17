@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
@@ -55,6 +56,12 @@ class VoiceSession(
     private val resumeDelayMillis: Long = 450,
     private val maxSilentTurns: Int = 2,
     private val maxBusyRetries: Int = 2,
+    /**
+     * Validated internet availability, if known. When speech recognition fails for lack of
+     * internet during a hands-free conversation, Penelope pauses and resumes listening by herself
+     * once this turns true again, instead of ending the conversation.
+     */
+    private val internetOnline: StateFlow<Boolean>? = null,
 ) {
     private val _state = MutableStateFlow<VoiceState>(VoiceState.Idle)
     val state: StateFlow<VoiceState> = _state.asStateFlow()
@@ -72,6 +79,10 @@ class VoiceSession(
     private var busyRetries = 0
     private var lastSpoken: String = ""
     private var holdsFocus = false
+    /** Set while paused because the internet dropped; cleared by any user action or resume. */
+    private var waitingForNetwork: Job? = null
+    /** Automatic resumes since the last successful turn; bounded so a flaky network can't loop. */
+    private var networkResumes = 0
 
     val isSpeechInputAvailable: Boolean get() = input.isAvailable
 
@@ -96,6 +107,8 @@ class VoiceSession(
 
     /** Starts a conversation (hands-free if enabled in Settings, otherwise a single turn). */
     fun start() {
+        cancelNetworkWait()
+        networkResumes = 0
         silentTurns = 0
         busyRetries = 0
         _conversationActive.value = continuousEnabled()
@@ -118,6 +131,7 @@ class VoiceSession(
 
     /** Ends the conversation and turns the microphone off. */
     fun end() {
+        cancelNetworkWait()
         job?.cancel()
         _inputLevel.value = 0f
         output.stop()
@@ -148,6 +162,7 @@ class VoiceSession(
 
     /** Typed input: same pipeline, without the microphone. Continues the conversation if one is active. */
     fun submitText(text: String) {
+        cancelNetworkWait()
         if (text.isBlank()) return
         output.stop()
         job?.cancel()
@@ -203,6 +218,7 @@ class VoiceSession(
         }
         silentTurns = 0
         busyRetries = 0
+        networkResumes = 0
         respondTo(text)
     }
 
@@ -256,6 +272,15 @@ class VoiceSession(
                     afterTurn()
                 }
             }
+            SpeechInputError.NETWORK -> {
+                val monitor = internetOnline
+                if (inConversation && monitor != null && networkResumes < MAX_NETWORK_RESUMES) {
+                    pauseUntilOnline(monitor)
+                } else {
+                    networkResumes = 0
+                    stopWithError(error)
+                }
+            }
             SpeechInputError.BUSY -> {
                 if (inConversation && busyRetries++ < maxBusyRetries) {
                     delay(800)
@@ -266,6 +291,36 @@ class VoiceSession(
             }
             else -> stopWithError(error)
         }
+    }
+
+    /**
+     * The internet dropped mid-conversation: say so once, release the microphone, and resume
+     * listening automatically when validated internet returns. One wait per outage; ending the
+     * conversation or tapping the mic cancels it.
+     */
+    private suspend fun pauseUntilOnline(online: StateFlow<Boolean>) {
+        val msg = com.aicarcompanion.app.ai.AiNotices.OFFLINE
+        _conversationActive.value = false
+        releaseFocus()
+        _state.value = VoiceState.Paused(msg)
+        if (networkResumes == 0) speakNotice(msg) // said once per outage, not on every retry
+        waitingForNetwork = scope.launch {
+            if (online.value) delay(NETWORK_RECHECK_MILLIS) // the drop may already be over
+            online.first { it }
+            waitingForNetwork = null
+            if (_state.value is VoiceState.Paused) {
+                networkResumes++
+                conversation.addNotice(com.aicarcompanion.app.ai.AiNotices.RESTORED)
+                val resumes = networkResumes
+                start()
+                networkResumes = resumes // start() is also the user's tap; keep the automatic count
+            }
+        }
+    }
+
+    private fun cancelNetworkWait() {
+        waitingForNetwork?.cancel()
+        waitingForNetwork = null
     }
 
     private suspend fun stopWithError(error: SpeechInputError) {
@@ -288,6 +343,9 @@ class VoiceSession(
         if (holdsFocus) { focus.release(); holdsFocus = false }
     }
 }
+
+private const val NETWORK_RECHECK_MILLIS = 3_000L
+private const val MAX_NETWORK_RESUMES = 2
 
 /** Detects when the recognizer transcribed Penelope's own speech (e.g. from car speakers). */
 object EchoGuard {

@@ -2,6 +2,7 @@ package com.aicarcompanion.app.regression
 
 import com.aicarcompanion.app.ai.AiChatClient
 import com.aicarcompanion.app.ai.AiFailure
+import com.aicarcompanion.app.ai.AiNotices
 import com.aicarcompanion.app.ai.AiResult
 import com.aicarcompanion.app.ai.AiStatus
 import com.aicarcompanion.app.ai.AiTurn
@@ -117,7 +118,7 @@ class PenelopeSafetyRegressionTest {
             URGENT_PHRASES.forEach { (phrase, category) ->
                 val reply = p.respond(request(phrase))
                 assertTrue("[$label] \"$phrase\"", reply.text.contains(SymptomGuide.safetyAdvice(category)!!))
-                assertFalse("[$label] no outage note on safety answers", reply.text.startsWith("I can't reach"))
+                assertFalse("[$label] no outage note on safety answers", AiNotices.startsWithNotice(reply.text))
             }
             assertTrue("[$label] Gemini must not be called", gemini.calls.isEmpty())
         }
@@ -152,7 +153,7 @@ class PenelopeSafetyRegressionTest {
             val p = penelope(gemini)
             val first = p.respond(request(question))
             assertEquals("[$reason] Gemini should have been tried", 1, gemini.calls.size)
-            assertTrue("[$reason] notice missing: ${first.text}", first.text.startsWith("I can't reach my smarter answers right now"))
+            assertTrue("[$reason] notice missing: ${first.text}", first.text.startsWith(AiNotices.outage(reason)))
             assertTrue("[$reason] basic answer missing", first.text.endsWith(basic.text))
             assertTrue("[$reason] spoken text should match", first.spokenText.endsWith(basic.spokenText))
             assertNotEquals(ReplyBasis.AI_EXPLANATION, first.basis)
@@ -175,7 +176,7 @@ class PenelopeSafetyRegressionTest {
         online = true
         val reply = p.respond(request("And what about brake fluid?"))
         assertEquals(ReplyBasis.AI_EXPLANATION, reply.basis)
-        assertEquals("Back online.", reply.text)
+        assertEquals("${AiNotices.RESTORED} Back online.", reply.text)
         assertEquals(AiStatus.Ready("gemini-3.8-flash"), p.status.value)
     }
 
