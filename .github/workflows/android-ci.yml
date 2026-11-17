@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           fetch-depth: 0 # full history, so the scan covers every commit
@@ -54,7 +54,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -73,13 +73,13 @@ jobs:
 
       # Caches the Gradle distribution and dependencies, and validates the Gradle wrapper.
       # Only main writes to the cache; other branches and pull requests read from it.
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       # Robolectric (Compose UI tests on the JVM) downloads an Android runtime jar once; cache it.
       - name: Cache Robolectric runtime
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository/org/robolectric
           key: robolectric-${{ hashFiles('gradle/libs.versions.toml') }}
@@ -117,11 +117,11 @@ jobs:
         run: ./gradlew detekt
 
       # Unit, integration (Robolectric UI, simulated adapters), regression and accessibility tests,
-      # with line coverage. testDebugUnitTest covers Android modules; :enet-core:test the ENET library.
+      # with line coverage.
       - name: Tests
         id: tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: ./gradlew testDebugUnitTest :enet-core:test :app:koverXmlReportDebug :enet-core:koverXmlReport
+        run: ./gradlew testDebugUnitTest :app:koverXmlReportDebug
 
       # Lint errors (including accessibility, security and lifecycle checks) fail the job.
       - name: Android Lint
@@ -172,7 +172,7 @@ jobs:
 
       - name: Upload debug APK
         if: success()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.apk.outputs.name }}
           path: app/build/outputs/apk/debug/*.apk
@@ -181,26 +181,17 @@ jobs:
 
       - name: Upload release APK (unsigned)
         if: ${{ success() && steps.release.outcome == 'success' }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ai-car-companion-release-unsigned-${{ steps.apk.outputs.sha }}
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload ENET tester APK (experimental)
-        if: success()
-        uses: actions/upload-artifact@v6
-        with:
-          name: enet-tester-debug-${{ steps.apk.outputs.sha }}
-          path: enet-tester/build/outputs/apk/debug/*.apk
-          if-no-files-found: ignore
-          retention-days: 14
-
       # The quality report plus the raw reports it was built from.
       - name: Upload quality report and test, lint, Detekt and coverage reports
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: quality-report-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
@@ -215,7 +206,7 @@ jobs:
 
       - name: Upload build reports on failure
         if: failure() && steps.build.outcome == 'failure'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: build-reports-${{ github.event.pull_request.head.sha || github.sha }}
           path: |

@@ -87,7 +87,8 @@ class Elm327Session(
      * ATZ, ATE0, ATL0, ATS1, ATH0, ATAT1, ATSP0. Options the adapter rejects fall back to the
      * automatic behavior and are recorded in [capabilities] so the UI only offers what works.
      */
-    suspend fun initialize(config: ObdConnectionConfig): ElmInitResult {
+    /** Resets and configures the adapter (no vehicle traffic). Returns the adapter version, if reported. */
+    suspend fun initializeAdapter(config: ObdConnectionConfig): String? {
         timeoutMillis = config.responseTimeoutMillis.toLong()
         retries = config.retries
         val reset = execute("ATZ", RESET_TIMEOUT)
@@ -121,8 +122,23 @@ class Elm327Session(
             if (protocolOk != true) optional("ATSP0") // never leave the adapter without a working protocol
         }
         capabilities = caps
-        return ElmInitResult(version?.let(::tidyVersion), probeVehicle())
+        return version?.let(::tidyVersion)
     }
+
+    /**
+     * Resets and configures the adapter, then asks the vehicle what it supports.
+     * Equivalent to [initializeAdapter] followed by [probeVehicle].
+     */
+    suspend fun initialize(config: ObdConnectionConfig): ElmInitResult {
+        val version = initializeAdapter(config)
+        return ElmInitResult(version, probeVehicle())
+    }
+
+    /**
+     * Selects an OBD-II protocol (ATSPn). Returns false if the adapter rejects it. Only used in
+     * automatic mode, after the adapter's own search found nothing.
+     */
+    suspend fun selectProtocol(protocol: ObdProtocol): Boolean = optional("ATSP${protocol.code}") == true
 
     /** Reads the adapter's description and port voltage. Both are optional on clones. */
     suspend fun identify(): Pair<String?, Double?> {
@@ -134,7 +150,7 @@ class Elm327Session(
     }
 
     /** Asks the vehicle which PIDs it supports. Null when the vehicle doesn't respond (e.g. ignition off). */
-    suspend fun probeVehicle(): VehicleProbe? {
+    suspend fun probeVehicle(onVehicleAnswered: () -> Unit = {}): VehicleProbe? {
         // A timeout here means the car didn't answer (ignition off, slow protocol search): the
         // adapter itself is fine, so report "vehicle not responding" instead of failing the whole
         // connection. A lost link (other IOException) still propagates.
@@ -145,6 +161,7 @@ class Elm327Session(
         }
         val supported = Elm327ResponseParser.decodeSupportedPids(first, 0x00).toMutableSet()
         if (supported.isEmpty()) return null
+        onVehicleAnswered()
         var base = 0x20
         while (base <= 0xA0 && base in supported) {
             // A timed-out extended range just means those PIDs aren't listed; keep what we have.

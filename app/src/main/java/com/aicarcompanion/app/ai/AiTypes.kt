@@ -24,7 +24,16 @@ enum class AiFailure(val userMessage: String) {
 
 sealed interface AiResult {
     data class Reply(val text: String, val model: String) : AiResult
-    data class Failure(val reason: AiFailure, val detail: String? = null) : AiResult
+    /**
+     * @param retryAfterSeconds the provider's suggested wait (e.g. "Please retry in 40s"), if any.
+     * @param httpStatus the provider's HTTP status code (e.g. 429, 503), if known. For logs only.
+     */
+    data class Failure(
+        val reason: AiFailure,
+        val detail: String? = null,
+        val retryAfterSeconds: Long? = null,
+        val httpStatus: Int? = null,
+    ) : AiResult
 }
 
 /** What the user sees about AI availability. */
@@ -54,6 +63,12 @@ interface AiChatClient {
     val isConfigured: Boolean
     val modelName: String
     suspend fun generate(systemInstruction: String, history: List<AiTurn>, message: String): AiResult
+
+    /**
+     * Drops any cached client state so the next request starts fresh. Called after repeated
+     * unexplained failures, never in the middle of a request. The conversation is kept by the caller.
+     */
+    fun reset() = Unit
 }
 
 /** Chooses the Gemini model: a stable Flash model only; never preview, "-latest" or retired names. */
@@ -77,6 +92,23 @@ object ModelSelection {
  * be unit-tested without the Firebase SDK.
  */
 object AiErrorClassifier {
+    private val RETRY_IN = Regex("(?i)retry(?:ing)? in\\s*([0-9]+(?:\\.[0-9]+)?)\\s*(ms|s|sec|seconds?)?")
+    private val RETRY_DELAY = Regex("(?i)\"?retry_?delay\"?\\s*[:=]\\s*\"?([0-9]+(?:\\.[0-9]+)?)s")
+    private val HTTP_STATUS = Regex("\\b(4\\d\\d|5\\d\\d)\\b")
+
+    /** The provider's suggested wait in whole seconds ("Please retry in 23.5s", "retryDelay": "23s"), if stated. */
+    fun retryAfterSeconds(message: String?): Long? {
+        val m = message ?: return null
+        RETRY_DELAY.find(m)?.let { return kotlin.math.ceil(it.groupValues[1].toDouble()).toLong() }
+        val r = RETRY_IN.find(m) ?: return null
+        val value = r.groupValues[1].toDouble()
+        val seconds = if (r.groupValues[2].equals("ms", ignoreCase = true)) value / 1000 else value
+        return kotlin.math.ceil(seconds).toLong().coerceAtLeast(1)
+    }
+
+    /** The first HTTP status code mentioned in the error (e.g. 429, 503), for diagnostics. */
+    fun httpStatus(message: String?): Int? = message?.let { HTTP_STATUS.find(it)?.value?.toInt() }
+
     fun classify(typeName: String, message: String?, causeIsNetwork: Boolean): AiFailure {
         val m = message.orEmpty().lowercase()
         val compact = m.replace("_", "").replace(" ", "").replace("-", "")

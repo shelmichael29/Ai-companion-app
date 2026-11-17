@@ -27,7 +27,6 @@ import com.aicarcompanion.app.data.vehicledb.UrlConnectionHttpClient
 import com.aicarcompanion.app.data.vehicledb.VehicleCatalogProvider
 import com.aicarcompanion.app.data.vehicledb.VinDecoder
 import com.aicarcompanion.app.diagnostics.dtc.GenericDtcCatalog
-import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothGateway
 import com.aicarcompanion.app.diagnostics.obd.ObdConnection
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
@@ -45,7 +44,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 
@@ -64,12 +65,19 @@ interface AppContainer {
     val obdConnection: ObdConnection
     val diagnosticCommands: DiagnosticCommandHandler
     val bluetooth: BluetoothGateway
+    /** Beginner-friendly adapter search and connection with bounded retries. */
+    val adapterSetup: com.aicarcompanion.app.connectivity.AdapterConnectionManager
     /** Saved OBD-II connection settings (applied only at the Advanced level). */
     val obdConfig: ObdConfigStore
     val obdControls: ObdAdvancedControls
     val voiceSession: VoiceSession
     val speechOutput: SpeechOutput
     val vehiclePhotos: com.aicarcompanion.app.data.photos.VehiclePhotoStore
+
+    /** Structured, redacted diagnostics for the vehicle, internet and AI connections (in memory only). */
+    val connectionLog: com.aicarcompanion.app.connectivity.ConnectionLog
+    /** Validated internet availability from Android's default network. */
+    val internet: com.aicarcompanion.app.connectivity.InternetMonitor
 
     /** Gemini availability, for Settings and the chat screen. */
     val aiStatus: kotlinx.coroutines.flow.StateFlow<com.aicarcompanion.app.ai.AiStatus>
@@ -95,6 +103,13 @@ class DefaultAppContainer(context: Context) : AppContainer {
     private val roomHistory by lazy { RoomHistoryRepository(database.serviceRecordDao(), database.diagnosticHistoryDao()) }
 
     override val settings: SettingsStore = SharedPreferencesSettingsStore(appContext)
+    override val connectionLog = com.aicarcompanion.app.connectivity.ConnectionLog()
+    override val internet: com.aicarcompanion.app.connectivity.InternetMonitor by lazy {
+        com.aicarcompanion.app.connectivity.AndroidInternetMonitor(appContext, connectionLog)
+    }
+    private val internetOnline by lazy {
+        internet.state.map { it.online }.stateIn(appScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, internet.state.value.online)
+    }
     override val vehicleRepository: VehicleRepository by lazy { RoomVehicleRepository(database.vehicleDao(), settings) }
     override val historyRepository: VehicleHistoryRepository get() = roomHistory
     override val maintenanceRepository: MaintenanceRepository get() = roomHistory
@@ -108,22 +123,50 @@ class DefaultAppContainer(context: Context) : AppContainer {
             appContext.getSharedPreferences("obd_settings", Context.MODE_PRIVATE),
         ),
     )
+    /** The selected car, kept current for protocol choices. Its VIN is never sent to the adapter. */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val activeVehicle by lazy {
+        vehicleRepository.activeVehicleId
+            .flatMapLatest { id -> id?.let { vehicleRepository.observeVehicle(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
+            .stateIn(appScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
+    }
+
     private val obdManager by lazy {
-        ObdManager(appScope, bluetooth, historyRepository, config = {
-            ObdConnectionConfig.effectiveFor(
-                settings.settings.value.explanationLevel, obdConfig.config.value,
-            )
-        })
+        ObdManager(
+            appScope, bluetooth, historyRepository,
+            config = { ObdConnectionConfig.effectiveFor(settings.settings.value.explanationLevel, obdConfig.config.value) },
+            activeVehicle = { activeVehicle.value },
+            protocolMemory = com.aicarcompanion.app.diagnostics.obd.SharedPreferencesProtocolMemory(
+                appContext.getSharedPreferences("obd_settings", Context.MODE_PRIVATE),
+            ),
+            log = connectionLog,
+        )
     }
     override val obdControls: ObdAdvancedControls get() = obdManager
     override val obdConnection: ObdConnection get() = obdManager
     override val diagnosticCommands: DiagnosticCommandHandler get() = obdManager
 
+    override val adapterSetup by lazy {
+        com.aicarcompanion.app.connectivity.AdapterConnectionManager(
+            scope = appScope,
+            transport = bluetooth,
+            obd = obdManager,
+            lastAdapterAddress = { settings.settings.value.lastAdapterAddress },
+            rememberAdapter = { device -> settings.update { it.copy(lastAdapterAddress = device.address) } },
+            log = connectionLog,
+        )
+    }
+
+    /** Reconnects quietly to the adapter that last worked; never searches or prompts. */
     override fun autoConnectAdapter() {
-        val address = settings.settings.value.lastAdapterAddress ?: return
-        if (obdManager.state.value != ObdConnectionState.Disconnected) return
-        if (bluetooth.availability() != BluetoothAvailability.READY) return
-        bluetooth.findPaired(address)?.let(obdManager::connect)
+        adapterSetup.reconnectLastAdapter()
+    }
+
+    /** Connection changes Penelope may mention, spoken only between conversation turns. */
+    private val announcer by lazy {
+        com.aicarcompanion.app.connectivity.ConnectionAnnouncer(appScope) { text ->
+            if (voiceSessionLazy.isInitialized()) voiceSession.queueStatusNotice(text)
+        }
     }
 
     override val diagnosticsRepository: DiagnosticsRepository by lazy {
@@ -168,11 +211,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val reasoning = geminiProvider(parser, ruleBased, recorder)
         VoiceSession(
             scope = appScope,
-            input = AndroidSpeechInput(appContext),
+            input = AndroidSpeechInput(appContext).apply { preferOffline = { !internetOnline.value } },
             output = speechOutput,
             conversation = ConversationManager(reasoning, assistantName, { settings.settings.value.explanationLevel }),
             focus = audioFocus,
             continuousEnabled = { settings.settings.value.continuousConversation },
+            internetOnline = internetOnline,
         )
     }
     override val voiceSession: VoiceSession by voiceSessionLazy
@@ -193,6 +237,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
         knowledge = GenericDtcCatalog,
         aiEnabled = { settings.settings.value.aiEnabled },
         recorder = recorder,
+        internetAvailable = { internetOnline.value },
+        log = connectionLog,
     ).also { provider ->
         gemini = provider
         appScope.launch { settings.settings.map { it.aiEnabled }.distinctUntilChanged().collect { provider.refreshStatus() } }
@@ -209,6 +255,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     init {
+        announcer.watch(obdManager.state)
         // Live polling covers only the readings the user's detail level shows.
         appScope.launch {
             settings.settings.map { it.explanationLevel }.distinctUntilChanged().collect { obdConnection.setLiveDetail(it) }

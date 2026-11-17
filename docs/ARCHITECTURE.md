@@ -377,6 +377,21 @@ Each style has its own token set (`penelopeTokens(dark, reducedMotion, style)`),
 
 DIY and Advanced keep the previous home design until their own dashboards land.
 
+## Connection recovery and Gemini reliability (Phase 7)
+
+See `docs/CONNECTION_RECOVERY.md`. Summary:
+- **`VehicleLinkStage`** only reports "vehicle connected" after a valid ECU answer.
+- **`ObdManager` protocol order** (automatic mode only): the remembered protocol, then the adapter's automatic search, then `GenericProtocolProfile` fallbacks.
+- **`ObdManager` recovery:** degraded after 3 silent requests; recovery is bounded and read-only.
+- **`InternetMonitor`** reports validated internet on the default network. The app never binds all its traffic to one network.
+- **`GeminiReasoningProvider`:**
+  - honors provider retry times;
+  - never contacts Gemini while offline;
+  - never adds notices to the history Gemini sees;
+  - makes one request at a time.
+- **`VoiceSession`** resumes listening when internet returns.
+- **`ConnectionLog`** is a redacted, in-memory diagnostic log, shown in Settings → Connection status.
+
 ## Persistence
 
 Room schema v1 (unchanged in Phase 3) (`app/schemas/…/1.json`): `vehicles`, `service_records`, `dtc_reads` +

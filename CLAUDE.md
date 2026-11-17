@@ -27,5 +27,6 @@ Follow `docs/DEVELOPMENT_QUALITY_GATES.md`. In short:
 ## Workflow
 - **Branches:** work on a feature branch from the latest `main`, one PR per stage.
 - **Merging:** never merge without the owner's explicit approval.
-- **Integration base:** `main`. The experimental ENET work (`experiment/*`, PR #11) stays separate.
+- **Integration base:** `main`, which contains only the Penelope app.
+- **ENET tester is separate:** the experimental BMW ENET tester is not part of main and not part of Penelope. It lives only on the `experiment/*` branches (`experiment/bmw-enet-tester`, PR #11). Never merge it into main, add it to Penelope's build, CI or quality gate, or mix it into Penelope work, unless the owner explicitly asks.
 - **Settings:** knowledge level (Everyday / DIY / Advanced) and home layout (Easy / Customizable) are independent settings.

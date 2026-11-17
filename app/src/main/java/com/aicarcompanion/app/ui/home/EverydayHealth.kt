@@ -48,7 +48,9 @@ fun everydayHealth(
     obd: ObdConnectionState,
     zone: ZoneId = ZoneId.systemDefault(),
 ): EverydayHealth {
-    val connected = obd is ObdConnectionState.Connected && obd.vehicleProtocol != null
+    val stage = com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(obd)
+    // Only a verified vehicle answer counts; a Bluetooth link alone never does.
+    val connected = stage.vehicleReady
     val sample = codes.any { it.origin == DataOrigin.SAMPLE } || lastRead?.origin == DataOrigin.SAMPLE
     val updated = lastRead?.readAt?.let { "Checked ${checked(it, zone)}" }
     val checkAction = if (connected) HealthAction.CHECK_CODES else HealthAction.CONNECT_ADAPTER
@@ -81,6 +83,14 @@ fun everydayHealth(
             tone = HealthTone.GOOD, codes = emptyList(), updated = updated,
             actionLabel = checkLabel, action = checkAction, sample = sample,
         )
+        stage == com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_PENDING ||
+            stage == com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.DEGRADED ||
+            stage == com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.RECOVERING -> EverydayHealth(
+            headline = if (stage == com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_PENDING) "Waiting for your car" else "Reconnecting",
+            detail = stage.everydayMessage + if (stage == com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_PENDING) " Make sure the ignition is on." else "",
+            tone = HealthTone.UNKNOWN, codes = emptyList(), updated = updated,
+            actionLabel = "Check my car now", action = HealthAction.CHECK_CODES, sample = sample,
+        )
         connected -> EverydayHealth(
             "Ready to check", "Your adapter is connected. I haven't checked for warning codes yet.",
             HealthTone.UNKNOWN, emptyList(), null, checkLabel, checkAction, sample = false,
@@ -96,9 +106,16 @@ fun everydayHealth(
 private fun checked(at: Instant, zone: ZoneId): String = CHECKED_FORMAT.format(at.atZone(zone))
 
 /** Short connection words for the header, plus whether the link is up. */
-fun everydayConnection(obd: ObdConnectionState): Pair<String, Boolean> = when (obd) {
-    is ObdConnectionState.Connected -> (if (obd.vehicleProtocol != null) "Connected" else "Adapter on · car not responding") to (obd.vehicleProtocol != null)
-    is ObdConnectionState.Connecting -> "Connecting…" to false
-    is ObdConnectionState.Reconnecting -> "Reconnecting…" to false
-    else -> "Not connected" to false
+fun everydayConnection(obd: ObdConnectionState): Pair<String, Boolean> {
+    val stage = com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(obd)
+    return when (stage) {
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_CONNECTED -> "Connected"
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_PENDING -> "Scanner on · car not responding"
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.DEGRADED,
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.RECOVERING -> "Reconnecting…"
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.ADAPTER_CONNECTED,
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.ADAPTER_INITIALIZING,
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.ECU_RESPONDING -> "Connecting…"
+        else -> if (obd is ObdConnectionState.Connecting) "Connecting…" else "Not connected"
+    } to stage.vehicleReady
 }

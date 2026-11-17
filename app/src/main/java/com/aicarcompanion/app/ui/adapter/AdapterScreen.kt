@@ -39,6 +39,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aicarcompanion.app.R
+import com.aicarcompanion.app.connectivity.AdapterSetupState
+import com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailure
 import com.aicarcompanion.app.assistant.conversation.SpokenFormat
 import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.obd.AdapterDevice
@@ -61,10 +63,11 @@ fun AdapterScreen(
     val state by viewModel.obd.state.collectAsStateWithLifecycle()
     val stats by viewModel.controls.stats.collectAsStateWithLifecycle()
     val info by viewModel.controls.adapterInfo.collectAsStateWithLifecycle()
+    val setup by viewModel.setup.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
 
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.refresh() }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { viewModel.refresh() }
     val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { viewModel.refresh() }
 
     LazyColumn(
@@ -76,7 +79,7 @@ fun AdapterScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val level = viewModel.level
-        item { StatusCard(state, viewModel) }
+        item { StatusCard(state, setup, viewModel) }
         if (level != ExplanationLevel.EVERYDAY) {
             item { ConnectionDetailsCard(state, viewModel) }
             val tips = ConnectionTroubleshooter.tips(state, stats, info)
@@ -107,17 +110,24 @@ fun AdapterScreen(
             )
         }
 
+        val permissionNeeded = viewModel.availability == BluetoothAvailability.NO_PERMISSION ||
+            (setup as? AdapterSetupState.Unavailable)?.reason == ConnectFailure.PERMISSION_DENIED
+        if (permissionNeeded) item {
+            SectionCard("Bluetooth permission needed") {
+                Text(
+                    "Allow \"Nearby devices\" so I can find and connect to your car adapter. " +
+                        "I only look for Bluetooth devices while you're connecting, and I don't track your location.",
+                )
+                Button(
+                    onClick = { permissionLauncher.launch(viewModel.requiredPermissions.toTypedArray()) },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text("Allow Bluetooth access") }
+            }
+        }
+
         when (viewModel.availability) {
             BluetoothAvailability.NOT_SUPPORTED -> item { Text("This phone doesn't have Bluetooth.") }
-            BluetoothAvailability.NO_PERMISSION -> item {
-                SectionCard("Bluetooth permission needed") {
-                    Text("Allow \"Nearby devices\" so the app can connect to your paired OBD-II adapter. The app doesn't scan for or track other devices.")
-                    Button(
-                        onClick = { viewModel.requiredPermission?.let(permissionLauncher::launch) },
-                        modifier = Modifier.heightIn(min = 48.dp),
-                    ) { Text("Allow Bluetooth access") }
-                }
-            }
+            BluetoothAvailability.NO_PERMISSION -> Unit // Permission card above.
             BluetoothAvailability.DISABLED -> item {
                 SectionCard("Bluetooth is off") {
                     Button(
@@ -143,6 +153,26 @@ fun AdapterScreen(
                         viewModel.connect(device)
                     }
                 }
+                // Adapters found nearby: from the user's search, or several found by "Connect my adapter".
+                val pairedAddresses = viewModel.devices.map { it.address }.toSet()
+                val nearby = ((setup as? AdapterSetupState.NeedsChoice)?.candidates.orEmpty() + viewModel.nearby)
+                    .distinctBy { it.address }.filter { it.address !in pairedAddresses }
+                if (nearby.isNotEmpty()) {
+                    item { Text("Found nearby", style = MaterialTheme.typography.titleMedium) }
+                    items(nearby, key = { "nearby-" + it.address }) { device ->
+                        DeviceRow(device, state, false, showTechnical = level != ExplanationLevel.EVERYDAY) {
+                            viewModel.connect(device)
+                        }
+                    }
+                }
+                if (level != ExplanationLevel.EVERYDAY) item {
+                    val searching = setup is AdapterSetupState.Searching
+                    OutlinedButton(
+                        onClick = viewModel::searchNearby,
+                        enabled = !searching,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    ) { Text(if (searching) "Searching nearby…" else "Search for nearby adapters") }
+                }
                 item {
                     OutlinedButton(
                         onClick = { context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) },
@@ -155,11 +185,12 @@ fun AdapterScreen(
 }
 
 @Composable
-private fun StatusCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
+private fun StatusCard(state: ObdConnectionState, setup: AdapterSetupState, viewModel: AdapterViewModel) {
     SectionCard("Connection") {
-        val (title, detail) = describe(state)
+        val everyday = viewModel.level == ExplanationLevel.EVERYDAY
+        val (title, detail) = statusText(state, setup, everyday)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (state is ObdConnectionState.Connecting || state is ObdConnectionState.Reconnecting) {
+            if (state is ObdConnectionState.Connecting || state is ObdConnectionState.Reconnecting || setup.isBusy()) {
                 CircularProgressIndicator(Modifier.size(20.dp).padding(end = 4.dp), strokeWidth = 2.dp)
             }
             Icon(painterResource(R.drawable.ic_bluetooth), contentDescription = null)
@@ -171,11 +202,15 @@ private fun StatusCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
             )
         }
         Text(detail, style = MaterialTheme.typography.bodyMedium)
-        val idle = state is ObdConnectionState.Disconnected || state is ObdConnectionState.Failed
+        val idle = (state is ObdConnectionState.Disconnected || state is ObdConnectionState.Failed) && !setup.isBusy()
+        if (setup.isBusy()) {
+            OutlinedButton(onClick = viewModel::disconnect, modifier = Modifier.heightIn(min = 48.dp)) { Text("Cancel") }
+        }
         if (idle && viewModel.bluetoothReady()) {
-            if (viewModel.level == ExplanationLevel.EVERYDAY) {
+            if (everyday) {
+                val retry = setup is AdapterSetupState.Failed || setup is AdapterSetupState.Unavailable
                 Button(onClick = viewModel::connectAutomatically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text("Connect my adapter")
+                    Text(if (retry) "Try again" else "Connect my adapter")
                 }
             } else if (viewModel.controls.currentDevice != null) {
                 Button(onClick = viewModel::reconnect, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reconnect") }
@@ -196,12 +231,41 @@ private fun StatusCard(state: ObdConnectionState, viewModel: AdapterViewModel) {
     }
 }
 
+private fun AdapterSetupState.isBusy() =
+    this is AdapterSetupState.Searching || this is AdapterSetupState.Found || this is AdapterSetupState.Connecting
+
+/**
+ * Title and detail for the status card. While the setup flow is searching, connecting or has
+ * failed, its plain-language step is shown. Everyday users never see technical details; DIY and
+ * Advanced users also see the underlying error, if any.
+ */
+fun statusText(state: ObdConnectionState, setup: AdapterSetupState, everyday: Boolean): Pair<String, String> {
+    val linkActive = state is ObdConnectionState.Connected || state is ObdConnectionState.Reconnecting
+    return when {
+        linkActive -> describe(state)
+        setup is AdapterSetupState.Searching || setup is AdapterSetupState.Found -> setup.everydayMessage to
+            "Make sure the adapter is plugged in under the dashboard and the ignition is on."
+        setup is AdapterSetupState.Connecting -> setup.everydayMessage to
+            if (everyday || setup.attempt == 1) "This can take a few seconds." else "Attempt ${setup.attempt} of ${setup.maxAttempts}."
+        setup is AdapterSetupState.NeedsChoice -> "Choose your adapter" to setup.everydayMessage
+        setup is AdapterSetupState.Unavailable -> "Not connected" to setup.everydayMessage
+        setup is AdapterSetupState.Failed -> "Not connected" to
+            if (everyday || setup.detail.isNullOrBlank()) setup.everydayMessage else "${setup.everydayMessage}\nDetails: ${setup.detail}"
+        else -> describe(state)
+    }
+}
+
 fun describe(state: ObdConnectionState): Pair<String, String> = when (state) {
     ObdConnectionState.Disconnected -> "Not connected" to "Choose your paired adapter below."
-    is ObdConnectionState.Connecting -> "Connecting…" to "Connecting to ${state.adapterName ?: "adapter"} and initializing."
-    is ObdConnectionState.Connected -> "Connected to ${state.adapterName}" to
-        if (state.vehicleProtocol != null) "Your car is responding." else
-            "The adapter is connected, but your car isn't responding. Turn the ignition on, then tap \"Check vehicle again\"."
+    is ObdConnectionState.Connecting -> com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(state).label + "…" to
+        "Connecting to ${state.adapterName ?: "adapter"} and checking that your car answers."
+    is ObdConnectionState.Connected -> when (com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(state)) {
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_CONNECTED -> "Vehicle connected" to "${state.adapterName} is connected and your car is responding."
+        com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.DEGRADED, com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.RECOVERING ->
+            "Recovering connection" to "Your car stopped answering for a moment. Penelope is re-checking it automatically."
+        else -> "Adapter connected" to
+            "${state.adapterName} is connected, but your car isn't responding. Turn the ignition on, then tap \"Check vehicle again\"."
+    }
     is ObdConnectionState.Reconnecting -> "Reconnecting (${state.attempt} of ${state.maxAttempts})…" to "Lost connection to ${state.adapterName}."
     is ObdConnectionState.Unavailable -> "Unavailable" to state.reason
     is ObdConnectionState.Failed -> "Not connected" to state.message

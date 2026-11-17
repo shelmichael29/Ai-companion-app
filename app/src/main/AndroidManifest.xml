@@ -1,15 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Vehicle lookups (FuelEconomy.gov, NHTSA vPIC). Normal permission; no prompt. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Read-only: lets Penelope tell "no internet" apart from AI errors. No permission prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Push-to-talk with Penelope. Requested at runtime the first time the mic is tapped. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- OBD-II over Bluetooth Classic. Only already-paired adapters are used, so no scanning
-         or location permission is requested. -->
+    <!-- OBD-II over Bluetooth Classic: connect to paired adapters, and optionally search for a
+         nearby one so beginners don't have to pair it in Android settings first. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Finding nearby adapters (Android 12+). Never used to derive location. -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <!-- Finding nearby adapters on Android 8–11 needs these (platform rule); not requested on 12+. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 

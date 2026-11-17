@@ -23,6 +23,9 @@ class AndroidSpeechInput(private val context: Context) : SpeechInput {
 
     @Volatile private var active: SpeechRecognizer? = null
 
+    /** When true (no internet), ask the recognizer to use its on-device model if it has one. */
+    @Volatile var preferOffline: () -> Boolean = { false }
+
     override val isAvailable: Boolean
         get() = SpeechRecognizer.isRecognitionAvailable(context) || onDeviceAvailable()
 
@@ -100,6 +103,7 @@ class AndroidSpeechInput(private val context: Context) : SpeechInput {
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+        if (preferOffline()) putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
     }
 
     private fun bestResult(bundle: Bundle?): String? =

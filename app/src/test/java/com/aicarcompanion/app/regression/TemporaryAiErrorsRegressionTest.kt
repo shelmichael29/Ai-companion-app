@@ -89,6 +89,8 @@ class TemporaryAiErrorsRegressionTest {
         }
     }
 
+    private var clock = Instant.parse("2026-11-17T12:00:00Z")
+
     @Test fun `after a temporary rate limit Penelope recovers and never mentions the daily limit`() = runTest {
         var calls = 0
         val client = object : AiChatClient {
@@ -102,15 +104,21 @@ class TemporaryAiErrorsRegressionTest {
         val parser = CommandParser { "Penelope" }
         val p = GeminiReasoningProvider(
             parser, RuleBasedReasoningProvider(parser, { context }, NoAdapterDiagnosticCommandHandler, GenericDtcCatalog),
-            { context }, client, GenericDtcCatalog, { true }, now = { Instant.parse("2026-11-17T12:00:00Z") },
+            { context }, client, GenericDtcCatalog, { true }, now = { clock },
         )
         val first = p.respond(AssistantRequest("How often should I rotate my tires?", "Penelope", ExplanationLevel.EVERYDAY))
         assertEquals(AiStatus.Unavailable(AiFailure.BUSY), p.status.value)
         assertFalse("temporary error must not claim the daily limit: ${first.text}", first.text.contains("usage limit"))
         assertFalse(first.text.contains("resets within a day"))
 
+        // Inside the provider's default 30 s wait Gemini isn't asked again (it would only fail again).
+        clock = clock.plusSeconds(10)
+        p.respond(AssistantRequest("And my wipers?", "Penelope", ExplanationLevel.EVERYDAY))
+        assertEquals(1, calls)
+        // After the wait, the next question works without restarting the app.
+        clock = clock.plusSeconds(30)
         val second = p.respond(AssistantRequest("And my brake pads?", "Penelope", ExplanationLevel.EVERYDAY))
-        assertEquals("Back to normal.", second.text)
+        assertEquals("${com.aicarcompanion.app.ai.AiNotices.RESTORED} Back to normal.", second.text)
         assertEquals(AiStatus.Ready("gemini-3.8-flash"), p.status.value)
     }
 }

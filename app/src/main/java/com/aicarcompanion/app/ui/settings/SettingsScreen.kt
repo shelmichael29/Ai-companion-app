@@ -132,6 +132,8 @@ class SettingsViewModel(
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory),
+    /** Live connection summary and log; omitted in previews and screen tests. */
+    connectionStatus: ConnectionStatusViewModel? = null,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val voices by viewModel.voices.collectAsStateWithLifecycle()
@@ -252,6 +254,11 @@ fun SettingsScreen(
             }
             OutlinedButton(onClick = viewModel::resetConversation, modifier = Modifier.heightIn(min = 48.dp)) {
                 Text("Reset conversation")
+            }
+
+            if (connectionStatus != null) {
+                Heading("Connection status")
+                ConnectionStatusSection(connectionStatus, settings.explanationLevel)
             }
 
             Heading("Conversation")

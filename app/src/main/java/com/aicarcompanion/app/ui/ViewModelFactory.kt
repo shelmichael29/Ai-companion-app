@@ -27,6 +27,10 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            com.aicarcompanion.app.ui.settings.ConnectionStatusViewModel(c.obdConnection.state, c.internet.state, c.aiStatus, c.connectionLog)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
             AssistantViewModel(c.voiceSession, c.settings, c.aiStatus)
         }
         initializer {
@@ -39,7 +43,7 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            AdapterViewModel(c.bluetooth, c.obdConnection, c.obdControls, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository)
+            AdapterViewModel(c.bluetooth, c.obdConnection, c.obdControls, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository, c.adapterSetup)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

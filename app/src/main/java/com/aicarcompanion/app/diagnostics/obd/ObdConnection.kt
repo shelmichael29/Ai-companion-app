@@ -34,7 +34,11 @@ data class AdapterDevice(val name: String, val address: String, val radio: Adapt
 
 sealed interface ObdConnectionState {
     data object Disconnected : ObdConnectionState
-    data class Connecting(val transport: ObdTransport, val adapterName: String? = null) : ObdConnectionState
+    data class Connecting(
+        val transport: ObdTransport,
+        val adapterName: String? = null,
+        val phase: ConnectPhase = ConnectPhase.OPENING_LINK,
+    ) : ObdConnectionState
 
     /**
      * The adapter link is up. [vehicleProtocol] is the OBD-II protocol the vehicle answered on,
@@ -45,11 +49,22 @@ sealed interface ObdConnectionState {
         val adapterName: String,
         val vehicleProtocol: String? = null,
         val adapterVersion: String? = null,
+        /** Whether the vehicle is still answering reliably (see [VehicleLinkStage]). */
+        val health: LinkHealth = LinkHealth.OK,
     ) : ObdConnectionState
 
     data class Reconnecting(val adapterName: String, val attempt: Int, val maxAttempts: Int) : ObdConnectionState
     data class Unavailable(val reason: String) : ObdConnectionState
-    data class Failed(val message: String) : ObdConnectionState
+    /**
+     * @param message plain words (no addresses or error codes), safe for every user.
+     * @param reason why, for Easy Mode wording and retry decisions.
+     * @param detail technical detail (e.g. the Android error), shown only to DIY/Advanced users.
+     */
+    data class Failed(
+        val message: String,
+        val reason: com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailure = com.aicarcompanion.app.diagnostics.bluetooth.ConnectFailure.UNKNOWN,
+        val detail: String? = null,
+    ) : ObdConnectionState
 }
 
 /** Read-only access to a vehicle through an OBD-II adapter. UI and assistant depend on this. */
