@@ -1,0 +1,79 @@
+# Penelope Detekt rules: built on Detekt's defaults (buildUponDefaultConfig = true).
+#
+# Goal: catch likely defects (crashes, coroutine misuse, swallowed cancellation, wrong equality,
+# unsafe casts), not argue about style. Rules that only measure size or style, or that conflict
+# with Jetpack Compose conventions, are turned off so the gate doesn't block on noise.
+# Findings that existed before the gate are recorded in baseline-<module>.xml; new ones fail.
+
+build:
+  maxIssues: 0
+
+complexity:
+  # Size and complexity metrics: useful in review, too noisy as a gate for Compose UI code.
+  LongMethod: { active: false }
+  LongParameterList: { active: false }
+  CyclomaticComplexMethod: { active: false }
+  CognitiveComplexMethod: { active: false }
+  TooManyFunctions: { active: false }
+  LargeClass: { active: false }
+  NestedBlockDepth: { active: false }
+  ComplexCondition: { active: false }
+
+style:
+  MagicNumber: { active: false }          # protocol constants, dp values, timeouts
+  MaxLineLength: { active: false }
+  WildcardImport: { active: false }
+  ReturnCount: { active: false }
+  ForbiddenComment: { active: false }
+  FunctionOnlyReturningConstant: { active: false }
+  UnusedPrivateMember: { active: true }
+  UnusedPrivateProperty: { active: true }
+  UnusedParameter: { active: false }      # Compose and interface callbacks
+  MayBeConst: { active: false }
+  DestructuringDeclarationWithTooManyEntries: { active: false }
+  LoopWithTooManyJumpStatements: { active: false }
+  ThrowsCount: { active: false }
+  SerialVersionUIDInSerializableClass: { active: false }
+  UnnecessaryAbstractClass: { active: false }
+
+naming:
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Composable', 'Test']   # Compose functions are PascalCase; tests use backticks
+  TopLevelPropertyNaming: { active: false }   # Compose design tokens (e.g. Sans, COVERED)
+  MatchingDeclarationName: { active: false }
+  ConstructorParameterNaming: { active: false }
+  VariableNaming: { active: false }
+
+exceptions:
+  # The app deliberately catches broad exceptions at hardware, network and AI boundaries so
+  # Penelope never crashes; those catches map errors to plain-language states.
+  TooGenericExceptionCaught: { active: false }
+  SwallowedException: { active: false }
+  TooGenericExceptionThrown: { active: true }
+  InstanceOfCheckForException: { active: false }
+
+coroutines:
+  # Kept on: these find real bugs (blocking calls in suspend code, lost cancellation, GlobalScope).
+  GlobalCoroutineUsage: { active: true }
+  SuspendFunWithCoroutineScopeReceiver: { active: true }
+  RedundantSuspendModifier: { active: true }
+  SleepInsteadOfDelay: { active: true }
+  SuspendFunSwallowedCancellation: { active: true }
+  InjectDispatcher: { active: false }    # dispatchers are injected where tests need it
+
+potential-bugs:
+  active: true
+  # All defaults stay on, plus these extras.
+  CastNullableToNonNullableType: { active: true }
+  DontDowncastCollectionTypes: { active: true }
+  ElseCaseInsteadOfExhaustiveWhen: { active: false }
+  IgnoredReturnValue: { active: true }
+  ImplicitUnitReturnType: { active: false }
+  UnconditionalJumpStatementInLoop: { active: true }
+  UnnecessaryNotNullCheck: { active: true }
+  UnsafeCast: { active: true }
+
+performance:
+  active: true
+  SpreadOperator: { active: false }

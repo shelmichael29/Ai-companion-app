@@ -129,10 +129,10 @@ private fun ShortcutRow(
             Switch(checked = shown, onCheckedChange = null, enabled = !item.required)
         }
         if (shown) {
-            IconButton(onClick = { onUp?.invoke() }, enabled = onUp != null) {
+            IconButton(onClick = { onUp?.invoke() }, enabled = onUp != null, modifier = Modifier.size(48.dp)) {
                 Icon(PenelopeIcons.ChevronUp, contentDescription = "Move ${item.label} up", modifier = Modifier.size(22.dp))
             }
-            IconButton(onClick = { onDown?.invoke() }, enabled = onDown != null) {
+            IconButton(onClick = { onDown?.invoke() }, enabled = onDown != null, modifier = Modifier.size(48.dp)) {
                 Icon(PenelopeIcons.ChevronDown, contentDescription = "Move ${item.label} down", modifier = Modifier.size(22.dp))
             }
         }

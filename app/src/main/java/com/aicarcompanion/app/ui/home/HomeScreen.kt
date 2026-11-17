@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import com.aicarcompanion.app.ai.AiFailure
 import com.aicarcompanion.app.ai.AiStatus
 import com.aicarcompanion.app.dashboard.DashboardItem
 import com.aicarcompanion.app.dashboard.DashboardKind
@@ -338,11 +339,28 @@ internal fun shortConnection(state: com.aicarcompanion.app.diagnostics.obd.ObdCo
 @Composable
 internal fun aiStatusChip(status: AiStatus): Pair<String, Color> {
     val t = Penelope.tokens
-    return when (status) {
-        is AiStatus.Ready, is AiStatus.Standby -> "Smarter answers on" to t.brandColors[1]
-        is AiStatus.Unavailable -> "Offline · using basic answers" to t.warning
-        AiStatus.NotConfigured, AiStatus.Off -> "Basic answers" to t.textSecondary
+    val color = when (status) {
+        is AiStatus.Ready, is AiStatus.Standby -> t.brandColors[1]
+        is AiStatus.Unavailable -> t.warning
+        AiStatus.NotConfigured, AiStatus.Off -> t.textSecondary
     }
+    return aiChipText(status) to color
+}
+
+/**
+ * The chip's words. An unavailable AI names the real reason in a few words: never "Offline"
+ * unless the phone is actually offline, and never "daily limit" for a temporary rate limit.
+ */
+internal fun aiChipText(status: AiStatus): String = when (status) {
+    is AiStatus.Ready, is AiStatus.Standby -> "Smarter answers on"
+    AiStatus.NotConfigured, AiStatus.Off -> "Basic answers"
+    is AiStatus.Unavailable -> when (status.reason) {
+        AiFailure.OFFLINE -> "Offline"
+        AiFailure.BUSY, AiFailure.TIMEOUT -> "Smarter answers busy"
+        AiFailure.QUOTA -> "Daily AI limit reached"
+        AiFailure.APP_CHECK -> "App not verified yet"
+        else -> "Smarter answers unavailable"
+    } + " · using basic answers"
 }
 
 /** A round, glowing shortcut with a label: large touch target, one TalkBack stop. */

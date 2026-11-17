@@ -1,0 +1,37 @@
+# Dependabot opens pull requests for dependency updates. Each one runs the full quality gate
+# (Android CI) before it can be merged. Updates are grouped so they arrive as a few
+# reviewable PRs a week instead of dozens.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    groups:
+      androidx-compose:
+        patterns: ["androidx.compose*", "androidx.activity*", "androidx.lifecycle*", "androidx.navigation*"]
+      firebase:
+        patterns: ["com.google.firebase*", "com.google.gms*"]
+      kotlin-and-build:
+        patterns: ["org.jetbrains.kotlin*", "org.jetbrains.kotlinx*", "com.android.tools.build*", "com.google.devtools.ksp*"]
+      testing-and-analysis:
+        patterns: ["junit*", "org.robolectric*", "androidx.compose.ui:ui-test*", "io.gitlab.arturbosch.detekt*", "org.jetbrains.kotlinx.kover*"]
+    ignore:
+      # Major Kotlin/AGP upgrades need a planned migration, not an automatic PR.
+      - dependency-name: "org.jetbrains.kotlin*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "com.android.tools.build*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    labels: ["dependencies", "ci"]
+    groups:
+      actions:
+        patterns: ["*"]

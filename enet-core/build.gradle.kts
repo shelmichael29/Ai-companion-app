@@ -3,6 +3,7 @@
 plugins {
     `java-library`
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kover) // test coverage report (informational; not a gate)
 }
 
 java {

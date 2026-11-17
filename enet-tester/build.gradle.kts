@@ -33,6 +33,17 @@ android {
         jvmTarget = "17"
     }
 
+    lint {
+        // Lint errors fail the build. Accessibility (e.g. missing content descriptions, small touch
+        // targets), lifecycle, security and correctness checks all stay on at their default levels.
+        abortOnError = true
+        checkReleaseBuilds = true
+        checkDependencies = true
+        sarifReport = true
+        // Version-update notices are handled by Dependabot pull requests instead of lint warnings.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
+    }
+
     buildFeatures {
         compose = true
     }

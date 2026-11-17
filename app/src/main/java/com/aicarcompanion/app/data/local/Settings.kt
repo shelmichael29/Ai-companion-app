@@ -206,5 +206,6 @@ class PersistentSettingsStore(private val store: KeyValueStore) : SettingsStore 
     }
 }
 
+@Suppress("FunctionNaming") // Factory function named after the type it creates (Kotlin convention).
 fun SharedPreferencesSettingsStore(context: Context): SettingsStore =
     PersistentSettingsStore(SharedPreferencesKeyValueStore(context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)))

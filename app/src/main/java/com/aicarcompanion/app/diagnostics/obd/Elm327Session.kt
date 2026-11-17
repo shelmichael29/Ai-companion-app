@@ -135,12 +135,21 @@ class Elm327Session(
 
     /** Asks the vehicle which PIDs it supports. Null when the vehicle doesn't respond (e.g. ignition off). */
     suspend fun probeVehicle(): VehicleProbe? {
-        val first = execute("0100", maxOf(SEARCH_TIMEOUT, timeoutMillis))
+        // A timeout here means the car didn't answer (ignition off, slow protocol search): the
+        // adapter itself is fine, so report "vehicle not responding" instead of failing the whole
+        // connection. A lost link (other IOException) still propagates.
+        val first = try {
+            execute("0100", maxOf(SEARCH_TIMEOUT, timeoutMillis))
+        } catch (e: ObdTimeoutException) {
+            return null
+        }
         val supported = Elm327ResponseParser.decodeSupportedPids(first, 0x00).toMutableSet()
         if (supported.isEmpty()) return null
         var base = 0x20
         while (base <= 0xA0 && base in supported) {
-            supported += Elm327ResponseParser.decodeSupportedPids(execute("01%02X".format(base)), base)
+            // A timed-out extended range just means those PIDs aren't listed; keep what we have.
+            val more = try { execute("01%02X".format(base)) } catch (e: ObdTimeoutException) { break }
+            supported += Elm327ResponseParser.decodeSupportedPids(more, base)
             base += 0x20
         }
         val dpn = runCatching { Elm327ResponseParser.lines(execute("ATDPN")).firstOrNull() }.getOrNull()

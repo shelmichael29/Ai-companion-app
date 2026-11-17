@@ -13,7 +13,10 @@ room = "2.6.1"
 orgJson = "20240303"
 firebaseBom = "35.2.0"
 googleServices = "4.6.0"
+crashlyticsPlugin = "3.0.2"
 robolectric = "4.14.1"
+detekt = "1.23.7"
+kover = "0.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +40,7 @@ firebase-ai = { group = "com.google.firebase", name = "firebase-ai" }
 firebase-config = { group = "com.google.firebase", name = "firebase-config" }
 firebase-appcheck-playintegrity = { group = "com.google.firebase", name = "firebase-appcheck-playintegrity" }
 firebase-appcheck-debug = { group = "com.google.firebase", name = "firebase-appcheck-debug" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
 # Compose UI tests run on the JVM with Robolectric: no emulator or device needed in CI.
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
@@ -51,3 +55,6 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "crashlyticsPlugin" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }

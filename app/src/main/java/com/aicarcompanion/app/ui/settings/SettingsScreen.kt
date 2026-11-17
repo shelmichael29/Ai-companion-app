@@ -324,6 +324,38 @@ fun SettingsScreen(
                     "Android's TalkBack screen reader works alongside ${settings.assistantName}.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val crashReports = remember { com.aicarcompanion.app.quality.CrashReporting.isAvailable(context) }
+            if (crashReports) {
+                Text(
+                    "Crash reports: if the app crashes, a technical report (the error, phone model, Android and app version) " +
+                        "is sent to the developer through Firebase Crashlytics. It never includes your name, VIN, location, " +
+                        "car data or conversations.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (com.aicarcompanion.app.BuildConfig.DEBUG && crashReports) {
+                var confirmCrash by remember { mutableStateOf(false) }
+                OutlinedButton(onClick = { confirmCrash = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("Send test crash report (debug builds only)")
+                }
+                if (confirmCrash) {
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { confirmCrash = false },
+                        title = { Text("Send a test crash?") },
+                        text = {
+                            Text(
+                                "The app will close on purpose. Open it again and the report is sent to Firebase " +
+                                    "Crashlytics within a few minutes. This checks crash reporting works; nothing is wrong.",
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { com.aicarcompanion.app.quality.CrashReporting.sendTestCrash() }) { Text("Crash now") }
+                        },
+                        dismissButton = { TextButton(onClick = { confirmCrash = false }) { Text("Cancel") } },
+                    )
+                }
+            }
         }
     }
 }

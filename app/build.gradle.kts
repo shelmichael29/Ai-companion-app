@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kover) // test coverage report (informational; not a gate)
     alias(libs.plugins.ksp)
 }
 
@@ -11,7 +12,11 @@ plugins {
  * app builds and runs with Penelope's built-in answers only. The file is never committed.
  */
 val firebaseConfigured = file("google-services.json").exists()
-if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
+if (firebaseConfigured) {
+    apply(plugin = "com.google.gms.google-services")
+    // Crash reporting (Firebase Crashlytics) only when the Firebase project config is present.
+    apply(plugin = "com.google.firebase.crashlytics")
+}
 
 android {
     namespace = "com.aicarcompanion.app"
@@ -50,6 +55,17 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    lint {
+        // Lint errors fail the build. Accessibility (e.g. missing content descriptions, small touch
+        // targets), lifecycle, security and correctness checks all stay on at their default levels.
+        abortOnError = true
+        checkReleaseBuilds = true
+        checkDependencies = true
+        sarifReport = true
+        // Version-update notices are handled by Dependabot pull requests instead of lint warnings.
+        disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
     }
 
     buildFeatures {
@@ -91,6 +107,7 @@ dependencies {
     implementation(libs.firebase.config)
     implementation(libs.firebase.appcheck.playintegrity)
     debugImplementation(libs.firebase.appcheck.debug) // debug builds only
+    implementation(libs.firebase.crashlytics) // crash reports; inactive without Firebase config
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

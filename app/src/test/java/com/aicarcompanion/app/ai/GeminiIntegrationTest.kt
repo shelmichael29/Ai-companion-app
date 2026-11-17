@@ -260,7 +260,9 @@ class GeminiIntegrationTest {
     }
 
     @Test fun `error classification`() {
-        assertEquals(AiFailure.QUOTA, AiErrorClassifier.classify("QuotaExceededException", null, false))
+        // A 429 with no detail is treated as temporary; only an explicit daily quota is QUOTA
+        // (see TemporaryAiErrorsRegressionTest).
+        assertEquals(AiFailure.BUSY, AiErrorClassifier.classify("QuotaExceededException", null, false))
         assertEquals(AiFailure.TIMEOUT, AiErrorClassifier.classify("RequestTimeoutException", null, false))
         assertEquals(AiFailure.SERVICE_DISABLED, AiErrorClassifier.classify("ServiceDisabledException", null, false))
         assertEquals(AiFailure.APP_CHECK, AiErrorClassifier.classify("ServerException", "Firebase App Check token is invalid.", false))
