@@ -44,3 +44,10 @@ Use the least expensive model that will give a reliable result. Escalate when a 
 - **Escalate:** if `penelope-implementer` hits an unclear root cause or a security, privacy or safety question, hand it to `penelope-architect`. If `penelope-explorer` can't find something after a focused search, do the search in the main session instead.
 - **Don't over-delegate:** small edits and questions already answered in the conversation are done directly. Subagents start without the conversation's context, so give them the goal, the relevant files and the constraints.
 - **Same rules everywhere:** every agent follows this file, including the quality gate, safety and privacy rules. Delegating never skips a check.
+
+## Project memory
+Durable project knowledge is in `docs/project-memory/`. Read its `README.md` table and open **only** the file the task needs (status, features, architecture, decisions, design, vehicle, roadmap).
+- **Status labels matter:** never treat 📋 Proposed or ❓ Undecided items as built.
+- **The code and the authoritative docs win** over memory; fix the memory file in the same PR.
+- **Record approved decisions** in `DECISIONS.md` and status changes in `FEATURES.md` / `DEVELOPMENT_STATUS.md`.
+- **Outside memory** (e.g. from ChatGPT) goes through `IMPORT_REVIEW.md` and the owner's approval first.

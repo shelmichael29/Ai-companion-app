@@ -11,7 +11,7 @@
    only in `AppContainer`.
 4. **Facts vs. hypotheses.** Observations are typed (symptom, note, verified finding, possible
    cause). Penelope frames code causes as possibilities until verified.
-5. **Lean, free, on-device.** AndroidX, Compose, Navigation, Room. Manual DI. No server, no keys.
+5. **Lean and keyless.** AndroidX, Compose, Navigation, Room. Manual DI. No backend server of our own, and no API keys in the app: Gemini goes through Firebase AI Logic with App Check (see "Gemini conversations"). Everything except Gemini and vehicle lookups works offline.
 
 ## Package map
 
@@ -57,6 +57,8 @@ network fails). Manual entry always works. Another provider (proprietary backend
 knowledge pack) implements `VehicleCatalogProvider` / `VinDecoder`.
 
 ## UI polish (v0.6): purple and black
+> **Superseded in part (v0.7, Phase A2):** Midnight (navy with cyan/teal light) is now the default color style; this purple-and-black look lives on as the **Amethyst** style. See "Everyday Driver dashboard and color styles".
+
 The Phase 4 structure below still applies. The palette and the home screen changed.
 
 - **Palette (`PenelopePalette`):** near-black `#050407` and charcoal `#0D0B12` backgrounds, with raised panels at `#16131F`. Electric purple `#7C3AED` (between deep violet `#5B21B6` and violet `#9333EA`) for gradients and fills; lilac `#A78BFA` and lavender `#C4B5FD` for accents and soft glows.
@@ -211,9 +213,10 @@ first), preview it, and reset to natural. A failed engine falls back to the phon
 **ElevenLabs later:** implement `SpeechOutput` (stream audio, honor `stop()`, report `Completed`
 only after playback ends so auto-listening stays half-duplex). Keep keys out of the APK.
 
-**AI reasoning later:** implement `ReasoningProvider`; it receives `AssistantRequest`
-(utterance, name, level) and must use `VehicleContextProvider`/`DiagnosticCommandHandler` for
-facts and readings, never generating numbers itself.
+**AI reasoning (built in Phase 5A):** `GeminiReasoningProvider` implements `ReasoningProvider`
+(see "Gemini conversations"). It receives `AssistantRequest` (utterance, name, level) and uses
+`VehicleContextProvider`/`DiagnosticCommandHandler` for facts and readings, never generating
+numbers itself. `HandsFreeReasoningProvider` sits in front of it (see "Hands-free foundation").
 
 **TalkBack.** Penelope's voice and TalkBack are independent. Controls have content
 descriptions and state descriptions; the status line is a polite live region.
