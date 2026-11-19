@@ -122,7 +122,8 @@ object AiErrorClassifier {
             typeName == "RequestTimeoutException" || "timeout" in typeName.lowercase() || "timed out" in m || "timeout" in m -> AiFailure.TIMEOUT
             typeName == "ServiceDisabledException" || typeName == "APINotConfiguredException" ||
                 "has not been used in project" in m || "is disabled" in m -> AiFailure.SERVICE_DISABLED
-            "app check" in m || "appcheck" in m || "app_check" in m -> AiFailure.APP_CHECK
+            "appcheck" in typeName.lowercase() || "app check" in m || "appcheck" in m || "app_check" in m -> AiFailure.APP_CHECK
+            "api key not valid" in m || "api_key_invalid" in m -> AiFailure.NOT_CONFIGURED
             typeName == "PromptBlockedException" || typeName == "ContentBlockedException" -> AiFailure.BLOCKED
             typeName == "InvalidAPIKeyException" -> AiFailure.NOT_CONFIGURED
             ("not found" in m || "404" in m || "is not supported" in m) && "model" in m -> AiFailure.MODEL_UNAVAILABLE

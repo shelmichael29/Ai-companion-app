@@ -200,7 +200,7 @@ class SafetyQuestionAndAiGuardTest {
             val p = penelope(gemini)
             val start = currentTime
             assertFallsBack(p, "What does a timing chain do?", level, AiFailure.TIMEOUT)
-            assertEquals("gives up after the 30 s limit", 30_000L, currentTime - start)
+            assertEquals("gives up after the configurable 12 s limit", com.aicarcompanion.app.ai.AiTimeouts.DEFAULT_MILLIS, currentTime - start)
         }
     }
 

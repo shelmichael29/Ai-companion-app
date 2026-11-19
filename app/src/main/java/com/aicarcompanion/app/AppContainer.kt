@@ -81,6 +81,9 @@ interface AppContainer {
 
     /** Gemini availability, for Settings and the chat screen. */
     val aiStatus: kotlinx.coroutines.flow.StateFlow<com.aicarcompanion.app.ai.AiStatus>
+
+    /** Where Penelope's latest answer came from (Gemini, built-in safety, fallback and why). */
+    val answerSources: com.aicarcompanion.app.ai.ResponseSourceTracker
     val aiModelName: String
     val aiAppCheckProvider: String
 
@@ -113,6 +116,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val settings: SettingsStore = SharedPreferencesSettingsStore(appContext)
     override val connectionLog = com.aicarcompanion.app.connectivity.ConnectionLog()
+    override val answerSources = com.aicarcompanion.app.ai.ResponseSourceTracker(connectionLog)
     override val internet: com.aicarcompanion.app.connectivity.InternetMonitor by lazy {
         com.aicarcompanion.app.connectivity.AndroidInternetMonitor(appContext, connectionLog)
     }
@@ -229,7 +233,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val reasoning = com.aicarcompanion.app.handsfree.HandsFreeReasoningProvider(
             delegate = geminiProvider(parser, ruleBased, recorder),
             capabilities = handsFreeCapabilities,
-        ) { kind, status -> connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Hands-free command", mapOf("command" to kind, "status" to status)) }
+        ) { kind, status ->
+            connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Hands-free command", mapOf("command" to kind, "status" to status))
+            answerSources.record(com.aicarcompanion.app.ai.ResponseRecord(com.aicarcompanion.app.ai.ResponseSource.DEVICE_COMMAND, category = status))
+        }
         VoiceSession(
             scope = appScope,
             input = AndroidSpeechInput(appContext).apply { preferOffline = { !internetOnline.value } },
@@ -263,6 +270,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
         recorder = recorder,
         internetAvailable = { internetOnline.value },
         log = connectionLog,
+        aiTimeoutMillis = { aiClient.requestTimeoutMillis },
+        sources = answerSources,
     ).also { provider ->
         gemini = provider
         appScope.launch { settings.settings.map { it.aiEnabled }.distinctUntilChanged().collect { provider.refreshStatus() } }

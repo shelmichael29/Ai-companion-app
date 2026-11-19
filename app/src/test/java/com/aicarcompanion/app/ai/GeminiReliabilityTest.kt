@@ -61,7 +61,11 @@ class GeminiReliabilityTest {
         val c = Client().apply { next = { AiResult.Failure(AiFailure.QUOTA, "429 PerDay", httpStatus = 429) } }
         val p = provider(c)
         assertTrue(p.ask("Is synthetic oil worth it?").text.startsWith(AiNotices.DAILY_LIMIT))
-        repeat(5) { clock = clock.plusSeconds(600); assertFalse(AiNotices.startsWithNotice(p.ask("Question $it").text)) }
+        repeat(5) {
+            clock = clock.plusSeconds(600)
+            // Short notice each time, never the full explanation again, never silent.
+            assertTrue(p.ask("Question $it").text.startsWith(AiNotices.stillUnavailable(AiFailure.QUOTA)))
+        }
         assertEquals("no endless retries within the hour", 1, c.calls.size)
         assertEquals(AiStatus.Unavailable(AiFailure.QUOTA), p.status.value)
         clock = clock.plusSeconds(600)
@@ -111,8 +115,10 @@ class GeminiReliabilityTest {
         val reply = p.ask("What is a CV joint?")
         assertTrue(reply.text.contains("App Check"))
         assertFalse(reply.text.contains("limit"))
-        clock = clock.plusSeconds(60); p.ask("Again?")
-        assertEquals(1, c.calls.size)
+        clock = clock.plusSeconds(30); p.ask("Again?")
+        assertEquals("paused for a minute, not hammered", 1, c.calls.size)
+        clock = clock.plusSeconds(31); p.ask("And again?")
+        assertEquals("retried by itself after a minute, so a newly registered token works quickly", 2, c.calls.size)
         p.resetContext() // Settings → Reset conversation
         c.next = { AiResult.Reply("Verified now.", "gemini-3.8-flash") }
         assertEquals("Verified now.", p.ask("And now?").text)

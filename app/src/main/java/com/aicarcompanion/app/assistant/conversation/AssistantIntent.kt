@@ -66,11 +66,13 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
         if (text in END_PHRASES) return AssistantIntent.EndConversation
         if (text in PAUSE_PHRASES) return AssistantIntent.PauseConversation
 
-        extractTroubleCode(text)?.let { return AssistantIntent.ExplainCode(it) }
-
-        // Safety-critical symptoms take priority over everything below.
+        // Safety-critical symptoms and "can I still drive?" take priority over everything below,
+        // including a trouble code in the same sentence ("can I drive with P0300?").
         val symptom = SymptomClassifier.classify(text)
         if (symptom != null && symptom.isUrgent) return AssistantIntent.Symptom(symptom, utterance.trim())
+        if (has(*CAN_I_DRIVE_PHRASES)) return AssistantIntent.CanIDrive
+
+        extractTroubleCode(text)?.let { return AssistantIntent.ExplainCode(it) }
 
         return when {
             // "Can I still drive?" and its everyday variations come before everything else below, so a

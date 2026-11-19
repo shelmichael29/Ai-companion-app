@@ -12,6 +12,7 @@ import com.aicarcompanion.app.assistant.voice.SpeechInputEvent
 import com.aicarcompanion.app.assistant.voice.SpeechOutput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -27,7 +28,8 @@ sealed interface VoiceState {
     /** No conversation. The microphone is off. */
     data object Idle : VoiceState
     data class Listening(val partialText: String = "") : VoiceState
-    data class Processing(val heard: String) : VoiceState
+    /** [slow] turns true when the answer takes a while; the screen then says "Still thinking…" (never spoken). */
+    data class Processing(val heard: String, val slow: Boolean = false) : VoiceState
     data class Speaking(val reply: AssistantReply) : VoiceState
     /** Conversation paused (by the user, silence, the app going to background, or a call). Mic is off. */
     data class Paused(val reason: String) : VoiceState
@@ -62,6 +64,8 @@ class VoiceSession(
      * once this turns true again, instead of ending the conversation.
      */
     private val internetOnline: StateFlow<Boolean>? = null,
+    /** After this long without an answer, Processing turns [VoiceState.Processing.slow]. */
+    private val slowNoticeMillis: Long = 4_000,
 ) {
     private val _state = MutableStateFlow<VoiceState>(VoiceState.Idle)
     val state: StateFlow<VoiceState> = _state.asStateFlow()
@@ -239,7 +243,16 @@ class VoiceSession(
 
     private suspend fun respondTo(text: String) {
         _state.value = VoiceState.Processing(text)
-        val reply = conversation.handle(text)
+        val reply = coroutineScope {
+            // A quiet "Still thinking…" on screen if the answer is slow; nothing is spoken, so it
+            // can never overlap Penelope's reply. Cancelled as soon as the answer arrives.
+            val slowNotice = launch {
+                delay(slowNoticeMillis)
+                val s = _state.value
+                if (s is VoiceState.Processing && s.heard == text) _state.value = s.copy(slow = true)
+            }
+            try { conversation.handle(text) } finally { slowNotice.cancel() }
+        }
         lastSpoken = reply.spokenText
         _state.value = VoiceState.Speaking(reply)
         when (val result = output.speak(reply.spokenText)) {

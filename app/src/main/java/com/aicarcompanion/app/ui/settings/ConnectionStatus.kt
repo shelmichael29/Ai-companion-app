@@ -62,6 +62,8 @@ class ConnectionStatusViewModel(
     internet: StateFlow<InternetState>,
     ai: StateFlow<AiStatus>,
     val log: ConnectionLog,
+    /** Where the latest answer came from; shown to everyone so "was that Gemini?" is easy to check. */
+    val lastAnswer: StateFlow<com.aicarcompanion.app.ai.ResponseRecord?> = kotlinx.coroutines.flow.MutableStateFlow(null),
 ) : ViewModel() {
     val state: StateFlow<Triple<ObdConnectionState, InternetState, AiStatus>> =
         combine(obd, internet, ai) { o, i, a -> Triple(o, i, a) }
@@ -77,6 +79,7 @@ class ConnectionStatusViewModel(
 fun ConnectionStatusSection(vm: ConnectionStatusViewModel, level: ExplanationLevel, modifier: Modifier = Modifier) {
     val (obd, internet, ai) = vm.state.collectAsStateWithLifecycle().value
     val events by vm.events.collectAsStateWithLifecycle()
+    val lastAnswer by vm.lastAnswer.collectAsStateWithLifecycle()
     val technical = level != ExplanationLevel.EVERYDAY
     val summary = connectionSummary(obd, internet, ai, technical)
     val clipboard = LocalClipboardManager.current
@@ -84,6 +87,7 @@ fun ConnectionStatusSection(vm: ConnectionStatusViewModel, level: ExplanationLev
         StatusLine("Your car", summary.vehicle, summary.vehicleDetail)
         StatusLine("Internet", summary.internet, null)
         StatusLine("Smarter answers", summary.ai, null)
+        StatusLine("Last answer came from", com.aicarcompanion.app.ai.ResponseSourceTracker.describe(lastAnswer), null)
         if (technical) {
             ExpandableSection("Technical log (${events.size} events)") {
                 Text(

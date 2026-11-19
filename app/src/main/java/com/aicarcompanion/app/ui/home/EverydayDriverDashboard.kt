@@ -275,7 +275,7 @@ fun VoiceInteractionPanel(
 /** Short status above the live words. The words themselves are shown once, by [liveLine]. */
 internal fun everydayStatus(voice: VoiceState, name: String): String = when (voice) {
     is VoiceState.Listening -> "Listening…"
-    is VoiceState.Processing -> "Thinking…"
+    is VoiceState.Processing -> if (voice.slow) "Still thinking…" else "Thinking…"
     is VoiceState.Speaking -> "$name is talking · tap to interrupt"
     else -> voice.statusText(name)
 }
