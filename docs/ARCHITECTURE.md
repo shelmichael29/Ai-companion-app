@@ -30,6 +30,11 @@ com.aicarcompanion.app
 ├── diagnostics/obd                 ElmLink, Elm327Session, ReadOnlyCommandPolicy, parser, ObdManager
 ├── diagnostics/bluetooth           BluetoothGateway (paired devices, SPP sockets), StreamElmLink
 ├── diagnostics/dtc                 DTC decoding, code format, offline generic catalog (DtcKnowledgeSource)
+├── connectivity                    ConnectionLog (redacted diagnostics), InternetMonitor, AdapterConnectionManager,
+│                                   ConnectionAnnouncer, VoiceDiagnostics
+├── handsfree                       platform-neutral hands-free contracts (media, messages, calls, audio route),
+│                                   VoiceCommandRouter, HandsFreeSafety, HandsFreeReasoningProvider (no android.*)
+├── handsfree/android               Android implementations (capabilities, audio-route watcher)
 └── ui/…                            Compose screens: dashboard, assistant, adapter, vehicles, history, settings
 ```
 
@@ -391,6 +396,15 @@ See `docs/CONNECTION_RECOVERY.md`. Summary:
   - makes one request at a time.
 - **`VoiceSession`** resumes listening when internet returns.
 - **`ConnectionLog`** is a redacted, in-memory diagnostic log, shown in Settings → Connection status.
+
+## Hands-free foundation (Phase H0)
+
+Details, the debugging audit and per-platform requirements: `docs/HANDS_FREE.md`.
+
+- **Routing:** `HandsFreeReasoningProvider` sits in front of Gemini and the rule-based assistant. Clear commands (music, messages, calls, navigation) are answered from `CapabilityProvider`; everything else passes through unchanged. This keeps contact names and message text away from the AI and stops it pretending to act.
+- **Platform split:** contracts in `handsfree/` have no Android imports (test-enforced), so a native iOS app can implement them. Android code lives in `handsfree/android/`.
+- **Status:** every capability reports `NotImplemented`; no new permissions.
+- **Diagnostics:** the `ConnectionLog` gained VOICE, AUDIO and APP areas (state names, focus results, audio route type, lifecycle), never transcripts or device names.
 
 ## Persistence
 
