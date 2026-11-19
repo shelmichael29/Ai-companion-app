@@ -32,4 +32,8 @@ Follow `docs/DEVELOPMENT_QUALITY_GATES.md`. In short:
 - **Settings:** knowledge level (Everyday / DIY / Advanced) and home layout (Easy / Customizable) are independent settings.
 
 ## Project memory
-Durable project knowledge (vision, decisions, UI preferences, platforms, OBD, milestones, open issues) is in `docs/project-memory/`; start with its `README.md`. Each fact is marked Built / Built-not-verified / Planned / Undecided: never treat a plan as a finished feature. The code wins over memory; fix the memory file in the same PR. Outside memory (e.g. from ChatGPT) is added only after review in `docs/project-memory/import-review.md` and the owner's approval.
+Durable project knowledge is in `docs/project-memory/`. Read its `README.md` table and open **only** the file the task needs (status, features, architecture, decisions, design, vehicle, roadmap).
+- **Status labels matter:** never treat 📋 Proposed or ❓ Undecided items as built.
+- **The code and the authoritative docs win** over memory; fix the memory file in the same PR.
+- **Record approved decisions** in `DECISIONS.md` and status changes in `FEATURES.md` / `DEVELOPMENT_STATUS.md`.
+- **Outside memory** (e.g. from ChatGPT) goes through `IMPORT_REVIEW.md` and the owner's approval first.

@@ -1,32 +1,40 @@
 # Penelope project memory
 
-Durable project knowledge for future development sessions. It sits between the rules in `CLAUDE.md` and the detailed technical docs in `docs/`.
+Durable project knowledge, so future sessions don't need things re-explained. It sits between the rules in `CLAUDE.md` and the detailed technical docs in `docs/`.
 
-## How to read it
-Every fact has a **status**, so plans are never mistaken for finished features:
-
-| Status | Meaning |
+## Load only what the task needs
+| Working on… | Read |
 |---|---|
-| ✅ Built | In `main`, with automated tests |
-| 🟡 Built, not verified | In `main` and tested with fakes, but not yet checked on the phone, adapter or car |
-| 📋 Planned | Agreed direction, not built |
-| ❓ Undecided | Needs the owner's decision |
+| What to build next, priorities | [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md), [ROADMAP.md](ROADMAP.md) |
+| Whether something exists already | [FEATURES.md](FEATURES.md) |
+| Code structure or a technical choice | [ARCHITECTURE.md](ARCHITECTURE.md), [DECISIONS.md](DECISIONS.md) |
+| Screens, wording, voice behavior | [DESIGN_PREFERENCES.md](DESIGN_PREFERENCES.md) |
+| OBD, adapters, the test car | [VEHICLE_KNOWLEDGE.md](VEHICLE_KNOWLEDGE.md) |
+| Product direction, target users | [PROJECT_VISION.md](PROJECT_VISION.md) |
+| Bringing in outside memory (e.g. ChatGPT) | [IMPORT_REVIEW.md](IMPORT_REVIEW.md) |
 
-**Source of truth:** the code and the canonical docs listed in each file. If a memory file disagrees with the code, the code wins: fix the memory file in the same PR.
+Don't read the whole folder for a narrow task. Each file is short, and each links to the authoritative doc for details.
 
-## Files
-| File | Covers |
+## Status labels
+| Label | Meaning |
 |---|---|
-| [vision-and-requirements.md](vision-and-requirements.md) | What Penelope is, who it's for, non-negotiable requirements |
-| [architecture-decisions.md](architecture-decisions.md) | Key technical decisions and why |
-| [ui-ux-preferences.md](ui-ux-preferences.md) | Visual style, voice behavior, accessibility, wording |
-| [platforms-android-ios.md](platforms-android-ios.md) | Android setup, test device, future iOS |
-| [vehicle-diagnostics-obd.md](vehicle-diagnostics-obd.md) | OBD-II, adapters, the test car, safety limits |
-| [milestones-and-status.md](milestones-and-status.md) | What's done, what's next |
-| [known-issues-and-testing.md](known-issues-and-testing.md) | Open bugs and decisions, testing rules, pending device tests |
-| [import-review.md](import-review.md) | Review of imported outside memory (e.g. ChatGPT) before it's accepted |
+| ✅ Verified | In `main`, automated tests pass, **and** checked on the phone or car |
+| 🟢 Built | In `main` with automated tests; not yet checked on a real device |
+| 🔵 In progress | Open PR or active branch |
+| 📋 Proposed | Planned, not built |
+| ⏸ Deferred | Deliberately postponed |
+| ❓ Undecided | Waiting for the owner's decision |
+
+A plan is never a feature: nothing is 🟢 or ✅ without code in `main`.
+
+## Source of truth (highest first)
+1. **The code in `main`.**
+2. **Authoritative docs:** `CLAUDE.md` (rules), `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/HANDS_FREE.md`, `docs/BLUETOOTH_CONNECTION.md`, `docs/CONNECTION_RECOVERY.md`, `docs/CI.md`, `docs/DEVELOPMENT_QUALITY_GATES.md`, `docs/QUALITY_SUMMARY.md`, `docs/DEVICE_TESTING.md`.
+3. **This folder** (summaries and decisions).
+4. **Outside memory** (e.g. ChatGPT): never authoritative until reviewed in `IMPORT_REVIEW.md` and approved by the owner.
+
+If a memory file disagrees with the code or an authoritative doc, fix the memory file in the same PR.
 
 ## Rules for this folder
-- **No personal data:** no names, emails, phone numbers, VINs, addresses, keys, tokens, or contents of `google-services.json` or keystores.
-- **Outside memory goes through review:** knowledge from outside the repo (another AI's memory, chats) is added only after it's checked against the repository in `import-review.md` and approved by the owner.
-- **Keep it current:** update the relevant file in the same PR as the change it describes. Mark status changes; don't delete history unless it's wrong.
+- **No private information:** no names, family, finances, contact details, VINs, addresses, passwords, keys, tokens, or contents of `google-services.json` or keystores.
+- **Keep it current:** update the relevant file in the same PR as the change it describes. Change the status; don't silently delete history.
