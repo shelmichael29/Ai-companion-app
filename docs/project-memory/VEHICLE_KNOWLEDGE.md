@@ -4,7 +4,8 @@
 
 ## Test car
 - **2011 BMW 528i, F10 body.**
-- **Engine:** N52 (N52B30), 3.0 L **inline-six**. Never call it a V6.
+- **Engine:** **N52N**, the updated N52 (engine code N52B30), 3.0 L **inline-six**. Never call it a V6. Confirmed by the owner on 2026-11-19.
+- **Test fixture, not a rule:** never infer every 528i build from this car or from EPA descriptions; other model years and markets can differ.
 - **OBD-II protocol:** expected CAN 11-bit 500 kbit/s (ELM327 `ATSP6`).
 - **Symptom seen:** some ELM327 clones fail the automatic protocol search (`ATSP0`) on this car. "The scanner connects, but the car doesn't respond." Penelope now falls back to trying CAN directly and remembers what worked. 🟢 Built, not verified on the car.
 - **Manufacturer modules** (ABS, airbag, transmission) aren't reachable with generic OBD-II. BMW-specific access (ENET/ISTA-style) is a separate experiment, not part of Penelope.
