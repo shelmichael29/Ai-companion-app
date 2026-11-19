@@ -11,12 +11,15 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -121,9 +124,31 @@ fun VoiceSessionControls(
     onEnd: () -> Unit,
     micAction: () -> Unit,
     modifier: Modifier = Modifier,
+    /** During a conversation: three 48 dp icon buttons in a row instead of the large labeled button. */
+    compact: Boolean = false,
 ) {
     val running = conversationActive || state is VoiceState.Listening || state is VoiceState.Speaking || state is VoiceState.Processing
     val paused = state is VoiceState.Paused
+    val reduced = Penelope.tokens.reducedMotion
+    val enter = if (reduced) EnterTransition.None else fadeIn() + scaleIn()
+    val exit = if (reduced) ExitTransition.None else fadeOut() + scaleOut()
+    if (compact) {
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            GlassIconButton(
+                iconFor(state), micActionLabel(state, name),
+                // Same rule as the large button: nothing to do while Penelope is thinking.
+                { if (state !is VoiceState.Processing) micAction() },
+                size = 48.dp, tint = Penelope.tokens.brandColors[1],
+            )
+            AnimatedVisibility(running && !paused, enter = enter, exit = exit) {
+                GlassIconButton(PenelopeIcons.Pause, "Pause conversation", onPause, size = 48.dp)
+            }
+            AnimatedVisibility(running || paused, enter = enter, exit = exit) {
+                GlassIconButton(PenelopeIcons.Close, "End conversation", onEnd, size = 48.dp, tint = Penelope.tokens.danger)
+            }
+        }
+        return
+    }
     FlowRow(
         modifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
@@ -136,10 +161,10 @@ fun VoiceSessionControls(
             enabled = state !is VoiceState.Processing,
             leading = iconFor(state),
         )
-        AnimatedVisibility(running && !paused, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+        AnimatedVisibility(running && !paused, enter = enter, exit = exit) {
             GlassIconButton(PenelopeIcons.Pause, "Pause conversation", onPause, size = 56.dp)
         }
-        AnimatedVisibility(running || paused, enter = fadeIn() + scaleIn(), exit = fadeOut() + scaleOut()) {
+        AnimatedVisibility(running || paused, enter = enter, exit = exit) {
             GlassIconButton(PenelopeIcons.Close, "End conversation", onEnd, size = 56.dp, tint = Penelope.tokens.danger)
         }
     }

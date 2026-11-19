@@ -159,6 +159,19 @@ VoiceSession ─▶ ConversationManager ─▶ GeminiReasoningProvider (Reasonin
 - **Safety questions:** about 25 everyday phrasings (`CommandParser.CAN_I_DRIVE_PHRASES`) are recognized as "can I still drive?". Examples: "can I keep driving", "should I pull over", "do I need to stop", "is it dangerous to drive". They're checked before every other topic except urgent symptoms, so they always get the built-in, offline answer immediately, never Gemini. Urgent symptoms such as smoke or oil pressure still take priority, with their specific advice.
 - **Guard around the AI client:** `GeminiReasoningProvider.generateSafely` turns any exception from the client, a `LinkageError` (for example, a missing SDK class), or no answer within 30 s into an `AiResult.Failure`. Penelope then gives her built-in answer and never crashes or goes silent. Cancellation, such as the user ending the conversation, still stops the request.
 
+## Conversation screen layout
+
+`ui/assistant/AssistantScreen.kt`. The stateless `AssistantContent` composable is tested in `ChatScreenTest`. The layout rules live in `ChatLayout`.
+
+- **Before the first message:** the AI status badge, a 132 dp orb, the voice status, instructions and suggested questions. All of these sit in their own scrollable area, so large fonts never push the controls off screen. The full-size voice controls sit below.
+- **During a conversation:** the introduction is hidden. A compact voice bar holds a 56 dp orb (decorative to TalkBack), the status text (a polite live region), and 48 dp mic, pause and end buttons. The bar stays fixed above the messages.
+- **Messages:** the messages scroll in their own area.
+  - New messages scroll into view only if the user was already at the latest message or sent it themselves.
+  - While the user is reading older messages, a **New messages ↓** button appears instead of jumping.
+- **Clear:** clearing the transcript brings back the introduction.
+- **Bottom spacing:** the floating navigation and the keyboard aren't stacked; the screen uses whichever is taller.
+- **Reduced motion:** scrolling and button transitions are instant.
+
 ## Penelope (voice) — hands-free conversation
 
 ```

@@ -28,6 +28,12 @@
   4. "You're connected."
   5. On failure: "I couldn't connect. Let's try again."
 
+## Conversation screen
+- **Before the first message:** the introduction, with instructions and suggestions.
+- **Once messages exist:** a compact voice bar (small orb, status, 48 dp mic/pause/end), and messages get the rest of the screen.
+- **Scrolling:** reading older messages is never interrupted; a "New messages" button jumps to the latest.
+- **Clear:** clearing the transcript brings back the introduction.
+
 ## Hands-free interaction
 - **Continuous conversation:** "goodbye", "stop" or "that's all" ends it; "pause" pauses.
 - **The mic is off while Penelope speaks.** Notices wait for a pause in the conversation.
