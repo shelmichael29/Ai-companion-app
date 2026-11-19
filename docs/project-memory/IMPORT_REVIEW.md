@@ -14,16 +14,11 @@ Knowledge from outside the repository, such as ChatGPT memory summaries or expor
 4. **Approve:** the owner approves item by item. Approved items are written to their destination file and committed. Rejected items are listed below with the reason.
 
 ## Current review
-**ChatGPT memory:** not provided yet.
-
-**Offline knowledge research package** (zip uploaded 2026-11-19; documents read, nothing run or downloaded):
+**Waiting for source material.** No ChatGPT memory has been provided yet.
 
 | # | Statement (summarized) | Verdict | Repo evidence | Destination | Owner decision |
 |---|---|---|---|---|---|
-| 1 | The 2011 528i test car has the N52N engine | Conflict (the repo said N52) | `CLAUDE.md`, `VEHICLE_KNOWLEDGE.md` | `CLAUDE.md`, `VEHICLE_KNOWLEDGE.md` | **Approved 2026-11-19: N52N** |
-| 2 | Offline knowledge database (24 symptom guides, 13 researched sources; upstream data not downloaded) | Proposed idea | none | `FEATURES.md`, `ROADMAP.md` | Pending |
-| 3 | Don't run the database download scripts yet | Owner instruction | chat, 2026-11-19 | `DECISIONS.md` | Pending |
-| 4 | License cautions (OBDb CC BY-SA, manufacturer bulletins, NHTSA complaints aren't diagnoses) | New | none | `DECISIONS.md` or a new offline-knowledge doc | Pending |
+| | | | | | |
 
 ## Rejected or outdated items
 None yet.
