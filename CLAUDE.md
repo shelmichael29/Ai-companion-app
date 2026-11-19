@@ -1,6 +1,6 @@
 # Instructions for Claude Code sessions: Penelope (AI Car Companion)
 
-Android app (Kotlin, Jetpack Compose, Gradle), Firebase (AI Logic/Gemini, App Check, Remote Config, Crashlytics). Owner's test device: Galaxy S26 Ultra. Test car: 2011 BMW 528i F10 with the N52 **inline-six** (never "V6").
+Android app (Kotlin, Jetpack Compose, Gradle), Firebase (AI Logic/Gemini, App Check, Remote Config, Crashlytics). Owner's test device: Galaxy S26 Ultra. Test car: 2011 BMW 528i F10 with the N52N (updated N52, engine code N52B30) **inline-six** (never "V6").
 
 ## Quality gate: required at the end of EVERY stage, feature or bug fix
 Follow `docs/DEVELOPMENT_QUALITY_GATES.md`. In short:
