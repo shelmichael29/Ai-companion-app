@@ -17,7 +17,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val container = (application as CarCompanionApplication).container
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) container.onAppBackgrounded()
+            when (event) {
+                Lifecycle.Event.ON_START -> container.onAppForegrounded()
+                Lifecycle.Event.ON_STOP -> container.onAppBackgrounded()
+                else -> Unit
+            }
         })
         setContent {
             val settings by container.settings.settings.collectAsStateWithLifecycle()

@@ -28,6 +28,16 @@
   detected from `STI`, with each command added to the allowlist only after review.
 - **Log export to a file**: the copy-to-clipboard export is enough for now.
 
+- **H0: Hands-free foundation**: contracts for media, messages and calls, command routing, safety rules, iOS-ready core, and voice/audio/lifecycle diagnostics (`docs/HANDS_FREE.md`).
+
+## Hands-free track
+1. **H1: Media control**: play/pause/next/previous via media key events (no special permission); now-playing info later with opt-in notification access.
+2. **H2: Read messages**: notification access, read on request only, never logged or sent to the AI.
+3. **H3: Reply to messages**: notification reply actions, with spoken read-back and confirmation.
+4. **H4: Calls**: place (with confirmation), answer, decline and hang up; contacts lookup.
+5. **H5: Background voice**: microphone foreground service, car hands-free microphone routing.
+6. **Navigation and the iOS app**: separate tracks, using the same `handsfree` contracts.
+
 ## Next (recommended order)
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
    ELM327 transcripts (Advanced → communication log → Copy log) and turn them into parser test fixtures.
@@ -46,6 +56,6 @@
 ## Housekeeping
 - Add Paparazzi (test-only) screenshot tests to CI once golden images are agreed; Phase 4 used it
   temporarily for visual review.
-- AGP/Kotlin/AndroidX upgrades (AGP 9 is a larger migration; do separately).
+- `targetSdk` 35 → 37: changes runtime behavior; needs its own stage with device testing.
 - Compose UI tests and Room DAO instrumented tests (need an emulator/device in CI).
 - Units preference (miles/km, °F/°C); currently U.S. units with metric in parentheses.
