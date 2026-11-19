@@ -5,6 +5,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
 | 2026-11-19 | Model delegation agents (config only) | PASS (local) | 364 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
+| 2026-11-19 | Phase H0: hands-free foundation and debugging audit | PASS (local) | 375 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | Fixed CI debug signing key | PASS (local) | 364 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | AGP 9 upgrade (AGP 9.5.1, Gradle 9.6, Kotlin 2.4, Compose BOM 2026.09, Room 2.8) | PASS (local) | 364 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | Bluetooth connection foundation | PASS (local) | 364 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
@@ -19,6 +20,8 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 - **OBD-II with a real adapter and the 528i:** pending, including the Phase 7 checks in `docs/CONNECTION_RECOVERY.md` §4 (protocol fallback, recovery, stages).
 - **Bluetooth adapter discovery, pairing, retries and reconnection with a real adapter:** pending (`docs/BLUETOOTH_CONNECTION.md` §5).
 - **Gemini limits, internet drop and voice auto-resume on the phone:** pending (`docs/CONNECTION_RECOVERY.md` §4).
+
+- **Hands-free foundation (H0):** diagnostics log, routing replies and audio route on the phone (`docs/HANDS_FREE.md` §4). Pending.
 
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.

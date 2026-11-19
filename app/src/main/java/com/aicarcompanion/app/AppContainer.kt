@@ -90,6 +90,15 @@ interface AppContainer {
     /** Called when the app leaves the foreground: the microphone must never stay on in the background. */
     fun onAppBackgrounded()
 
+    /** The app became visible again (diagnostics only). */
+    fun onAppForegrounded() {}
+
+    /** Which hands-free features this build and platform can offer. */
+    val handsFreeCapabilities: com.aicarcompanion.app.handsfree.CapabilityProvider
+
+    /** Where Penelope's voice plays (car Bluetooth, phone speaker…), for diagnostics. */
+    val carAudioRoute: com.aicarcompanion.app.handsfree.CarAudioRoute
+
     /** Reconnects to the last-used adapter if Bluetooth is ready. Never prompts the user. */
     fun autoConnectAdapter()
 }
@@ -190,7 +199,14 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val vehiclePhotos by lazy { com.aicarcompanion.app.data.photos.VehiclePhotoStore(appContext) }
-    private val audioFocus by lazy { AndroidAudioFocus(appContext) }
+    private val audioFocus by lazy { AndroidAudioFocus(appContext, connectionLog) }
+
+    /** Hands-free foundation (Phase H0): capabilities report "not yet"; see docs/HANDS_FREE.md. */
+    override val handsFreeCapabilities: com.aicarcompanion.app.handsfree.CapabilityProvider =
+        com.aicarcompanion.app.handsfree.android.AndroidHandsFreeCapabilities()
+    override val carAudioRoute: com.aicarcompanion.app.handsfree.CarAudioRoute by lazy {
+        com.aicarcompanion.app.handsfree.android.AndroidCarAudioRoute(appContext, connectionLog)
+    }
 
     override val speechOutput: SpeechOutput by lazy {
         AndroidSpeechOutput(appContext, audioFocus, audioFocus.attributes).also { output ->
@@ -208,7 +224,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val parser = CommandParser(assistantName)
         val recorder = com.aicarcompanion.app.assistant.conversation.ObservationRecorder { historyRepository.saveObservation(it) }
         val ruleBased = RuleBasedReasoningProvider(parser, vehicleContext, diagnosticCommands, GenericDtcCatalog, recorder)
-        val reasoning = geminiProvider(parser, ruleBased, recorder)
+        // Hands-free commands (music, messages, calls) are routed first, so the AI never sees
+        // names or message text and never pretends to perform them.
+        val reasoning = com.aicarcompanion.app.handsfree.HandsFreeReasoningProvider(
+            delegate = geminiProvider(parser, ruleBased, recorder),
+            capabilities = handsFreeCapabilities,
+        ) { kind, status -> connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Hands-free command", mapOf("command" to kind, "status" to status)) }
         VoiceSession(
             scope = appScope,
             input = AndroidSpeechInput(appContext).apply { preferOffline = { !internetOnline.value } },
@@ -217,7 +238,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
             focus = audioFocus,
             continuousEnabled = { settings.settings.value.continuousConversation },
             internetOnline = internetOnline,
-        )
+        ).also { session ->
+            com.aicarcompanion.app.connectivity.VoiceDiagnostics(appScope, connectionLog).watch(session.state)
+            carAudioRoute // start watching the audio route once voice is in use
+        }
     }
     override val voiceSession: VoiceSession by voiceSessionLazy
 
@@ -251,7 +275,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override fun initializeAi() = aiClient.initialize()
 
     override fun onAppBackgrounded() {
+        connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "App in background")
         if (voiceSessionLazy.isInitialized()) voiceSession.onAppBackgrounded()
+    }
+
+    override fun onAppForegrounded() {
+        connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "App in foreground")
     }
 
     init {

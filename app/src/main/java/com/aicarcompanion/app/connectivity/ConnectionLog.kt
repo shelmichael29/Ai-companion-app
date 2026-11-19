@@ -9,14 +9,22 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** Which system an event belongs to. Each is diagnosed separately. */
-enum class LogArea(val label: String) { VEHICLE("Vehicle"), INTERNET("Internet"), AI("AI") }
+enum class LogArea(val label: String) {
+    VEHICLE("Vehicle"), INTERNET("Internet"), AI("AI"),
+    /** Voice session states (never what was said). */
+    VOICE("Voice"),
+    /** Audio focus and output route (never device names). */
+    AUDIO("Audio"),
+    /** App lifecycle and hands-free routing (command kinds only). */
+    APP("App"),
+}
 
 /** One structured diagnostic event: a short name plus key/value details. Never conversation text. */
 data class ConnectionEvent(val at: Instant, val area: LogArea, val event: String, val details: Map<String, String> = emptyMap())
 
 /**
- * In-memory, size-limited diagnostic log for the vehicle connection, the internet connection and
- * the AI service. Shown in Settings → Connection status (technical log for DIY/Advanced users).
+ * In-memory, size-limited diagnostic log for the vehicle connection, the internet connection, the
+ * AI service, the voice session, audio and app lifecycle. Shown in Settings → Connection status (technical log for DIY/Advanced users).
  *
  * Privacy: details are redacted when recorded. VINs and Bluetooth/MAC addresses are masked,
  * and anything that looks like a key or token is removed. Callers must never pass API keys, tokens

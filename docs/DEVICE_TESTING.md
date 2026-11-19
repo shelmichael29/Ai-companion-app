@@ -9,6 +9,9 @@
    unknown apps" for your file manager).
 3. Upgrading from v0.1: profiles from v0.1 were in-memory only, so re-add your vehicle once.
 
+## 0. Hands-free foundation (Phase H0)
+See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call focus loss, and "not yet" replies for music, messages and calls.
+
 ## 1. Vehicle identification (needs internet)
 - Vehicles → **+** → **Search**: 2011 → BMW → 528i. Engine (3.0L 6-cyl) and transmission
   (Automatic, 8-speed) auto-select and the review form fills in.
