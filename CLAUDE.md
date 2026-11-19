@@ -30,3 +30,6 @@ Follow `docs/DEVELOPMENT_QUALITY_GATES.md`. In short:
 - **Integration base:** `main`, which contains only the Penelope app.
 - **ENET tester is separate:** the experimental BMW ENET tester is not part of main and not part of Penelope. It lives only on the `experiment/*` branches (`experiment/bmw-enet-tester`, PR #11). Never merge it into main, add it to Penelope's build, CI or quality gate, or mix it into Penelope work, unless the owner explicitly asks.
 - **Settings:** knowledge level (Everyday / DIY / Advanced) and home layout (Easy / Customizable) are independent settings.
+
+## Project memory
+Durable project knowledge (vision, decisions, UI preferences, platforms, OBD, milestones, open issues) is in `docs/project-memory/`; start with its `README.md`. Each fact is marked Built / Built-not-verified / Planned / Undecided: never treat a plan as a finished feature. The code wins over memory; fix the memory file in the same PR. Outside memory (e.g. from ChatGPT) is added only after review in `docs/project-memory/import-review.md` and the owner's approval.
