@@ -9,6 +9,16 @@
    unknown apps" for your file manager).
 3. Upgrading from v0.1: profiles from v0.1 were in-memory only, so re-add your vehicle once.
 
+## 0b. Conversation screen layout
+1. Open Chat. The introduction (suggestions) shows with the large orb.
+2. Start talking. The orb shrinks into a compact bar, the introduction disappears and messages fill the screen.
+3. After several answers, scroll up and keep the conversation going. The list must not jump. "New messages ↓" appears; tap it to return.
+4. Type a message with the keyboard open. The input sits just above the keyboard (no big gap) and above the floating navigation when the keyboard is closed.
+5. Phone font size at maximum (Settings → Display → Font size): nothing overlaps, and all buttons are reachable.
+6. Check both color styles (Midnight and Amethyst), and with Reduce motion on.
+7. With TalkBack: the mic, pause, end, send and "New messages" buttons are announced, the orb isn't read twice, and voice status changes are spoken.
+8. Tap Clear. The introduction returns.
+
 ## 0a. Gemini as primary intelligence
 See `docs/GEMINI_ROUTING.md` §6: check "Last answer came from" in Settings → Connection status for each kind of question.
 
