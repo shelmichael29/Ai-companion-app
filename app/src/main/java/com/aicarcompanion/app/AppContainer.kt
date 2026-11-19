@@ -76,6 +76,9 @@ interface AppContainer {
 
     /** Structured, redacted diagnostics for the vehicle, internet and AI connections (in memory only). */
     val connectionLog: com.aicarcompanion.app.connectivity.ConnectionLog
+
+    /** Offline trouble codes, recalls, crash ratings, EPA vehicles and symptom guides. */
+    val offlineKnowledge: com.aicarcompanion.app.diagnostics.knowledge.OfflineKnowledge
     /** Validated internet availability from Android's default network. */
     val internet: com.aicarcompanion.app.connectivity.InternetMonitor
 
@@ -127,7 +130,19 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val historyRepository: VehicleHistoryRepository get() = roomHistory
     override val maintenanceRepository: MaintenanceRepository get() = roomHistory
     override val vehicleCatalog: VehicleCatalogProvider by lazy {
-        FuelEconomyCatalogProvider(http, RoomResponseCache(database.responseCacheDao()))
+        // Online first; the offline EPA copy answers when the web service can't be reached.
+        com.aicarcompanion.app.data.vehicledb.FallbackVehicleCatalog(
+            FuelEconomyCatalogProvider(http, RoomResponseCache(database.responseCacheDao())),
+            com.aicarcompanion.app.data.vehicledb.OfflineEpaCatalog(offlineKnowledge),
+        )
+    }
+
+    /** The offline knowledge pack (docs/OFFLINE_KNOWLEDGE.md), installed in the background at start. */
+    override val offlineKnowledge = com.aicarcompanion.app.data.knowledge.SqliteOfflineKnowledge(appContext)
+
+    /** Trouble-code meanings: Penelope's own text first, then the selected car's make, then the offline catalog. */
+    private val dtcKnowledge by lazy {
+        com.aicarcompanion.app.diagnostics.knowledge.KnowledgeDtcSource(GenericDtcCatalog, offlineKnowledge) { activeVehicle.value?.make }
     }
     override val vinDecoder: VinDecoder = NhtsaVinDecoder(http)
     override val bluetooth = BluetoothGateway(appContext)
@@ -183,7 +198,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val diagnosticsRepository: DiagnosticsRepository by lazy {
-        DefaultDiagnosticsRepository(historyRepository, settings, GenericDtcCatalog, obdManager.liveReadings)
+        DefaultDiagnosticsRepository(historyRepository, settings, dtcKnowledge, obdManager.liveReadings)
     }
 
     private val vehicleContext = VehicleContextProvider {
@@ -227,7 +242,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val assistantName = { settings.settings.value.assistantName }
         val parser = CommandParser(assistantName)
         val recorder = com.aicarcompanion.app.assistant.conversation.ObservationRecorder { historyRepository.saveObservation(it) }
-        val ruleBased = RuleBasedReasoningProvider(parser, vehicleContext, diagnosticCommands, GenericDtcCatalog, recorder)
+        val ruleBased = RuleBasedReasoningProvider(parser, vehicleContext, diagnosticCommands, dtcKnowledge, recorder, offline = offlineKnowledge)
         // Hands-free commands (music, messages, calls) are routed first, so the AI never sees
         // names or message text and never pretends to perform them.
         val reasoning = com.aicarcompanion.app.handsfree.HandsFreeReasoningProvider(
@@ -265,7 +280,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
         deterministic = ruleBased,
         context = vehicleContext,
         client = aiClient,
-        knowledge = GenericDtcCatalog,
+        knowledge = dtcKnowledge,
+        offline = offlineKnowledge,
         aiEnabled = { settings.settings.value.aiEnabled },
         recorder = recorder,
         internetAvailable = { internetOnline.value },
@@ -293,6 +309,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     init {
+        appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val ok = offlineKnowledge.install()
+            connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Offline knowledge", mapOf("available" to ok, "built" to offlineKnowledge.info?.builtUtc))
+        }
         announcer.watch(obdManager.state)
         // Live polling covers only the readings the user's detail level shows.
         appScope.launch {

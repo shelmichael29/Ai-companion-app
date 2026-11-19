@@ -49,7 +49,9 @@ object AiRouting {
             if (CODE_CONCEPT.containsMatchIn(normalizedUtterance)) Route.AI else Route.DATA_THEN_AI
         is AssistantIntent.LiveValue ->
             if (LIVE_REQUEST.containsMatchIn(normalizedUtterance)) Route.DATA_THEN_AI else Route.AI
-        AssistantIntent.SensorReadings, AssistantIntent.Help -> Route.DATA_THEN_AI
+        AssistantIntent.SensorReadings, AssistantIntent.Help,
+        // Recalls and crash ratings come from the offline database first; Gemini explains them.
+        AssistantIntent.Recalls, AssistantIntent.SafetyRating -> Route.DATA_THEN_AI
         // Code explanations, follow-ups, greetings, vehicle questions, non-urgent symptoms, and
         // anything unrecognized: real conversation with Gemini, grounded in verified facts.
         else -> Route.AI
@@ -114,6 +116,8 @@ class GeminiReasoningProvider(
     val sources: ResponseSourceTracker = ResponseSourceTracker(log),
     /** Monotonic clock for request durations. */
     private val clockMillis: () -> Long = { System.nanoTime() / 1_000_000 },
+    /** Offline triage guides give Gemini the right clarifying questions for a described symptom. */
+    private val offline: com.aicarcompanion.app.diagnostics.knowledge.OfflineKnowledge = com.aicarcompanion.app.diagnostics.knowledge.NoOfflineKnowledge,
 ) : ReasoningProvider {
 
     private val _status = MutableStateFlow(initialStatus())
@@ -193,7 +197,8 @@ class GeminiReasoningProvider(
         val allowedCodes = mentioned + ctx.demoCodes.map { it.code } + ctx.latestCodeRead?.codes?.map { it.code }.orEmpty() +
             verified?.text?.let { t -> CODE.findAll(t).map { it.value } }.orEmpty()
         val system = PromptBuilder.systemInstruction(request.assistantName, request.level, ctx, knowledge, mentioned, now()) +
-            (verified?.let { PromptBuilder.verifiedResult(it.text) } ?: "")
+            (verified?.let { PromptBuilder.verifiedResult(it.text) } ?: "") +
+            triageFor(intent, request.utterance).orEmpty()
 
         val result = nextResult(system, request.utterance)
         val duration = clockMillis() - started
@@ -240,6 +245,16 @@ class GeminiReasoningProvider(
                 remember(request.utterance, fallback.withNotice(notice), historyText = fallback.text)
             }
         }
+    }
+
+    /** The offline triage guide for a described symptom; a stricter match for unrecognized questions. */
+    private fun triageFor(intent: AssistantIntent, utterance: String): String? {
+        val min = when (intent) {
+            is AssistantIntent.Symptom -> 1
+            is AssistantIntent.Unknown -> 2
+            else -> return null
+        }
+        return com.aicarcompanion.app.diagnostics.knowledge.TriageMatcher.best(offline.triageGuides(), utterance, min)?.let(PromptBuilder::triageGuide)
     }
 
     /**
