@@ -13,14 +13,13 @@ Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 | Bluetooth connection foundation | 364 tests, 0 failed |
 | AGP 9 upgrade; fixed CI signing key | 364 tests, 0 failed |
 | H0: hands-free foundation | 375 tests, 0 failed |
+| Model delegation agents (Haiku / Sonnet / Opus) | Config only; CI green |
 
 ## Active pull requests
 | PR | What | State |
 |---|---|---|
-| #35 | Model delegation agents | Approved by the owner; merges when CI passes |
+| This PR | Project memory (`docs/project-memory/`) and doc corrections | Open, waiting for the owner's review |
 | #11 | ENET tester (experimental) | Kept open and separate on purpose |
-
-The **project memory** is on branch `docs/project-memory`, waiting for the owner's approval. There's no PR yet.
 
 ## Outstanding tasks
 - **Owner:**

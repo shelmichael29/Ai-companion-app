@@ -18,12 +18,13 @@ Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified
 | Connection stages, protocol fallback, bounded recovery; Gemini reliability fixes | Phase 7 | `docs/CONNECTION_RECOVERY.md` |
 | Adapter discovery, bounded connect, auto-reconnect, voice announcements | Bluetooth foundation | `docs/BLUETOOTH_CONNECTION.md` |
 | Hands-free foundation: routing, honest "not yet" replies, voice/audio diagnostics | H0 | `docs/HANDS_FREE.md` |
+| Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 
 ## In progress (🔵)
 | Item | Where |
 |---|---|
-| Model delegation agents (Haiku / Sonnet / Opus) | PR #35 |
-| This project memory | branch `docs/project-memory` (not a PR yet) |
+| This project memory | branch `docs/project-memory` (PR open) |
+| ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)
 - **Hands-free:** media control (H1), read messages (H2), reply (H3), calls (H4), background voice and car microphone (H5), navigation.

@@ -3,7 +3,7 @@
 ## Done
 - **M1 Foundation** — Compose app, profiles, dashboard, DTC/PID decoding.
 - **M2 (Phase 2)** — Vehicle database selection + VIN decode, Room persistence, Penelope
-  push-to-talk voice, read-only Bluetooth Classic OBD-II, per-vehicle history.
+  push-to-talk voice (continuous conversation came in M3), read-only Bluetooth Classic OBD-II, per-vehicle history.
 
 - **M3 (Phase 3)** — Hands-free continuous conversation, natural voice settings (pitch fix,
   voice/engine choice), Everyday/DIY/Advanced explanations, symptom conversations, Smart
@@ -17,6 +17,17 @@
   protocol, timing, retry, polling and reconnection settings, adapter identification, a
   connection test, a redacted traffic log, a read-only expert console and restore defaults.
 
+- **5A**: Gemini answers through Firebase AI Logic with App Check, with a rule-based fallback.
+- **A1 / A2 (v0.7.0)**: per-level home layout (Easy / Customizable, Extras); Everyday Driver
+  dashboard; Midnight and Amethyst color styles.
+- **Phase 6**: automated quality gates (Detekt, Lint, coverage, secret scan, Crashlytics, CI report).
+- **Phase 7**: connection stages, protocol fallback and bounded recovery; Gemini reliability.
+- **Bluetooth foundation**: adapter discovery, bounded connect, auto-reconnect, voice announcements.
+- **Build upgrade**: AGP 9.5, Gradle 9.9, Kotlin 2.4, Compose BOM 2026.09, Room 2.8; optional fixed CI debug signing key.
+- **H0: Hands-free foundation**: contracts for media, messages and calls, command routing, safety rules, iOS-ready core, and voice/audio/lifecycle diagnostics (`docs/HANDS_FREE.md`).
+
+All of these passed the automated gate; none is device-verified yet (`docs/QUALITY_SUMMARY.md`).
+
 ### Phase 4.1 remaining work (documented, not yet built)
 - **BLE adapters**: a GATT `ElmLink` (service/characteristic discovery for common FFE0/FFF0
   clones, MTU handling) plus scanning and its permission. Not shown in settings until built.
@@ -27,8 +38,6 @@
 - **Adapter-specific extensions**: STN/OBDLink `ST` commands (faster CAN, larger buffers),
   detected from `STI`, with each command added to the allowlist only after review.
 - **Log export to a file**: the copy-to-clipboard export is enough for now.
-
-- **H0: Hands-free foundation**: contracts for media, messages and calls, command routing, safety rules, iOS-ready core, and voice/audio/lifecycle diagnostics (`docs/HANDS_FREE.md`).
 
 ## Hands-free track
 1. **H1: Media control**: play/pause/next/previous via media key events (no special permission); now-playing info later with opt-in notification access.
@@ -45,8 +54,7 @@
    and compare with the profile, freeze-frame (mode 02) with codes, adaptive polling.
 3. **Mechanic handoff report** — PDF/text via the share sheet: profile, codes with
    origin/time, freeze frame, history, observations (facts vs. hypotheses clearly separated).
-4. **AI reasoning provider (opt-in)** — behind `ReasoningProvider`; grounded in
-   `VehicleContext`; key handling without bundling secrets.
+4. ~~AI reasoning provider (opt-in)~~: done in 5A (Gemini via Firebase AI Logic).
 5. **Voice upgrades** — voice barge-in with echo cancellation (see ARCHITECTURE), ElevenLabs
    `SpeechOutput`, car hands-free microphone routing, steering-wheel/media-button activation.
 6. **BLE, Wi-Fi and USB adapters**: `ElmLink` implementations (see Phase 4.1 remaining work).
