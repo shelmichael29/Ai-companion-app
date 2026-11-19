@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-19 | Model delegation agents (config only) | PASS (local) | 364 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
 | 2026-11-19 | Phase H0: hands-free foundation and debugging audit | PASS (local) | 375 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | Fixed CI debug signing key | PASS (local) | 364 run, 0 failed | 0 / 0 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-17 | AGP 9 upgrade (AGP 9.5.1, Gradle 9.6, Kotlin 2.4, Compose BOM 2026.09, Room 2.8) | PASS (local) | 364 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
