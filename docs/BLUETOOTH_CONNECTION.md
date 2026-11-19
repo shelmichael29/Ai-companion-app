@@ -2,7 +2,7 @@
 
 How Penelope finds and connects to a Bluetooth Classic ELM327 OBD-II adapter, and how to test it on a real phone and car.
 
-> **Status:** everything below is covered by automated tests with simulated hardware. **Nothing has been tested with a physical adapter yet.** The checklist in §5 is still to do on the Galaxy S26 Ultra and the 2011 BMW 528i (N52 inline-six).
+> **Status:** everything below is covered by automated tests with simulated hardware. **Nothing has been tested with a physical adapter yet.** The checklist in §5 is still to do on the Galaxy S26 Ultra and the 2011 BMW 528i (N52N inline-six).
 
 ## 1. Layers
 
