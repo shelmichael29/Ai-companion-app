@@ -23,7 +23,7 @@ Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified
 ## In progress (🔵)
 | Item | Where |
 |---|---|
-| This project memory | branch `docs/project-memory` (PR open) |
+| Gemini primary routing, honest fallbacks, response-source log | branch `feature/gemini-primary` (PR open) |
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)

@@ -4,6 +4,7 @@ Approved product and technical decisions. Dates are when the change merged into 
 
 | Date | Decision | Source |
 |---|---|---|
+| 2026-11-19 | **Gemini is the primary intelligence.** Only safety, conversation controls and connection status stay built-in; data questions are read by the app first, then explained by Gemini; fallbacks are always announced; every answer's source is logged; timeout 12 s via Remote Config (`penelope_ai_timeout_ms`) | This PR, `docs/GEMINI_ROUTING.md` (pending merge) |
 | 2026-11-19 | Model delegation: Haiku for lookups, Sonnet for implementation, Opus for planning and reviews; the Opus agent is read-only | PR #35 |
 | 2026-11-18 | Hands-free commands are routed before the AI; the AI never sees contact names or message text; messages and calls will need spoken confirmation; hands-free core stays free of Android imports for iOS | PR #34, `docs/HANDS_FREE.md` |
 | 2026-11-17 | Optional fixed CI debug signing key via a repository secret | PR #33 |

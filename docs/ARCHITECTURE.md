@@ -129,6 +129,8 @@ details. Sample data is badged.
 
 ## Gemini conversations (Phase 5A)
 
+> **Updated (Gemini primary routing):** Gemini is now the primary intelligence. Code explanations, help and most questions go to Gemini; data questions are read by the app first and then explained by Gemini; only safety, conversation controls and connection status stay built-in. Every fallback is announced, and every answer's source is logged. See `docs/GEMINI_ROUTING.md`. Where the text below differs, that doc wins.
+
 ```
 VoiceSession ─▶ ConversationManager ─▶ GeminiReasoningProvider (ReasoningProvider)
                                          ├─ AiRouting: DETERMINISTIC ─▶ RuleBasedReasoningProvider (unchanged)

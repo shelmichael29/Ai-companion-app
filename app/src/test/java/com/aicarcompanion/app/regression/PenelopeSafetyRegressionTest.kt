@@ -145,7 +145,7 @@ class PenelopeSafetyRegressionTest {
 
     // ---- Gemini fallback ---------------------------------------------------------------------------
 
-    @Test fun `every Gemini failure falls back to the built-in answer with a one-time notice`() = runTest {
+    @Test fun `every Gemini failure falls back to the built-in answer, always with a notice`() = runTest {
         val question = "Is a BMW 528i expensive to maintain?"
         val basic = deterministicAnswer(question)
         for (reason in AiFailure.entries) {
@@ -161,7 +161,8 @@ class PenelopeSafetyRegressionTest {
             assertEquals(expectedStatus, p.status.value)
 
             val second = p.respond(request(question))
-            assertEquals("[$reason] the notice is said only once", basic.text, second.text)
+            // The full explanation once; after that a short notice, so a canned answer is never passed off as AI.
+            assertEquals("[$reason] short notice afterwards", "${AiNotices.stillUnavailable(reason)} ${basic.text}", second.text)
         }
     }
 
@@ -190,7 +191,8 @@ class PenelopeSafetyRegressionTest {
             val gemini = MockGemini().apply { respond = { AiResult.Reply(unsafe, "gemini-3.8-flash") } }
             val reply = penelope(gemini).respond(request(question))
             assertEquals(1, gemini.calls.size)
-            assertEquals("unverified AI text must be replaced", basic.text, reply.text)
+            assertEquals("unverified AI text must be replaced, and the user told why", "${AiNotices.UNVERIFIED} ${basic.text}", reply.text)
+            assertFalse(reply.text.contains("P0420") || reply.text.contains("245"))
             assertNotEquals(ReplyBasis.AI_EXPLANATION, reply.basis)
         }
     }

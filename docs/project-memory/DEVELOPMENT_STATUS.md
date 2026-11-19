@@ -18,7 +18,7 @@ Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 ## Active pull requests
 | PR | What | State |
 |---|---|---|
-| This PR | Project memory (`docs/project-memory/`) and doc corrections | Open, waiting for the owner's review |
+| Gemini primary routing | Make Gemini the primary intelligence; honest fallbacks; answer-source log | Open, waiting for the owner's review |
 | #11 | ENET tester (experimental) | Kept open and separate on purpose |
 
 ## Outstanding tasks
@@ -41,5 +41,6 @@ Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 - Adapter checklist: `docs/BLUETOOTH_CONNECTION.md` §5.
 - 528i connection recovery and voice auto-resume: `docs/CONNECTION_RECOVERY.md` §4.
 - Hands-free foundation: `docs/HANDS_FREE.md` §4.
+- Gemini routing and answer sources: `docs/GEMINI_ROUTING.md` §6.
 
 When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/QUALITY_SUMMARY.md`.

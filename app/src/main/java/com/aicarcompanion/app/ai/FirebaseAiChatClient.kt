@@ -26,7 +26,6 @@ import java.io.IOException
  */
 class FirebaseAiChatClient(
     private val context: Context,
-    private val timeoutMillis: Long = 15_000,
 ) : AiChatClient {
 
     override val isConfigured: Boolean
@@ -38,6 +37,16 @@ class FirebaseAiChatClient(
         get() = if (!isConfigured) ModelSelection.DEFAULT_MODEL else runCatching {
             ModelSelection.choose(FirebaseRemoteConfig.getInstance().getString(ModelSelection.REMOTE_CONFIG_KEY))
         }.getOrDefault(ModelSelection.DEFAULT_MODEL)
+
+    /**
+     * How long one Gemini answer may take ([AiTimeouts]): Remote Config `penelope_ai_timeout_ms`,
+     * clamped to 6–30 s, default 12 s. Adjustable without a new build if the logged durations
+     * show normal answers need longer.
+     */
+    val requestTimeoutMillis: Long
+        get() = if (!isConfigured) AiTimeouts.DEFAULT_MILLIS else runCatching {
+            AiTimeouts.choose(FirebaseRemoteConfig.getInstance().getLong(AiTimeouts.REMOTE_CONFIG_KEY))
+        }.getOrDefault(AiTimeouts.DEFAULT_MILLIS)
 
     /**
      * A new Gemini model object is created for every request, so no session state can go stale;
@@ -54,7 +63,7 @@ class FirebaseAiChatClient(
         runCatching {
             val rc = FirebaseRemoteConfig.getInstance()
             rc.setConfigSettingsAsync(remoteConfigSettings { minimumFetchIntervalInSeconds = 12 * 60 * 60 })
-            rc.setDefaultsAsync(mapOf(ModelSelection.REMOTE_CONFIG_KEY to ModelSelection.DEFAULT_MODEL))
+            rc.setDefaultsAsync(mapOf(ModelSelection.REMOTE_CONFIG_KEY to ModelSelection.DEFAULT_MODEL, AiTimeouts.REMOTE_CONFIG_KEY to AiTimeouts.DEFAULT_MILLIS))
             rc.fetchAndActivate()
         }.onFailure { Log.w(TAG, "Remote Config unavailable: ${it.javaClass.simpleName}") }
     }
@@ -82,6 +91,7 @@ class FirebaseAiChatClient(
     }
 
     private suspend fun call(model: String, system: String, history: List<AiTurn>, message: String, useThinking: Boolean): AiResult = try {
+        val timeoutMillis = requestTimeoutMillis
         val generative = Firebase.ai(backend = GenerativeBackend.googleAI(), useLimitedUseAppCheckTokens = true).generativeModel(
             modelName = model,
             generationConfig = generationConfig {

@@ -83,7 +83,7 @@ fun VoiceState.shortLabel(): String = when (this) {
 fun VoiceState.statusText(name: String): String = when (this) {
     VoiceState.Idle -> "Tap $name or the button below and just start talking."
     is VoiceState.Listening -> if (partialText.isBlank()) "I'm listening…" else "“$partialText”"
-    is VoiceState.Processing -> "Thinking…"
+    is VoiceState.Processing -> if (slow) "Still thinking…" else "Thinking…"
     is VoiceState.Speaking -> "$name is talking. Tap to interrupt."
     is VoiceState.Paused -> reason
     is VoiceState.Error -> message

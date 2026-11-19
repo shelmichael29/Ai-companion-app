@@ -9,6 +9,9 @@
    unknown apps" for your file manager).
 3. Upgrading from v0.1: profiles from v0.1 were in-memory only, so re-add your vehicle once.
 
+## 0a. Gemini as primary intelligence
+See `docs/GEMINI_ROUTING.md` §6: check "Last answer came from" in Settings → Connection status for each kind of question.
+
 ## 0. Hands-free foundation (Phase H0)
 See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call focus loss, and "not yet" replies for music, messages and calls.
 

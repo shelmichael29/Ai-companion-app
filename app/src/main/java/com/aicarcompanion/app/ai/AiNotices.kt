@@ -13,6 +13,8 @@ object AiNotices {
     const val TEMPORARY = "I'm having trouble reaching the AI service. Your conversation is saved."
     const val DAILY_LIMIT = "Today's AI usage limit has been reached, so I'll use my built-in answers until it resets. Your conversation is saved."
     const val RESTORED = "Connection restored. We can continue."
+    /** Gemini answered, but with something the app couldn't verify (an invented code or reading). */
+    const val UNVERIFIED = "I couldn't double-check the AI's answer, so here's what I know for sure."
 
     /** The notice for a failure reason. Configuration problems name the specific cause. */
     fun outage(reason: AiFailure): String = when (reason) {
@@ -23,7 +25,16 @@ object AiNotices {
             "My smarter answers aren't available right now (${reason.userMessage.trimEnd('.').replaceFirstChar { it.lowercase() }}). Your conversation is saved."
     }
 
-    /** True if [text] begins with any outage or recovery notice. */
+    /**
+     * The short notice for later answers in the same outage, so a built-in answer is never passed
+     * off as an AI answer, without repeating the full explanation every time.
+     */
+    fun stillUnavailable(reason: AiFailure): String = when (reason) {
+        AiFailure.OFFLINE -> "Still offline, so here's my basic answer."
+        else -> "My smarter answers are still unavailable, so here's my basic answer."
+    }
+
+    /** True if [text] begins with any outage, recovery or verification notice. */
     fun startsWithNotice(text: String): Boolean =
-        (AiFailure.entries.map(::outage) + RESTORED).any { text.startsWith(it) }
+        (AiFailure.entries.flatMap { listOf(outage(it), stillUnavailable(it)) } + RESTORED + UNVERIFIED).any { text.startsWith(it) }
 }

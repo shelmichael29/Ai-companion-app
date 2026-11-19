@@ -53,6 +53,17 @@ object PromptBuilder {
         append(vehicleFacts(ctx, knowledge, mentionedCodes))
     }
 
+    /**
+     * The result the app just read for this question (trouble codes, live values, connection
+     * status). Gemini explains it; it must not change or add to it.
+     */
+    fun verifiedResult(appAnswer: String): String = buildString {
+        appendLine()
+        appendLine("APP RESULT FOR THIS QUESTION (read by the app just now; verified)")
+        appendLine(appAnswer.trim())
+        appendLine("Explain this result naturally in your own words for this user. Keep every number, unit, code and status exactly as given. Don't add readings, codes or causes that aren't above or in VEHICLE FACTS. If the result says something isn't available or connected, say so and tell them what to do.")
+    }
+
     fun vehicleFacts(ctx: VehicleContext, knowledge: DtcKnowledgeSource, mentionedCodes: Set<String>): String = buildString {
         val v = ctx.vehicle
         if (v == null) {

@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-19 | Gemini primary routing and reliability | PASS (local) | 398 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Project memory and doc corrections (docs only) | PASS (local) | 375 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
 | 2026-11-19 | Model delegation agents (config only) | PASS (local) | 364 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
 | 2026-11-19 | Phase H0: hands-free foundation and debugging audit | PASS (local) | 375 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
@@ -23,6 +24,8 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 - **Gemini limits, internet drop and voice auto-resume on the phone:** pending (`docs/CONNECTION_RECOVERY.md` §4).
 
 - **Hands-free foundation (H0):** diagnostics log, routing replies and audio route on the phone (`docs/HANDS_FREE.md` §4). Pending.
+
+- **Gemini on the phone:** answer source, timeout durations and App Check behavior (`docs/GEMINI_ROUTING.md` §6). Pending.
 
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.

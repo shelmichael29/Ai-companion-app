@@ -92,25 +92,48 @@ class GeminiIntegrationTest {
         assertTrue(r.text.startsWith("AI says"))
     }
 
-    @Test fun `safety-critical and real-data requests never reach Gemini`() = runTest {
+    @Test fun `safety-critical requests never reach Gemini`() = runTest {
         val client = FakeClient()
         val p = provider(client)
         assertTrue(p.ask("My car is overheating and there's steam").text.startsWith("Safety first"))
+        p.ask("can I still drive my car")
+        p.ask("goodbye")
+        assertEquals("AI must not be called for safety or conversation controls", 0, client.calls.size)
+    }
+
+    @Test fun `real-data requests are read by the app first, then Gemini explains the verified result`() = runTest {
+        val client = FakeClient()
+        val p = provider(client)
         p.ask("what's my coolant temperature")
         p.ask("read my trouble codes")
-        p.ask("can I still drive my car")
-        p.ask("explain P0171")
+        assertEquals(2, client.calls.size)
+        // Connection status stays built-in: its text can include the adapter's Bluetooth name.
         p.ask("are you connected to the adapter")
-        assertEquals("AI must not be called for safety or data requests", 0, client.calls.size)
+        assertEquals(2, client.calls.size)
+        client.calls.forEach { assertTrue("the app's verified result is in the prompt", it.system.contains("APP RESULT FOR THIS QUESTION")) }
+        // The app's own reading (here: not connected) is what Gemini is told, never a made-up value.
+        assertTrue(client.calls[0].system.contains("connect", ignoreCase = true))
+        assertTrue(client.calls[1].system.contains("P0171"))
+    }
+
+    @Test fun `code explanations go to Gemini with the verified meaning`() = runTest {
+        val client = FakeClient()
+        val r = provider(client).ask("explain P0171")
+        assertEquals(ReplyBasis.AI_EXPLANATION, r.basis)
+        assertTrue(client.calls.single().system.contains("P0171 (stored) verified meaning: System too lean (bank 1)"))
     }
 
     @Test fun `general questions using data words still get real conversation`() {
         val p = CommandParser { "Penelope" }
         fun route(s: String) = AiRouting.route(p.parse(s), p.normalize(s))
         assertEquals(AiRouting.Route.AI, route("How long does a car battery usually last?"))
-        assertEquals(AiRouting.Route.DETERMINISTIC, route("What's my battery voltage?"))
+        assertEquals(AiRouting.Route.DATA_THEN_AI, route("What's my battery voltage?"))
         assertEquals(AiRouting.Route.AI, route("What are trouble codes anyway?"))
-        assertEquals(AiRouting.Route.DETERMINISTIC, route("Why is my check engine light on?"))
+        assertEquals(AiRouting.Route.DATA_THEN_AI, route("Why is my check engine light on?"))
+        assertEquals(AiRouting.Route.AI, route("What does P0171 mean?"))
+        assertEquals(AiRouting.Route.AI, route("What is a coolant temperature sensor?"))
+        assertEquals(AiRouting.Route.DATA_THEN_AI, route("Can you help me?"))
+        assertEquals(AiRouting.Route.DETERMINISTIC, route("Can I still drive my car?"))
         assertEquals(AiRouting.Route.AI, route("My car makes a weird noise when I turn"))
         assertEquals(AiRouting.Route.DETERMINISTIC, route("I smell burning"))
     }
@@ -121,11 +144,13 @@ class GeminiIntegrationTest {
         val client = FakeClient()
         val p = provider(client)
         p.ask("Hi Penelope")
-        p.ask("explain P0171") // deterministic, still remembered
+        p.ask("can I still drive my car") // deterministic safety answer, still remembered
+        p.ask("explain P0171")
         p.ask("What should I do about it?")
         val last = client.calls.last()
-        assertEquals(4, last.history.size)
-        assertTrue(last.history.any { it.role == AiTurn.Role.MODEL && it.text.contains("more air than expected") })
+        assertEquals(6, last.history.size)
+        assertTrue("the app's safety answer is in the AI's context", last.history.any { it.role == AiTurn.Role.MODEL && !it.text.startsWith("AI says") })
+        assertTrue(last.history.any { it.role == AiTurn.Role.USER && it.text == "explain P0171" })
         assertEquals("What should I do about it?", last.message)
     }
 
@@ -198,7 +223,8 @@ class GeminiIntegrationTest {
         assertTrue(first.text.startsWith(AiNotices.OFFLINE))
         assertEquals(AiStatus.Unavailable(AiFailure.OFFLINE), p.status.value)
         val second = p.ask("What about synthetic oil?")
-        assertFalse(AiNotices.startsWithNotice(second.text))
+        // Never a silent canned answer: a short notice on every later fallback.
+        assertTrue(second.text.startsWith(AiNotices.stillUnavailable(AiFailure.OFFLINE)))
         client.next = { AiResult.Reply("Synthetic oil is fine.", "gemini-3.8-flash") }
         // Recovery is announced once, only after a real successful reply.
         assertEquals("${AiNotices.RESTORED} Synthetic oil is fine.", p.ask("And synthetic oil?").text)
