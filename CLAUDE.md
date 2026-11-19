@@ -38,7 +38,7 @@ Use the least expensive model that will give a reliable result. Escalate when a 
 |---|---|---|
 | Finding files, call sites, settings or docs; summarizing existing code; simple repetitive lookups | Haiku | `penelope-explorer` (read-only) |
 | Well-defined Kotlin, Compose, Room, Firebase, Gradle or test work; routine fixes with a known cause; Lint/Detekt fixes | Sonnet | `penelope-implementer` |
-| Architecture and phase planning; complex or intermittent bugs; security, privacy and vehicle-safety decisions; major migrations; final review of risky changes | Opus | `penelope-architect` (plans and reviews, doesn't edit) |
+| Architecture and phase planning; complex or intermittent bugs; security, privacy and vehicle-safety decisions; major migrations; final review of risky changes | Opus | `penelope-architect` (read-only: plans and reviews) |
 
 - **Plan with Opus, build with Sonnet:** for a substantial stage, get a plan from `penelope-architect`, implement it with `penelope-implementer`, and send risky diffs back to `penelope-architect` for review.
 - **Escalate:** if `penelope-implementer` hits an unclear root cause or a security, privacy or safety question, hand it to `penelope-architect`. If `penelope-explorer` can't find something after a focused search, do the search in the main session instead.
