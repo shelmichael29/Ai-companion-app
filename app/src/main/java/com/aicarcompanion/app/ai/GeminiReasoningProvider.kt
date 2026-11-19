@@ -41,6 +41,9 @@ object AiRouting {
     fun route(intent: AssistantIntent, normalizedUtterance: String): Route = when (intent) {
         AssistantIntent.EndConversation, AssistantIntent.PauseConversation, AssistantIntent.Repeat,
         AssistantIntent.CanIDrive,
+        // Recalls and crash ratings: campaign numbers, star counts and "your car has a recall" claims
+        // can't be checked by ReplyGuard, so the app's own wording is used as is.
+        AssistantIntent.Recalls, AssistantIntent.SafetyRating,
         // Connection status is a device status read; its text can include the adapter's Bluetooth
         // name, which may contain a person's name, so it's never sent to Gemini.
         AssistantIntent.ConnectionStatus -> Route.DETERMINISTIC
@@ -49,9 +52,7 @@ object AiRouting {
             if (CODE_CONCEPT.containsMatchIn(normalizedUtterance)) Route.AI else Route.DATA_THEN_AI
         is AssistantIntent.LiveValue ->
             if (LIVE_REQUEST.containsMatchIn(normalizedUtterance)) Route.DATA_THEN_AI else Route.AI
-        AssistantIntent.SensorReadings, AssistantIntent.Help,
-        // Recalls and crash ratings come from the offline database first; Gemini explains them.
-        AssistantIntent.Recalls, AssistantIntent.SafetyRating -> Route.DATA_THEN_AI
+        AssistantIntent.SensorReadings, AssistantIntent.Help -> Route.DATA_THEN_AI
         // Code explanations, follow-ups, greetings, vehicle questions, non-urgent symptoms, and
         // anything unrecognized: real conversation with Gemini, grounded in verified facts.
         else -> Route.AI
@@ -61,6 +62,7 @@ object AiRouting {
     fun deterministicSource(intent: AssistantIntent): ResponseSource = when (intent) {
         AssistantIntent.EndConversation, AssistantIntent.PauseConversation, AssistantIntent.Repeat -> ResponseSource.CONVERSATION_CONTROL
         AssistantIntent.ConnectionStatus -> ResponseSource.DEVICE_COMMAND
+        AssistantIntent.Recalls, AssistantIntent.SafetyRating -> ResponseSource.OFFLINE_REFERENCE
         else -> ResponseSource.SAFETY
     }
 }

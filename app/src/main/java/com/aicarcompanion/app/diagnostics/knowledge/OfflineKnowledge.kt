@@ -94,8 +94,11 @@ class KnowledgeDtcSource(
         val c = code.trim().uppercase()
         curated.lookup(c)?.let { return it }
         if (!knowledge.available) return null
-        val m = make()?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
-        if (m != null && isManufacturerRange(c)) knowledge.manufacturerDtc(c, m)?.let { return fromManufacturer(it) }
+        if (isManufacturerRange(c)) {
+            // Its meaning depends on the make: only the selected car's make is used, never a guess.
+            val m = make()?.trim()?.uppercase()?.takeIf { it.isNotEmpty() } ?: return null
+            return knowledge.manufacturerDtc(c, m)?.let(::fromManufacturer)
+        }
         return knowledge.dtc(c)?.let(::fromGeneric)
     }
 
@@ -108,13 +111,21 @@ class KnowledgeDtcSource(
             else -> false
         }
 
-        private val SAFETY_WORDS = Regex("\\b(airbag|deployment|squib|restraint|brake|abs|steering|seat ?belt|pretensioner)\\b", RegexOption.IGNORE_CASE)
+        private val SAFETY_WORDS = Regex(
+            "\\b(airbags?|deployment|squib|restraint|brakes?|braking|abs|steering|seat ?belt|pretensioner|" +
+                "oil pressure|over ?temp\\w*|overheat\\w*|coolant temp\\w*|fuel (leak|pressure)|stability|traction|throttle actuator)\\b",
+            RegexOption.IGNORE_CASE,
+        )
 
-        fun severityOf(d: KnowledgeDtc): DtcSeverity = when {
-            d.limpModePossible || SAFETY_WORDS.containsMatchIn(d.title) -> DtcSeverity.SEVERE
-            d.turnsOnCheckEngineLight -> DtcSeverity.MODERATE
-            else -> DtcSeverity.UNKNOWN
-        }
+        /**
+         * Community data never says a code is minor: either "get it checked promptly" (limp mode or a
+         * safety system) or "not sure how serious". Only Penelope's reviewed text uses milder levels.
+         */
+        fun severityOf(d: KnowledgeDtc): DtcSeverity =
+            if (d.limpModePossible || SAFETY_WORDS.containsMatchIn(d.title) || SAFETY_WORDS.containsMatchIn(d.description)) DtcSeverity.SEVERE
+            else DtcSeverity.UNKNOWN
+
+        fun severityOf(d: ManufacturerDtc): DtcSeverity = if (SAFETY_WORDS.containsMatchIn(d.description)) DtcSeverity.SEVERE else DtcSeverity.UNKNOWN
 
         fun fromGeneric(d: KnowledgeDtc): DtcInfo {
             val causes = d.causes.take(4).map { it.label }
@@ -150,7 +161,7 @@ class KnowledgeDtcSource(
                 "This is a manufacturer-specific code from community data, so a shop with brand software can confirm it.",
             diyChecks = "Manufacturer-specific codes are best confirmed with brand diagnostic software before any repair.",
             technical = "${d.make} manufacturer-specific definition (community data): ${d.description}",
-            severity = DtcSeverity.UNKNOWN,
+            severity = severityOf(d),
             headline = d.description,
             source = "Wal33D dtc-database (MIT), ${d.make}-specific",
         )
@@ -183,7 +194,10 @@ object VehicleRecords {
 
     fun recallAnswer(vehicleName: String, count: Int, sample: List<RecallCampaign>, snapshot: String?): String {
         val asOf = snapshot?.let { " (NHTSA data from $it)" }.orEmpty()
-        if (count == 0) return "I don't have any recall campaigns on record for the $vehicleName in my offline data$asOf. $VIN_CHECK"
+        if (count == 0) {
+            return "I couldn't find recall campaigns for the $vehicleName in my offline data$asOf. Model names don't always match, " +
+                "so that doesn't mean there are none. $VIN_CHECK"
+        }
         val examples = sample.take(3).joinToString("; ") { r ->
             listOfNotNull(r.component?.lowercase()?.replaceFirstChar(Char::uppercase), r.consequence?.takeIf { it.isNotBlank() }?.let { "risk: ${it.trimEnd('.')}" })
                 .joinToString(", ") + " (campaign ${r.campaign})"
@@ -195,6 +209,11 @@ object VehicleRecords {
     fun ratingAnswer(vehicleName: String, ratings: List<SafetyRating>): String {
         val rated = ratings.filter { it.overall != null || it.rollover != null }
         if (rated.isEmpty()) return "I don't have NHTSA crash-test ratings for the $vehicleName in my offline data."
+        val overall = rated.mapNotNull { it.overall }.distinct()
+        if (overall.size > 1) {
+            return "NHTSA rated versions of the $vehicleName between ${overall.min()} and ${overall.max()} out of 5 stars overall, " +
+                "depending on body style and drive type. Tell me which one you have and I can be more specific."
+        }
         val best = rated.first()
         val parts = listOfNotNull(
             best.overall?.let { "$it out of 5 stars overall" },

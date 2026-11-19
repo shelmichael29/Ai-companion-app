@@ -16,6 +16,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+import re
 import shutil
 import sqlite3
 import tempfile
@@ -54,7 +55,9 @@ CREATE INDEX idx_safety_ymm ON safety_rating(make, year, model);
 """
 
 # Wal33D manufacturer names → names used by EPA/NHTSA and the app's vehicle profiles.
-MAKE_ALIASES = {'CHEVY': 'CHEVROLET', 'MERCEDES': 'MERCEDES-BENZ', 'VOLKSWAGEN': 'VOLKSWAGEN'}
+MAKE_ALIASES = {'CHEVY': 'CHEVROLET', 'MERCEDES': 'MERCEDES-BENZ'}
+CAMPAIGN = re.compile(r'^\d{2}V\d{6}$')
+RECALL_FIELDS = 29
 
 
 def sha256(path):
@@ -118,14 +121,21 @@ def build_dtc(conn):
 
 
 def build_manufacturer_dtc(conn):
+    """Only makes that exist in the EPA vehicle list (as the app's vehicle profiles use them) are kept,
+    so a make-specific meaning can only ever be applied to that make."""
+    epa_makes = {m.upper() for (m,) in conn.execute('SELECT DISTINCT make FROM epa_vehicle')}
     src = sqlite3.connect(f"file:{DL / 'wal33d_dtc_codes.db'}?mode=ro", uri=True)
-    n = 0
+    skipped = set()
     for code, make, desc in src.execute(
         "SELECT code, manufacturer, description FROM dtc_definitions WHERE is_generic = 0 AND locale = 'en' AND manufacturer NOT IN ('GENERIC','OTHER')"):
         make = MAKE_ALIASES.get(make.upper(), make.upper())
+        if make not in epa_makes:
+            skipped.add(make)
+            continue
         conn.execute('INSERT OR IGNORE INTO dtc_manufacturer VALUES (?,?,?)', (code.strip().upper(), make, clip(desc, 200)))
-        n += 1
     src.close()
+    if skipped:
+        print('Manufacturer codes skipped (make not in EPA list):', ', '.join(sorted(skipped)))
     return conn.execute('SELECT COUNT(*) FROM dtc_manufacturer').fetchone()[0]
 
 
@@ -179,11 +189,18 @@ def build_recalls(conn):
     Text is clipped: this is a campaign index, not the full notice. VIN-specific status is online-only."""
     seen = set()
     vehicles = 0
+    rejected = 0
     for name in ('nhtsa_recalls_pre2010.zip', 'nhtsa_recalls_post2010.zip'):
         with zipfile.ZipFile(DL / name) as zf, zf.open(zf.namelist()[0]) as raw:
             for line in io.TextIOWrapper(raw, encoding='latin-1', newline=''):
                 p = line.rstrip('\r\n').split('\t')
-                if len(p) < 22 or p[10] != 'V':
+                if len(p) != RECALL_FIELDS:
+                    rejected += 1
+                    continue
+                if p[10] != 'V':
+                    continue
+                if not CAMPAIGN.match(p[1].strip()):
+                    rejected += 1
                     continue
                 year = as_int(p[4])
                 if year is None or year < MIN_YEAR or year > 2100:
@@ -197,6 +214,9 @@ def build_recalls(conn):
                         campaign, clip(p[6], 100), p[15][:8] or None, clip(p[19], 260), clip(p[20], 200), clip(p[21], 160)))
                 conn.execute('INSERT INTO recall_vehicle VALUES (?,?,?,?)', (campaign, make, model, year))
                 vehicles += 1
+    # A format change upstream must fail the build, not quietly corrupt the data.
+    if rejected > vehicles * 0.01:
+        raise SystemExit(f'Recall file format changed: {rejected} malformed rows vs {vehicles} vehicle rows')
     # One row per campaign/make/model/year.
     conn.execute('CREATE TABLE rv AS SELECT DISTINCT campaign, make, model, year FROM recall_vehicle')
     conn.execute('DELETE FROM recall_vehicle')
@@ -235,9 +255,9 @@ def main():
         conn.executescript(SCHEMA)
         counts = {}
         counts['dtc_generic'] = build_dtc(conn)
+        counts['epa_vehicle'] = build_epa(conn)
         counts['dtc_manufacturer'] = build_manufacturer_dtc(conn)
         counts['obd_pid'] = build_pids(conn)
-        counts['epa_vehicle'] = build_epa(conn)
         counts['symptom_guide'] = build_symptoms(conn)
         counts['recall_campaign'], counts['recall_vehicle'] = build_recalls(conn)
         counts['safety_rating'] = build_safety(conn)

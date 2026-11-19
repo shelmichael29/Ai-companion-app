@@ -97,16 +97,29 @@ class OfflineKnowledgeTest {
         assertTrue(info.simple.contains("clue, not a diagnosis"))
         assertTrue(info.diyChecks.startsWith("Common causes, most likely first"))
         assertTrue(info.source!!.startsWith("OBDex"))
-        assertEquals(DtcSeverity.MODERATE, info.severity)
+        assertTrue("community data never says a code is minor", info.severity == DtcSeverity.SEVERE || info.severity == DtcSeverity.UNKNOWN)
         assertEquals("limp-mode codes are severe", DtcSeverity.SEVERE, src.lookup("U0100")!!.severity)
+    }
+
+    /** Review finding: any check-engine code was "usually OK to keep driving", including oil pressure. */
+    @Test fun `oil pressure, overheating and brake codes from community data are never rated as mild`() {
+        val src = KnowledgeDtcSource(GenericDtcCatalog, kb) { "BMW" }
+        for (code in listOf("P0520", "P0524", "P0217", "P0571", "B0001", "C0035")) {
+            assertNull("$code isn't in the built-in catalog", GenericDtcCatalog.lookup(code))
+            assertEquals(code, DtcSeverity.SEVERE, src.lookup(code)!!.severity)
+        }
+        for (code in listOf("P2096", "U0001", "P0700")) {
+            if (GenericDtcCatalog.lookup(code) != null) continue // Penelope's reviewed text may be mild
+            val sev = src.lookup(code)?.severity ?: continue
+            assertTrue("$code: $sev", sev == DtcSeverity.SEVERE || sev == DtcSeverity.UNKNOWN)
+        }
     }
 
     @Test fun `manufacturer-specific codes use the selected car's make only`() {
         val bmwSrc = KnowledgeDtcSource(GenericDtcCatalog, kb) { "BMW" }
         assertTrue(bmwSrc.lookup("P1083")!!.simple.startsWith("On Bmw vehicles, P1083 means: Fuel Control Mixture Lean"))
-        val other = KnowledgeDtcSource(GenericDtcCatalog, kb) { "Kia" }
-        assertFalse("never a BMW meaning on a Kia", other.lookup("P1083")?.simple.orEmpty().contains("Bmw"))
-        assertNull("no car selected: no manufacturer guess", KnowledgeDtcSource(GenericDtcCatalog, kb) { null }.lookup("P1083")?.takeIf { it.source?.contains("Wal33D") == true })
+        assertNull("never a BMW meaning on a Kia, and no generic guess either", KnowledgeDtcSource(GenericDtcCatalog, kb) { "Kia" }.lookup("P1083"))
+        assertNull("no car selected: no manufacturer guess", KnowledgeDtcSource(GenericDtcCatalog, kb) { null }.lookup("P1083"))
     }
 
     @Test fun `without the pack Penelope falls back to her built-in catalog`() {
@@ -147,8 +160,10 @@ class OfflineKnowledgeTest {
         val p = CommandParser { "Penelope" }
         for (q in listOf("Are there any recalls on my car?", "Has my car been recalled?", "Is there a safety recall for my BMW?")) {
             assertEquals(q, AssistantIntent.Recalls, p.parse(q))
-            assertEquals(AiRouting.Route.DATA_THEN_AI, AiRouting.route(p.parse(q), p.normalize(q)))
+            // Built-in wording: ReplyGuard can't check campaign numbers or star counts.
+            assertEquals(AiRouting.Route.DETERMINISTIC, AiRouting.route(p.parse(q), p.normalize(q)))
         }
+        assertEquals(AssistantIntent.CanIDrive, p.parse("Is my car safe to drive?"))
         assertFalse(p.parse("I don't recall when I changed the oil") is AssistantIntent.Recalls)
         assertEquals(AssistantIntent.SafetyRating, p.parse("What are the crash test ratings for my car?"))
     }
@@ -176,17 +191,37 @@ class OfflineKnowledgeTest {
     @Test fun `Gemini explains new codes from the sourced catalog`() = runTest {
         val c = Recorder()
         gemini(c).respond(AssistantRequest("What does P2096 mean?", "Penelope"))
-        assertTrue(c.system.contains("P2096. verified meaning: " + kb.dtc("P2096")!!.title))
+        assertTrue(c.system.contains("P2096. reference meaning (community data): " + kb.dtc("P2096")!!.title))
+        assertFalse("community data is never called verified", c.system.contains("P2096. verified meaning"))
         assertTrue(c.system.contains("source: OBDex community catalog"))
     }
 
-    @Test fun `Gemini explains recalls from the offline data, read first`() = runTest {
+    /** Review finding: Gemini could restate recall facts that ReplyGuard can't verify. */
+    @Test fun `recall answers use the app's own wording and are logged as offline records`() = runTest {
         val c = Recorder()
         val p = gemini(c)
-        p.respond(AssistantRequest("Any recalls on my car?", "Penelope"))
-        assertTrue(c.system.contains("APP RESULT FOR THIS QUESTION"))
-        assertTrue(c.system.contains("NHTSA lists 4 recall campaigns"))
-        assertEquals(ResponseSource.GEMINI_WITH_VEHICLE_DATA, p.sources.last.value!!.source)
+        val r = p.respond(AssistantRequest("Any recalls on my car?", "Penelope"))
+        assertEquals("", c.system)
+        assertTrue(r.text.startsWith("NHTSA lists 4 recall campaigns"))
+        assertEquals(ResponseSource.OFFLINE_REFERENCE, p.sources.last.value!!.source)
+    }
+
+    /** Review finding: "MUSTANG" also matched "MUSTANG MACH E" (19 campaigns instead of 6). */
+    @Test fun `recalls match the exact model, not a different car with a longer name`() {
+        assertEquals(6, kb.recallCount(2021, "Ford", "Mustang"))
+        assertEquals("F-150 has only one NHTSA name", 29, kb.recallCount(2021, "Ford", "F-150"))
+        assertEquals("a wildcard can't match everything", 0, kb.recallCount(2021, "Ford", "%"))
+    }
+
+    @Test fun `honest wording when nothing matches or ratings differ by version`() {
+        val none = com.aicarcompanion.app.diagnostics.knowledge.VehicleRecords.recallAnswer("2011 Ford F150 Pickup 2WD", 0, emptyList(), "2026-11-19")
+        assertTrue(none.contains("doesn't mean there are none"))
+        assertTrue(none.contains("nhtsa.gov/recalls"))
+        val ratings = listOf(
+            com.aicarcompanion.app.diagnostics.knowledge.SafetyRating("MUSTANG", "2 DR", "RWD", 5, 5, 5, 4),
+            com.aicarcompanion.app.diagnostics.knowledge.SafetyRating("MUSTANG", "C", "RWD", 4, 4, 5, 4),
+        )
+        assertTrue(com.aicarcompanion.app.diagnostics.knowledge.VehicleRecords.ratingAnswer("2021 Ford Mustang", ratings).contains("between 4 and 5"))
     }
 
     @Test fun `a described symptom gives Gemini the matching triage guide, and emergencies stay built-in`() = runTest {

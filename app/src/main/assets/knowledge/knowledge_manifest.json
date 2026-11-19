@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "built_utc": "2026-11-19T22:49:04Z",
-  "database_sha256": "a37132c72847606767f53dcffe5a46107e2ac51538c3ef8216fedf17b35fd0e8",
-  "database_bytes": 41041920,
-  "compressed_bytes": 10190247,
+  "built_utc": "2026-11-19T23:03:58Z",
+  "database_sha256": "9921e430b60b2a3d2ea698f267c5956161a38d2d108f23663764087e5baa2bfc",
+  "database_bytes": 40996864,
+  "compressed_bytes": 10178668,
   "min_model_year": 1996,
   "row_counts": {
     "dtc_generic": 9533,
-    "dtc_manufacturer": 6770,
-    "obd_pid": 132,
     "epa_vehicle": 35869,
+    "dtc_manufacturer": 6368,
+    "obd_pid": 132,
     "symptom_guide": 24,
-    "recall_campaign": 20138,
-    "recall_vehicle": 130142,
+    "recall_campaign": 20128,
+    "recall_vehicle": 130007,
     "safety_rating": 8432
   },
   "sources": [

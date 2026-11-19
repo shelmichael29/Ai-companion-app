@@ -42,8 +42,8 @@ class SqliteOfflineKnowledge(private val context: Context) : OfflineKnowledge {
             val dir = File(context.noBackupFilesDir, "knowledge").apply { mkdirs() }
             val target = File(dir, "penelope_knowledge_${sha.take(12)}.db")
             if (!target.exists()) {
-                dir.listFiles()?.forEach { it.delete() } // older packs
                 val temp = File(dir, "installing.tmp")
+                try {
                 val digest = MessageDigest.getInstance("SHA-256")
                 packStream().use { input ->
                     temp.outputStream().buffered().use { out ->
@@ -59,6 +59,11 @@ class SqliteOfflineKnowledge(private val context: Context) : OfflineKnowledge {
                 val actual = digest.digest().joinToString("") { "%02x".format(it) }
                 check(actual == sha) { "Knowledge pack checksum mismatch" }
                 check(temp.renameTo(target)) { "Couldn't install knowledge pack" }
+                } finally {
+                    temp.delete() // never leave a partial file behind (no space, bad checksum)
+                }
+                // Older packs are removed only once the new one is verified and in place.
+                dir.listFiles()?.filter { it != target }?.forEach { it.delete() }
             }
             db = SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS)
             info = KnowledgeInfo(
@@ -125,13 +130,29 @@ class SqliteOfflineKnowledge(private val context: Context) : OfflineKnowledge {
         }
     } ?: emptyList()).also { if (it.isNotEmpty()) guides = it }
 
-    /** Matches the exact model, or a longer recall model name that starts with it ("F-150" → "F-150 SUPERCREW"). */
-    private val modelMatch = "(model = ? OR model LIKE ? || ' %')"
+    /**
+     * The model name to use in NHTSA tables: the exact name when it exists for that year and make,
+     * otherwise the only longer name that starts with it ("F-150" → "F-150 SUPERCREW"). Never a
+     * guess between several ("MUSTANG" must not pick up "MUSTANG MACH E").
+     */
+    private fun nhtsaModel(table: String, year: Int, make: String, model: String): String? {
+        val m = model.trim().uppercase()
+        val exact = query("SELECT 1 FROM $table WHERE make = ? AND year = ? AND model = ? LIMIT 1", arrayOf(make.uppercase(), year.toString(), m)) { it.moveToFirst() }
+        if (exact == true) return m
+        val escaped = m.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        val longer = query(
+            "SELECT DISTINCT model FROM $table WHERE make = ? AND year = ? AND model LIKE ? ESCAPE '\\' LIMIT 2",
+            arrayOf(make.uppercase(), year.toString(), "$escaped %"),
+        ) { c -> buildList { while (c.moveToNext()) add(c.getString(0)) } }.orEmpty()
+        return longer.singleOrNull()
+    }
 
-    override fun recalls(year: Int, make: String, model: String, limit: Int): List<RecallCampaign> = query(
-        "SELECT c.* FROM recall_campaign c WHERE c.campaign IN (SELECT campaign FROM recall_vehicle WHERE make = ? AND year = ? AND $modelMatch) " +
-            "ORDER BY c.report_date DESC LIMIT $limit",
-        arrayOf(make.uppercase(), year.toString(), model.uppercase(), model.uppercase()),
+    override fun recalls(year: Int, make: String, model: String, limit: Int): List<RecallCampaign> {
+        val m = nhtsaModel("recall_vehicle", year, make, model) ?: return emptyList()
+        return query(
+        "SELECT c.* FROM recall_campaign c WHERE c.campaign IN (SELECT campaign FROM recall_vehicle WHERE make = ? AND year = ? AND model = ?) " +
+            "ORDER BY c.report_date DESC LIMIT ${limit.coerceIn(1, 50)}",
+        arrayOf(make.uppercase(), year.toString(), m),
     ) { c ->
         buildList {
             while (c.moveToNext()) add(
@@ -139,20 +160,27 @@ class SqliteOfflineKnowledge(private val context: Context) : OfflineKnowledge {
             )
         }
     }.orEmpty()
+    }
 
-    override fun recallCount(year: Int, make: String, model: String): Int = query(
-        "SELECT COUNT(DISTINCT campaign) FROM recall_vehicle WHERE make = ? AND year = ? AND $modelMatch",
-        arrayOf(make.uppercase(), year.toString(), model.uppercase(), model.uppercase()),
-    ) { c -> if (c.moveToFirst()) c.getInt(0) else 0 } ?: 0
+    override fun recallCount(year: Int, make: String, model: String): Int {
+        val m = nhtsaModel("recall_vehicle", year, make, model) ?: return 0
+        return query(
+            "SELECT COUNT(DISTINCT campaign) FROM recall_vehicle WHERE make = ? AND year = ? AND model = ?",
+            arrayOf(make.uppercase(), year.toString(), m),
+        ) { c -> if (c.moveToFirst()) c.getInt(0) else 0 } ?: 0
+    }
 
-    override fun safetyRatings(year: Int, make: String, model: String): List<SafetyRating> = query(
-        "SELECT * FROM safety_rating WHERE make = ? AND year = ? AND $modelMatch ORDER BY overall IS NULL, overall DESC",
-        arrayOf(make.uppercase(), year.toString(), model.uppercase(), model.uppercase()),
+    override fun safetyRatings(year: Int, make: String, model: String): List<SafetyRating> {
+        val m = nhtsaModel("safety_rating", year, make, model) ?: return emptyList()
+        return query(
+        "SELECT * FROM safety_rating WHERE make = ? AND year = ? AND model = ? ORDER BY overall IS NULL, overall DESC",
+        arrayOf(make.uppercase(), year.toString(), m),
     ) { c ->
         buildList {
             while (c.moveToNext()) add(SafetyRating(c.str("model")!!, c.str("body"), c.str("drive"), c.int("overall"), c.int("frontal"), c.int("side"), c.int("rollover")))
         }
     }.orEmpty()
+    }
 
     // ---- EPA vehicles (used by OfflineEpaCatalog) ----------------------------------------------------
 

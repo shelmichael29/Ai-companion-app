@@ -139,7 +139,8 @@ object PromptBuilder {
 
     private fun codeMeaning(code: String, knowledge: DtcKnowledgeSource): String =
         knowledge.lookup(code)?.let {
-            " verified meaning: ${it.description}; plain explanation: ${it.simple}; urgency: ${it.severity.label}" +
+            (if (it.source == null) " verified meaning: " else " reference meaning (community data): ") +
+                "${it.description}; plain explanation: ${it.simple}; urgency: ${it.severity.label}" +
                 (it.source?.let { s -> "; source: $s; common causes are possibilities, not a diagnosis" } ?: "") + "."
         } ?: ""
 }
