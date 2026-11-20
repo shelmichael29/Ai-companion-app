@@ -2,7 +2,6 @@ package com.aicarcompanion.app.ui.vehicles
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -57,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import com.aicarcompanion.app.data.vehicledb.DecodedVehicle
 import com.aicarcompanion.app.data.vehicledb.VinValidator
 import com.aicarcompanion.app.domain.model.EngineLayout
@@ -168,7 +168,7 @@ private fun copyVin(context: android.content.Context, vin: String) {
 
 private fun openLink(context: android.content.Context, url: String) {
     try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {
         // No browser installed: nothing to open; the address is also shown on screen.
     }
