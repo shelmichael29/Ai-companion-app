@@ -31,6 +31,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Live camera preview with on-device text recognition (CameraX + ML Kit, bundled model).
@@ -69,9 +70,14 @@ fun VinCameraView(
         val analysisExecutor = Executors.newSingleThreadExecutor()
         val providerFuture = ProcessCameraProvider.getInstance(context)
         var provider: ProcessCameraProvider? = null
+        var previewUseCase: Preview? = null
         var analysisUseCase: ImageAnalysis? = null
+        // Set first thing on dispose. The camera provider can finish starting after the screen has
+        // already closed; without this it would bind the camera to the Activity and leave it on.
+        val disposed = AtomicBoolean(false)
 
         providerFuture.addListener({
+            if (disposed.get()) return@addListener
             try {
                 val cameraProvider = providerFuture.get().also { provider = it }
                 // Same 16:9 shape for the preview and the analysis, so a box found in the analyzed
@@ -83,7 +89,7 @@ fun VinCameraView(
                     .setResolutionStrategy(ResolutionStrategy(Size(1920, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
                     .build()
                 val preview = Preview.Builder().setResolutionSelector(previewSelector).build()
-                    .also { it.surfaceProvider = previewView.surfaceProvider }
+                    .also { it.surfaceProvider = previewView.surfaceProvider; previewUseCase = it }
                 val analysis = ImageAnalysis.Builder()
                     .setResolutionSelector(analysisSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -92,27 +98,36 @@ fun VinCameraView(
 
                 var lastRun = 0L
                 analysis.setAnalyzer(analysisExecutor) { proxy ->
-                    val image = proxy.image
-                    val now = SystemClock.elapsedRealtime()
-                    if (!analyzingNow || image == null || now - lastRun < MIN_FRAME_GAP_MILLIS) {
-                        proxy.close()
-                        return@setAnalyzer
-                    }
-                    lastRun = now
-                    val rotation = proxy.imageInfo.rotationDegrees
-                    val upright = if (rotation % 180 == 0) proxy.width to proxy.height else proxy.height to proxy.width
-                    recognizer.process(InputImage.fromMediaImage(image, rotation))
-                        .addOnSuccessListener { text ->
-                            val lines = text.textBlocks.flatMap { it.lines }.map { line ->
-                                RecognizedLine(line.text, line.boundingBox?.let { ScanBox(it.left, it.top, it.right, it.bottom) })
-                            }
-                            onLinesNow(lines, upright.first, upright.second)
+                    try {
+                        val image = proxy.image
+                        val now = SystemClock.elapsedRealtime()
+                        if (disposed.get() || !analyzingNow || image == null || now - lastRun < MIN_FRAME_GAP_MILLIS) {
+                            proxy.close()
+                            return@setAnalyzer
                         }
-                        .addOnCompleteListener { proxy.close() } // the frame is released here, never stored
+                        lastRun = now
+                        val rotation = proxy.imageInfo.rotationDegrees
+                        val upright = if (rotation % 180 == 0) proxy.width to proxy.height else proxy.height to proxy.width
+                        recognizer.process(InputImage.fromMediaImage(image, rotation))
+                            .addOnSuccessListener { text ->
+                                if (disposed.get()) return@addOnSuccessListener
+                                val lines = text.textBlocks.flatMap { it.lines }.map { line ->
+                                    RecognizedLine(line.text, line.boundingBox?.let { ScanBox(it.left, it.top, it.right, it.bottom) })
+                                }
+                                onLinesNow(lines, upright.first, upright.second)
+                            }
+                            .addOnCompleteListener { proxy.close() } // the frame is released here, never stored
+                    } catch (e: Exception) {
+                        // A failure here must not leak the frame (CameraX would stop delivering) or crash the app.
+                        proxy.close()
+                    }
                 }
 
-                cameraProvider.unbindAll()
                 val bound = cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                if (disposed.get()) { // closed while binding: undo at once so the camera doesn't stay on
+                    cameraProvider.unbind(preview, analysis)
+                    return@addListener
+                }
                 camera = bound
                 onTorchAvailableNow(bound.cameraInfo.hasFlashUnit())
             } catch (e: Exception) {
@@ -121,8 +136,10 @@ fun VinCameraView(
         }, ContextCompat.getMainExecutor(context))
 
         onDispose {
+            disposed.set(true)
             analysisUseCase?.clearAnalyzer()
-            provider?.unbindAll() // also turns the flashlight off
+            // Our own use cases only. Unbinding the last ones also turns the flashlight off.
+            provider?.unbind(*listOfNotNull(previewUseCase, analysisUseCase).toTypedArray())
             camera = null
             recognizer.close()
             analysisExecutor.shutdown()

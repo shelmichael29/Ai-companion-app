@@ -32,11 +32,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -116,7 +120,21 @@ fun VehicleEditScreen(
             }
             DetailsForm(viewModel)
 
-            com.aicarcompanion.app.ui.design.GradientButton("Confirm and save", { viewModel.save(onDone) }, Modifier.fillMaxWidth())
+            viewModel.duplicateOf?.let { saved ->
+                Text(
+                    "You've already added this car as ${saved.displayName}, so I won't save a second copy.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                OutlinedButton(
+                    onClick = { onOpenExisting(saved.id) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text("Open my saved car") }
+            }
+            com.aicarcompanion.app.ui.design.GradientButton(
+                "Confirm and save", { viewModel.save(onDone) }, Modifier.fillMaxWidth(), enabled = !viewModel.saving,
+            )
             if (viewModel.isEditing) {
                 OutlinedButton(
                     onClick = { confirmDelete = true },

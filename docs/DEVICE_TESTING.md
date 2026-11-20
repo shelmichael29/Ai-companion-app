@@ -58,6 +58,13 @@ See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call f
 - **Battery/heat:** scan for two minutes; the phone shouldn't get warm, and the camera light/flashlight must turn off
   when you leave the screen or lock the phone.
 - **Privacy:** confirm no photo appears in the gallery or app storage after scanning.
+- **Camera lifecycle (not unit-testable):** open the scanner and press Back immediately, 20 times in a row (also
+  "Type my VIN instead" right after opening, and lock the phone mid-scan). No crash, and the camera indicator dot and
+  flashlight must go off every time, including when the screen closes before the camera finished starting.
+- **Rotation:** deny the camera once, rotate the phone: the permission prompt must not appear again by itself. Rotate
+  during a scan and on the results screen: nothing resets unexpectedly.
+- **Double tap:** tap **Save this car** twice quickly: one car only.
+- **Clipboard:** "Copy my VIN" then check the clipboard preview doesn't show the VIN (Android 13+).
 - Airplane mode: lists you opened before still appear ("Saved list"); new ones show an
   error with Retry; **Manual** always works.
 

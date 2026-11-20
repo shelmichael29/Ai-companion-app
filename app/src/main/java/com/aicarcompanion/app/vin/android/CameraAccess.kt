@@ -12,8 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
@@ -40,18 +40,26 @@ class CameraAccessController(
 fun rememberCameraAccess(): CameraAccessController {
     val context = LocalContext.current
     fun granted() = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    var access by remember { mutableStateOf<CameraAccess>(if (granted()) CameraAccess.Granted else CameraAccess.NotAsked) }
+    // Saved across rotation: forgetting a denial would make the screen ask again by itself, and a second
+    // denial is permanent on Android 11 and later.
+    var code by rememberSaveable { mutableIntStateOf(if (granted()) CODE_GRANTED else CODE_NOT_ASKED) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        access = if (isGranted) {
-            CameraAccess.Granted
+        code = if (isGranted) {
+            CODE_GRANTED
         } else {
             val activity = context.findActivity()
-            CameraAccess.Denied(activity != null && ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA))
+            if (activity != null && ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)) CODE_DENIED else CODE_BLOCKED
         }
     }
     // Back from system settings: pick up a permission granted (or revoked) there.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        if (granted()) access = CameraAccess.Granted else if (access is CameraAccess.Granted) access = CameraAccess.Denied(canAskAgain = true)
+        if (granted()) code = CODE_GRANTED else if (code == CODE_GRANTED) code = CODE_DENIED
+    }
+    val access = when (code) {
+        CODE_GRANTED -> CameraAccess.Granted
+        CODE_DENIED -> CameraAccess.Denied(canAskAgain = true)
+        CODE_BLOCKED -> CameraAccess.Denied(canAskAgain = false)
+        else -> CameraAccess.NotAsked
     }
     return CameraAccessController(
         access = access,
@@ -64,6 +72,11 @@ fun rememberCameraAccess(): CameraAccessController {
         },
     )
 }
+
+private const val CODE_NOT_ASKED = 0
+private const val CODE_GRANTED = 1
+private const val CODE_DENIED = 2
+private const val CODE_BLOCKED = 3
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this

@@ -44,7 +44,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -54,7 +53,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -140,7 +138,6 @@ fun VinFlowOverlay(viewModel: VehicleEditViewModel, onOpenExisting: (String) -> 
                 val decoded = ((vm.vinState as? VinState.Done)?.result as? com.aicarcompanion.app.data.vehicledb.VinDecodeResult.Decoded)
                 if (decoded != null) {
                     val context = LocalContext.current
-                    val clipboard = LocalClipboardManager.current
                     VinResultsContent(
                         vehicle = decoded.vehicle, warnings = decoded.warnings, recalls = vm.recallState,
                         duplicateName = vm.duplicateOf?.let { listOfNotNull(it.year.toString(), it.make, it.model).joinToString(" ") },
@@ -148,13 +145,25 @@ fun VinFlowOverlay(viewModel: VehicleEditViewModel, onOpenExisting: (String) -> 
                         onReview = vm::reviewDetails,
                         onOpenExisting = { vm.duplicateOf?.let { onOpenExisting(it.id) } },
                         onOpenLink = { url -> openLink(context, url) },
-                        onCopyVin = { clipboard.setText(AnnotatedString(decoded.vehicle.vin)) },
+                        onCopyVin = { copyVin(context, decoded.vehicle.vin) },
                         onBack = vm::closeVinFlow,
                     )
                 }
             }
         }
     }
+}
+
+/** Copies the VIN marked sensitive (Android 13+), so the clipboard preview doesn't show it. */
+private fun copyVin(context: android.content.Context, vin: String) {
+    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java) ?: return
+    val clip = android.content.ClipData.newPlainText("VIN", vin)
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        clip.description.extras = android.os.PersistableBundle().apply {
+            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+        }
+    }
+    clipboard.setPrimaryClip(clip)
 }
 
 private fun openLink(context: android.content.Context, url: String) {
@@ -350,7 +359,7 @@ private fun ScanSheet(
     GlassPanel(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp), strong = true, contentPadding = 16.dp) {
         val locked = scanState as? ScanState.Locked
         if (locked != null) {
-            ConfirmFields(vinText, onVinChange, locked.candidate.correctedChars, VinFlowText.CONFIRM_TITLE, Modifier.testTag(VinTags.CONFIRM))
+            ConfirmFields(vinText, onVinChange, if (vinText == locked.candidate.vin) locked.candidate.correctedChars else 0, VinFlowText.CONFIRM_TITLE, Modifier.testTag(VinTags.CONFIRM))
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onRescan, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Scan again") }
                 val usable = VinValidator.validate(vinText) is VinValidator.Result.Valid
@@ -391,7 +400,7 @@ private fun ConfirmFields(vin: String, onVinChange: (String) -> Unit, correctedC
             label = { Text("VIN (17 characters)") },
             supportingText = { Text(invalid ?: "${vin.length}/17 · ${VinFlowText.CONFIRM_HINT}") },
             isError = invalid != null, singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, keyboardType = KeyboardType.Ascii),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, autoCorrectEnabled = false, keyboardType = KeyboardType.Ascii),
             modifier = Modifier.fillMaxWidth(),
         )
         if (correctedChars > 0) Text(VinFlowText.correctedNote(correctedChars), style = MaterialTheme.typography.bodySmall, color = t.warning)
@@ -549,7 +558,7 @@ private fun RecallSection(name: String, make: String?, state: RecallUiState, onO
                 GlassPanel(Modifier.fillMaxWidth(), strong = true, contentPadding = 14.dp) {
                     if (status.urgent) StatusBadge("Important", t.danger, icon = PenelopeIcons.Alert)
                     Text(
-                        status.headline, style = MaterialTheme.typography.titleMedium, color = if (status.urgent) t.danger else t.textPrimary,
+                        status.headline, style = MaterialTheme.typography.titleMedium, color = t.textPrimary, // the headline is about the model, so it isn't red; the badge carries the advisory
                         fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = if (status.urgent) 8.dp else 0.dp).semantics { liveRegion = LiveRegionMode.Polite },
                     )
                     Text(status.body, style = MaterialTheme.typography.bodyMedium, color = t.textSecondary, modifier = Modifier.padding(top = 6.dp))

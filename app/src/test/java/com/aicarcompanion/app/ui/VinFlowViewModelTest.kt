@@ -61,7 +61,9 @@ class VinFlowViewModelTest {
     private class FakeDecoder(var result: VinDecodeResult) : VinDecoder {
         override val sourceName = "fake"
         val decoded = mutableListOf<String>()
-        override suspend fun decode(vin: String): VinDecodeResult { decoded += vin; return result }
+        /** When set, decoding waits for this before answering (to test cancelling mid-lookup). */
+        var hold: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+        override suspend fun decode(vin: String): VinDecodeResult { decoded += vin; hold?.await(); return result }
     }
 
     private class FakeRecalls(var result: RecallLookupResult) : RecallLookup {
@@ -296,5 +298,62 @@ class VinFlowViewModelTest {
         assertEquals(VinStage.None, vm.vinStage)
         assertEquals("BMW", vm.form.make)
         assertTrue(vm.detailsAppliedCount > before)
+    }
+
+    // ---- review findings: regression tests --------------------------------------------------------------------
+
+    @Test fun `a duplicate on the normal form's Save explains itself and offers the saved car`() = runTest {
+        val vm = vm(listOf(saved))
+        vm.typeAndLookUp()
+        vm.reviewDetails() // back on the normal form, already filled in with the same VIN
+        vm.update { it.copy(layout = EngineLayout.INLINE) }
+        var savedCalled = false
+        vm.save { savedCalled = true }
+        assertFalse(savedCalled)
+        assertEquals("old", vm.duplicateOf?.id)
+        assertTrue(vm.errors.values.any { it.contains("already added") })
+        assertEquals(1, repo.vehicles.first().size)
+    }
+
+    @Test fun `changing the VIN on the form drops the stale duplicate notice`() {
+        val vm = vm(listOf(saved))
+        vm.typeAndLookUp()
+        vm.reviewDetails()
+        assertEquals("old", vm.duplicateOf?.id)
+        vm.update { it.copy(vin = "") }
+        assertNull(vm.duplicateOf)
+    }
+
+    @Test fun `saving twice never creates two cars`() = runTest {
+        val vm = vm()
+        vm.typeAndLookUp()
+        vm.update { it.copy(layout = EngineLayout.INLINE) }
+        var count = 0
+        vm.save { count++ }
+        vm.save { count++ }
+        assertEquals(1, repo.vehicles.first().size)
+        assertEquals(vin, repo.vehicles.first().single().vin)
+        assertFalse(vm.saving)
+    }
+
+    @Test fun `going back while a lookup is running leaves nothing stuck`() {
+        decoder.hold = kotlinx.coroutines.CompletableDeferred()
+        val vm = vm()
+        vm.typeAndLookUp()
+        assertEquals(VinStage.Working, vm.vinStage)
+        vm.vinBack()
+        assertEquals(VinStage.Confirm, vm.vinStage)
+        assertEquals(com.aicarcompanion.app.ui.vehicles.VinState.Idle, vm.vinState)
+        decoder.hold!!.complete(Unit) // a late answer to the cancelled lookup changes nothing
+        assertEquals(VinStage.Confirm, vm.vinStage)
+        assertEquals("", vm.form.make)
+    }
+
+    @Test fun `closing the flow while recalls are loading does not leave Loading behind`() {
+        recalls.result = noRecalls
+        val vm = vm()
+        vm.typeAndLookUp()
+        vm.closeVinFlow()
+        assertTrue(vm.recallState !is RecallUiState.Loading)
     }
 }

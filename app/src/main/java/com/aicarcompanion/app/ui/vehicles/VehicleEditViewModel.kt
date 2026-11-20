@@ -65,6 +65,10 @@ class VehicleEditViewModel(
 
     private val existingId: String? = savedStateHandle[VEHICLE_ID_ARG]
     val isEditing: Boolean = existingId != null
+    /** One id per screen, so saving twice updates the same car instead of adding another. */
+    private val carId: String = existingId ?: UUID.randomUUID().toString()
+    var saving by mutableStateOf(false)
+        private set
 
     val selection = VehicleSelectionController(catalog, viewModelScope)
     val catalogSourceName: String = catalog.sourceName
@@ -149,7 +153,10 @@ class VehicleEditViewModel(
     }
 
     fun update(transform: (VehicleForm) -> VehicleForm) {
+        val oldVin = form.vin
         form = transform(form)
+        // The duplicate notice belongs to the VIN it was found for.
+        if (form.vin != oldVin && vinStage == VinStage.None) duplicateOf = null
     }
 
     fun updateVin(text: String) {
@@ -231,9 +238,16 @@ class VehicleEditViewModel(
         speakJob = null
     }
 
+    /** A cancelled lookup must not leave "Decoding" or "Loading" behind. */
+    private fun clearPendingLookups() {
+        if (vinState is VinState.Decoding) vinState = VinState.Idle
+        if (recallState is RecallUiState.Loading) recallState = RecallUiState.Idle
+    }
+
     fun closeVinFlow() {
         stopSpeaking()
         vinJob?.cancel()
+        clearPendingLookups()
         vinStage = VinStage.None
         scanHighlight = null
     }
@@ -243,7 +257,7 @@ class VehicleEditViewModel(
         when (vinStage) {
             VinStage.Scan -> { stopSpeaking(); vinStage = VinStage.Guide }
             VinStage.Confirm -> vinStage = VinStage.Guide
-            VinStage.Working -> { vinJob?.cancel(); vinStage = VinStage.Confirm }
+            VinStage.Working -> { vinJob?.cancel(); clearPendingLookups(); vinStage = VinStage.Confirm }
             VinStage.Results -> closeVinFlow()
             else -> closeVinFlow()
         }
@@ -312,7 +326,7 @@ class VehicleEditViewModel(
 
     private suspend fun findDuplicate(vin: String?): Vehicle? {
         val normalized = vin?.let(VinValidator::normalize)?.takeIf { it.isNotEmpty() } ?: return null
-        return repository.vehicles.first().firstOrNull { it.id != existingId && it.vin?.let(VinValidator::normalize) == normalized }
+        return repository.vehicles.first().firstOrNull { it.id != carId && it.vin?.let(VinValidator::normalize) == normalized }
     }
 
     /** The saved car that shares this VIN, so the user can open it instead of adding a copy. */
@@ -322,24 +336,32 @@ class VehicleEditViewModel(
 
     /** Validates and saves; calls [onSaved] only on success. */
     fun save(onSaved: () -> Unit) {
-        val id = existingId ?: UUID.randomUUID().toString()
-        when (val result = VehicleFormValidator.validate(form, id, Year.now().value)) {
+        if (saving) return
+        when (val result = VehicleFormValidator.validate(form, carId, Year.now().value)) {
             is VehicleFormResult.Invalid -> {
                 errors = result.errors
                 // Problems are shown in the form, so leave the guided steps.
                 if (vinStage != VinStage.None) closeVinFlow()
             }
-            is VehicleFormResult.Valid -> viewModelScope.launch {
-                // Never a second profile for the same car: offer the saved one instead.
-                findDuplicate(result.vehicle.vin)?.let {
-                    duplicateOf = it
-                    if (vinStage != VinStage.None) vinStage = VinStage.Results
-                    return@launch
+            is VehicleFormResult.Valid -> {
+                saving = true
+                viewModelScope.launch {
+                    try {
+                        // Never a second profile for the same car: offer the saved one instead.
+                        findDuplicate(result.vehicle.vin)?.let {
+                            duplicateOf = it
+                            errors = mapOf(VehicleField.VIN to "You've already added this car (${it.displayName}).")
+                            if (vinStage != VinStage.None) vinStage = VinStage.Results
+                            return@launch
+                        }
+                        errors = emptyMap()
+                        repository.upsert(result.vehicle)
+                        if (!isEditing) repository.setActive(result.vehicle.id)
+                        onSaved()
+                    } finally {
+                        saving = false
+                    }
                 }
-                errors = emptyMap()
-                repository.upsert(result.vehicle)
-                if (!isEditing) repository.setActive(result.vehicle.id)
-                onSaved()
             }
         }
     }
