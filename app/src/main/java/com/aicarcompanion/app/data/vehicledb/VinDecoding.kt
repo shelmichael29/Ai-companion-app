@@ -60,7 +60,14 @@ data class DecodedVehicle(
     val transmission: String?,
     val drivetrain: String?,
     val bodyClass: String?,
+    /** Who built it and where, as NHTSA reports it. Null when the VIN doesn't say. */
+    val manufacturerName: String? = null,
+    val plantCity: String? = null,
+    val plantCountry: String? = null,
 ) {
+    /** "Munich, Germany", or whichever part is known. */
+    val builtAt: String? get() = listOfNotNull(plantCity, plantCountry).joinToString(", ").ifEmpty { null }
+
     /** Human-readable names of important fields the decoder could not determine. */
     val notDetermined: List<String>
         get() = buildList {
@@ -82,15 +89,6 @@ sealed interface VinDecodeResult {
 interface VinDecoder {
     val sourceName: String
     suspend fun decode(vin: String): VinDecodeResult
-}
-
-/**
- * Future camera-based VIN capture (e.g. barcode or OCR). No implementation ships yet; the
- * capture result must still go through [VinValidator] and user confirmation.
- */
-interface VinScanner {
-    val isAvailable: Boolean
-    suspend fun scan(): String?
 }
 
 /**
@@ -150,6 +148,9 @@ object VpicParser {
                 ).joinToString(" ").ifEmpty { null },
                 drivetrain = str("DriveType"),
                 bodyClass = str("BodyClass"),
+                manufacturerName = str("Manufacturer")?.let(::tidyName),
+                plantCity = str("PlantCity")?.let(::tidyName),
+                plantCountry = str("PlantCountry")?.let(::tidyName),
             ),
             warnings,
         )

@@ -69,13 +69,23 @@ import com.aicarcompanion.app.ui.components.SearchableSelector
 @Composable
 fun VehicleEditScreen(
     onDone: () -> Unit,
+    onOpenExisting: (String) -> Unit = {},
     viewModel: VehicleEditViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     val detailsRequester = remember { BringIntoViewRequester() }
+    val scroll = rememberScrollState()
+    val inVinFlow = viewModel.vinStage != VinStage.None
 
-    LaunchedEffect(viewModel.detailsAppliedCount) {
-        if (viewModel.detailsAppliedCount > 0) detailsRequester.bringIntoView()
+    // Scroll to the review form after details are applied, once the guided VIN steps (which replace
+    // this form while open) have handed back to it.
+    LaunchedEffect(viewModel.detailsAppliedCount, inVinFlow) {
+        if (viewModel.detailsAppliedCount > 0 && !inVinFlow) detailsRequester.bringIntoView()
+    }
+
+    if (inVinFlow) {
+        VinFlowOverlay(viewModel, onOpenExisting = onOpenExisting, onSaved = onDone)
+        return
     }
 
     Scaffold(
@@ -89,7 +99,7 @@ fun VehicleEditScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -197,77 +207,22 @@ private fun CatalogSearch(viewModel: VehicleEditViewModel) {
 
 @Composable
 private fun VinLookup(viewModel: VehicleEditViewModel) {
-    val state = viewModel.vinState
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = viewModel.vinInput,
-            onValueChange = viewModel::updateVin,
-            label = { Text("VIN (17 characters)") },
-            supportingText = {
-                Text(viewModel.vinLocalError ?: "${viewModel.vinInput.length}/17 · Found on the dashboard by the windshield or the driver's door jamb")
-            },
-            isError = viewModel.vinLocalError != null,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Characters,
-                keyboardType = KeyboardType.Ascii,
-                imeAction = ImeAction.Search,
-            ),
-            keyboardActions = KeyboardActions(onSearch = { viewModel.decodeVin() }),
-            modifier = Modifier.fillMaxWidth(),
+        Text(
+            "Scan or type your car's VIN and I'll fill in its details and check for recalls.",
+            style = MaterialTheme.typography.bodyMedium,
         )
-        Button(
-            onClick = viewModel::decodeVin,
-            enabled = viewModel.vinInput.length == 17 && viewModel.vinLocalError == null && state !is VinState.Decoding,
+        com.aicarcompanion.app.ui.design.GradientButton("Scan VIN with the camera", { viewModel.openVinFlow(scan = true) }, Modifier.fillMaxWidth())
+        OutlinedButton(
+            onClick = { viewModel.openVinFlow(scan = false) },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) { Text(if (state is VinState.Decoding) "Decoding…" else "Decode VIN") }
-
-        if (state is VinState.Done) {
-            when (val r = state.result) {
-                is VinDecodeResult.Decoded -> DecodedVinCard(r, viewModel)
-                is VinDecodeResult.NotDecoded -> ErrorText("Couldn't decode this VIN: ${r.reason}")
-                is VinDecodeResult.Failed -> ErrorText(r.error.userMessage)
-            }
-        }
+        ) { Text("Enter VIN") }
         Text(
             "Source: ${viewModel.vinSourceName}. A VIN decode often can't determine the exact trim, engine " +
                 "variant or transmission, so please review the results.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun DecodedVinCard(result: VinDecodeResult.Decoded, viewModel: VehicleEditViewModel) {
-    val v = result.vehicle
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Decoded by NHTSA", fontWeight = FontWeight.SemiBold)
-            LabeledValue("Vehicle", listOfNotNull(v.year?.toString(), v.make, v.model).joinToString(" "))
-            v.series?.let { LabeledValue("Series", it) }
-            v.trim?.let { LabeledValue("Trim", it) }
-            val engine = listOfNotNull(
-                v.displacementLiters?.let { "%.1fL".format(java.util.Locale.US, it) },
-                v.cylinders?.let { v.layout.shortLabel(it) },
-                v.engineCode,
-            ).joinToString(" ")
-            if (engine.isNotEmpty()) LabeledValue("Engine", engine)
-            v.transmission?.let { LabeledValue("Transmission", it) }
-            v.drivetrain?.let { LabeledValue("Drivetrain", it) }
-            v.bodyClass?.let { LabeledValue("Body", it) }
-            if (v.notDetermined.isNotEmpty()) {
-                Text(
-                    "Not determined from the VIN: ${v.notDetermined.joinToString(", ")}. Please fill these in below if you know them.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            result.warnings.forEach { ErrorText(it) }
-            Button(
-                onClick = viewModel::useDecodedVin,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp),
-            ) { Text("Use these details") }
-        }
     }
 }
 

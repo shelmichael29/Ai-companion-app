@@ -32,6 +32,32 @@ See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call f
   your odometer → **Confirm and save**. Dashboard should read "3.0L I6 Gasoline" (never V6).
 - **VIN** tab: enter your real VIN → Decode. Expect year/make/model/3.0 L/6 cyl and a list of
   fields NHTSA couldn't determine. Tap "Use these details", review, save.
+  (Replaced by the guided flow below; see `docs/VIN_SCANNER.md`.)
+
+## 1c. VIN scanner, decoder and recalls (needs internet, camera)
+- **Guide:** Vehicles → **+** → **VIN** → **Scan VIN with the camera**. Three places are explained with drawings;
+  "Read this to me" speaks them (and stops if you leave the screen).
+- **Permission:** first time, the Android prompt appears. Deny it: the screen explains and offers Allow camera and
+  Type my VIN. Deny with "don't ask again": it offers Open phone settings; grant it there and come back (the camera
+  should start without reopening the screen). Revoke it while scanning: no crash.
+- **Scanning, in real conditions:** the VIN on the windshield plate (through glass, with reflections), the door-jamb
+  sticker, a registration card, an insurance card, a photo of a paper. Each: does it find the VIN, how long, is the
+  outline over the right text, is the result correct? Try dark (use the flashlight), glare, and a curved or dirty plate.
+- **Never auto-picks:** even when the outline turns green, nothing happens until you press **Use this VIN**, and every
+  character is editable. Aim at a page with two VINs: expect "more than one possible VIN".
+- **Wrong reads:** if the scan misreads a character, correct it by hand; if it changed an I/O/Q it should say so.
+- **Results:** the 2011 528i shows 3.0 L / 6-cyl (never V6), "A VIN can't tell me…" (layout, engine code,
+  transmission…), manufacturer and plant. Recalls say "for the 2011 BMW 528i", never "your car is affected", with
+  campaign number, component, problem, remedy and "Reported to NHTSA <date>". The NHTSA link opens the browser.
+- **Duplicate:** add the same VIN twice: the second time shows "already added", no second car, and "Open my saved car" works.
+- **Offline:** airplane mode: the decode explains it can't reach NHTSA and "Fill in my car's details myself" works.
+  Turn airplane mode on after decoding: recalls show the saved snapshot labeled "saved data", or "couldn't check", and
+  Save still works.
+- **TalkBack:** every step is readable and in a sensible order; scan progress and warnings are announced; flashlight
+  and voice buttons say on/off; recall cards expand with "Show details". Also check 200% font.
+- **Battery/heat:** scan for two minutes; the phone shouldn't get warm, and the camera light/flashlight must turn off
+  when you leave the screen or lock the phone.
+- **Privacy:** confirm no photo appears in the gallery or app storage after scanning.
 - Airplane mode: lists you opened before still appear ("Saved list"); new ones show an
   error with Retry; **Manual** always works.
 

@@ -209,7 +209,15 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                     },
                 ),
             ) {
-                VehicleEditScreen(onDone = { navController.popBackStack() })
+                VehicleEditScreen(
+                    onDone = { navController.popBackStack() },
+                    // A car with this VIN is already saved: open it instead of adding a copy.
+                    onOpenExisting = { id ->
+                        navController.navigate(Routes.vehicleEdit(id)) {
+                            popUpTo(Routes.VEHICLE_EDIT) { inclusive = true }
+                        }
+                    },
+                )
             }
         }
 

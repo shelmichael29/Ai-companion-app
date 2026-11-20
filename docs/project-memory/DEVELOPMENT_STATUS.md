@@ -19,6 +19,7 @@ Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 | PR | What | State |
 |---|---|---|
 | Gemini primary routing | Make Gemini the primary intelligence; honest fallbacks; answer-source log | Open, waiting for the owner's review |
+| VIN scanner, decoder and recalls | CameraX + ML Kit VIN scan, guided flow, NHTSA decode and model-level recalls | Open, waiting for the owner's review |
 | #11 | ENET tester (experimental) | Kept open and separate on purpose |
 
 ## Outstanding tasks

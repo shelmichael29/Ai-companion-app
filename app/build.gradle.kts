@@ -95,6 +95,14 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    // VIN scanner: camera preview and frames, plus on-device text recognition (bundled model:
+    // works offline and without Google Play services; nothing is sent anywhere).
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.text.recognition)
+
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

@@ -20,6 +20,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 |---|---|
 | Vehicle lookup: year → make → model → engine → transmission (FuelEconomy.gov), searchable | Implemented, unit-tested with captured API responses |
 | VIN entry, validation and decoding (NHTSA vPIC) with review/correction | Implemented, unit-tested |
+| VIN scanner (CameraX + on-device ML Kit), guided flow, and model-level NHTSA recall campaigns (never VIN-confirmed) | Implemented, unit-tested; needs phone testing (`docs/VIN_SCANNER.md`) |
 | Offline: cached lookups, manual entry, profiles stored on-device (Room) | Implemented |
 | Penelope hands-free conversation: listens again after each reply; goodbye/pause; tap to interrupt; auto-pause on silence, background or calls | Implemented; state machine unit-tested with fake engines; **needs on-device check** |
 | Natural voice: explicit pitch + separate speed, voice/engine choice, sample, reset | Implemented; **needs on-device listening check** |
