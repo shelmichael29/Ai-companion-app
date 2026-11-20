@@ -6,9 +6,10 @@
 1. **Device verification** on the S26 Ultra, the adapter and the 528i. This is the biggest gap: nothing is device-verified yet.
 2. **H1: media control.** Play, pause and skip through media keys; no special permission.
 3. **A3 / A4:** DIY and Advanced dashboards.
-4. **OBD hardening:** freeze-frame, VIN via Mode 09, foreground service for long sessions.
-5. **Mechanic handoff report:** shareable PDF or text.
-6. **Hands-free:** H2 read messages → H3 reply → H4 calls → H5 background voice and car microphone.
+4. **Offline knowledge follow-ups:** sample-accuracy review of the code data; VIN-specific recall status (online NHTSA API); server-side bulletins and investigations.
+5. **OBD hardening:** freeze-frame, VIN via Mode 09, foreground service for long sessions.
+6. **Mechanic handoff report:** shareable PDF or text.
+7. **Hands-free:** H2 read messages → H3 reply → H4 calls → H5 background voice and car microphone.
 
 ## Longer term
 - Navigation (hands-free, via map apps).

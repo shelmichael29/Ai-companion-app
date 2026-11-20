@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-19 | Offline knowledge pack | PASS (local) | 429 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Chat screen layout, scrolling and compact voice bar | PASS (local) | 409 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Gemini primary routing and reliability | PASS (local) | 398 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Project memory and doc corrections (docs only) | PASS (local) | 375 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
@@ -29,6 +30,8 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 - **Gemini on the phone:** answer source, timeout durations and App Check behavior (`docs/GEMINI_ROUTING.md` §6). Pending.
 
 - **Chat screen on the phone:** layout, scrolling, keyboard, 200% font, TalkBack (`docs/DEVICE_TESTING.md` §0b). Pending.
+
+- **Offline knowledge on the phone:** first-launch install time, storage, recall/rating answers, adding a car offline (`docs/OFFLINE_KNOWLEDGE.md` §5). Pending.
 
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.

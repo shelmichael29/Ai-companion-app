@@ -14,6 +14,7 @@ enum class ResponseSource(val label: String, val isGemini: Boolean = false) {
     SAFETY("Built-in safety answer"),
     CONVERSATION_CONTROL("Conversation control"),
     DEVICE_COMMAND("Device command or status (built-in)"),
+    OFFLINE_REFERENCE("Built-in offline vehicle records (recalls, crash ratings)"),
     OFFLINE_FALLBACK("Built-in answer: no internet"),
     AI_OFF("Built-in answer: smarter answers turned off"),
     NOT_CONFIGURED("Built-in answer: Gemini isn't set up in this build"),

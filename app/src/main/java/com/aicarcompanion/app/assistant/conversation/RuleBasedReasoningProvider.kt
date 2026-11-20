@@ -46,6 +46,8 @@ class RuleBasedReasoningProvider(
     private val knowledge: DtcKnowledgeSource,
     private val recorder: ObservationRecorder? = null,
     private val now: () -> Instant = Instant::now,
+    /** The offline knowledge pack: recalls, crash ratings and symptom triage guides. */
+    private val offline: com.aicarcompanion.app.diagnostics.knowledge.OfflineKnowledge = com.aicarcompanion.app.diagnostics.knowledge.NoOfflineKnowledge,
 ) : ReasoningProvider {
 
     /** What the last answer was about, so it can be re-explained at another level. */
@@ -132,6 +134,8 @@ class RuleBasedReasoningProvider(
             AssistantIntent.ConnectionStatus -> connection(ctx, level)
             AssistantIntent.LastService -> lastService(ctx)
             AssistantIntent.Mileage -> mileage(ctx)
+            AssistantIntent.Recalls -> vehicleRecord(ctx, recalls = true)
+            AssistantIntent.SafetyRating -> vehicleRecord(ctx, recalls = false)
             is AssistantIntent.Unknown -> reply(
                 "I'm not sure I can help with that yet. You can describe what your car is doing, ask about warning " +
                     "codes, or say \"what can you do\".",
@@ -387,7 +391,11 @@ class RuleBasedReasoningProvider(
         val opening = SymptomGuide.opening(category)
         val question = SymptomGuide.followUp(category)
         pendingFollowUp = question
-        val body = listOfNotNull(opening + noted, question?.question).joinToString(" ")
+        // No built-in follow-up for this symptom: ask the offline triage guide's first question instead.
+        val guideQuestion = if (question == null) {
+            com.aicarcompanion.app.diagnostics.knowledge.TriageMatcher.best(offline.triageGuides(), text)?.questions?.firstOrNull()
+        } else null
+        val body = listOfNotNull(opening + noted, question?.question ?: guideQuestion).joinToString(" ")
         return reply(body, ReplyBasis.GENERAL_KNOWLEDGE)
     }
 
@@ -465,6 +473,29 @@ class RuleBasedReasoningProvider(
         val basis = if (last.origin == DataOrigin.SAMPLE) ReplyBasis.SAMPLE_DATA else ReplyBasis.RECORDED_DATA
         val samplePrefix = if (basis == ReplyBasis.SAMPLE_DATA) "This is sample data: " else ""
         return reply("${samplePrefix}Your last recorded ${last.kind.label.lowercase()} was ${last.title.lowercase()} on $date$miles.", basis)
+    }
+
+    /** Recall campaigns or crash ratings for the selected car's year/make/model, from the offline pack. */
+    private fun vehicleRecord(ctx: VehicleContext, recalls: Boolean): AssistantReply {
+        val v = ctx.vehicle ?: return reply(
+            "Add your car first (year, make and model), and I can look up " + (if (recalls) "recall campaigns." else "its crash-test ratings."),
+            ReplyBasis.NOT_AVAILABLE,
+        )
+        if (!offline.available) {
+            return reply(
+                if (recalls) "My recall data isn't available right now. You can check your VIN at nhtsa.gov/recalls." else "My crash-rating data isn't available right now.",
+                ReplyBasis.NOT_AVAILABLE,
+            )
+        }
+        val name = listOf(v.year.toString(), v.make, v.model).joinToString(" ")
+        val text = if (recalls) {
+            com.aicarcompanion.app.diagnostics.knowledge.VehicleRecords.recallAnswer(
+                name, offline.recallCount(v.year, v.make, v.model), offline.recalls(v.year, v.make, v.model, limit = 3), offline.info?.recallSnapshot,
+            )
+        } else {
+            com.aicarcompanion.app.diagnostics.knowledge.VehicleRecords.ratingAnswer(name, offline.safetyRatings(v.year, v.make, v.model))
+        }
+        return reply(text, ReplyBasis.OFFLINE_REFERENCE)
     }
 
     private fun mileage(ctx: VehicleContext): AssistantReply {

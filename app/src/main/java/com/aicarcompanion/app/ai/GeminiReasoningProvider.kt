@@ -41,6 +41,9 @@ object AiRouting {
     fun route(intent: AssistantIntent, normalizedUtterance: String): Route = when (intent) {
         AssistantIntent.EndConversation, AssistantIntent.PauseConversation, AssistantIntent.Repeat,
         AssistantIntent.CanIDrive,
+        // Recalls and crash ratings: campaign numbers, star counts and "your car has a recall" claims
+        // can't be checked by ReplyGuard, so the app's own wording is used as is.
+        AssistantIntent.Recalls, AssistantIntent.SafetyRating,
         // Connection status is a device status read; its text can include the adapter's Bluetooth
         // name, which may contain a person's name, so it's never sent to Gemini.
         AssistantIntent.ConnectionStatus -> Route.DETERMINISTIC
@@ -59,6 +62,7 @@ object AiRouting {
     fun deterministicSource(intent: AssistantIntent): ResponseSource = when (intent) {
         AssistantIntent.EndConversation, AssistantIntent.PauseConversation, AssistantIntent.Repeat -> ResponseSource.CONVERSATION_CONTROL
         AssistantIntent.ConnectionStatus -> ResponseSource.DEVICE_COMMAND
+        AssistantIntent.Recalls, AssistantIntent.SafetyRating -> ResponseSource.OFFLINE_REFERENCE
         else -> ResponseSource.SAFETY
     }
 }
@@ -114,6 +118,8 @@ class GeminiReasoningProvider(
     val sources: ResponseSourceTracker = ResponseSourceTracker(log),
     /** Monotonic clock for request durations. */
     private val clockMillis: () -> Long = { System.nanoTime() / 1_000_000 },
+    /** Offline triage guides give Gemini the right clarifying questions for a described symptom. */
+    private val offline: com.aicarcompanion.app.diagnostics.knowledge.OfflineKnowledge = com.aicarcompanion.app.diagnostics.knowledge.NoOfflineKnowledge,
 ) : ReasoningProvider {
 
     private val _status = MutableStateFlow(initialStatus())
@@ -193,7 +199,8 @@ class GeminiReasoningProvider(
         val allowedCodes = mentioned + ctx.demoCodes.map { it.code } + ctx.latestCodeRead?.codes?.map { it.code }.orEmpty() +
             verified?.text?.let { t -> CODE.findAll(t).map { it.value } }.orEmpty()
         val system = PromptBuilder.systemInstruction(request.assistantName, request.level, ctx, knowledge, mentioned, now()) +
-            (verified?.let { PromptBuilder.verifiedResult(it.text) } ?: "")
+            (verified?.let { PromptBuilder.verifiedResult(it.text) } ?: "") +
+            triageFor(intent, request.utterance).orEmpty()
 
         val result = nextResult(system, request.utterance)
         val duration = clockMillis() - started
@@ -240,6 +247,16 @@ class GeminiReasoningProvider(
                 remember(request.utterance, fallback.withNotice(notice), historyText = fallback.text)
             }
         }
+    }
+
+    /** The offline triage guide for a described symptom; a stricter match for unrecognized questions. */
+    private fun triageFor(intent: AssistantIntent, utterance: String): String? {
+        val min = when (intent) {
+            is AssistantIntent.Symptom -> 1
+            is AssistantIntent.Unknown -> 2
+            else -> return null
+        }
+        return com.aicarcompanion.app.diagnostics.knowledge.TriageMatcher.best(offline.triageGuides(), utterance, min)?.let(PromptBuilder::triageGuide)
     }
 
     /**

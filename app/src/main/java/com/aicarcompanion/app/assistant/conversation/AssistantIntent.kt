@@ -49,6 +49,10 @@ sealed interface AssistantIntent {
     data class Symptom(val category: SymptomCategory, val text: String) : AssistantIntent
     data object LastService : AssistantIntent
     data object Mileage : AssistantIntent
+    /** "Are there any recalls on my car?" */
+    data object Recalls : AssistantIntent
+    /** "What's my car's crash test rating?" */
+    data object SafetyRating : AssistantIntent
     data class Unknown(val text: String) : AssistantIntent
 }
 
@@ -104,6 +108,9 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
             has("connected", "adapter", "obd", "obd2", "bluetooth", "dongle") -> AssistantIntent.ConnectionStatus
             has("engine", "motor", "horsepower", "cylinder", "cylinders") -> AssistantIntent.EngineInfo
             has("last service", "oil change", "maintenance", "serviced", "service history") -> AssistantIntent.LastService
+            has("recalls", "any recall", "a recall", "recall on", "recall for", "open recall", "safety recall", "recalled") &&
+                !has("i recall", "don't recall", "dont recall", "can't recall", "cant recall") -> AssistantIntent.Recalls
+            has("crash test", "crash tests", "crash rating", "crash ratings", "safety rating", "safety ratings", "ncap", "safety stars") -> AssistantIntent.SafetyRating
             has("mileage", "odometer", "how many miles") -> AssistantIntent.Mileage
             has("what vehicle", "which vehicle", "what car", "which car", "what truck", "my vehicle", "my car",
                 "am i driving", "what am i driving") -> AssistantIntent.WhatVehicle

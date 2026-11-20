@@ -1,0 +1,5 @@
+# Local large downloads and compiled data (do not commit raw vendor data)
+downloads
+output
+__pycache__/
+*.pyc

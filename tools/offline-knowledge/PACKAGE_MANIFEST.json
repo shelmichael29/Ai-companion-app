@@ -1,0 +1,45 @@
+{
+  "generated": "2026-11-18",
+  "files": {
+    "README.md": {
+      "bytes": 5775,
+      "sha256": "489938c795762826f7d9bf4eebeadefc284a76e8c6a67ad232a8a9db300ea2c8"
+    },
+    "data/sources.json": {
+      "bytes": 9153,
+      "sha256": "fc62382750d1d3f69fb84f1caa716f8c18da6a0c8f2eb72f833d9a8603947a92"
+    },
+    "data/symptom_guides.json": {
+      "bytes": 13005,
+      "sha256": "e1e6ba1d74c9fb785ec8416ebb6b51f9a9d98fe2c7d4bef5be44bab786946885"
+    },
+    "docs/CLAUDE_HANDOFF.md": {
+      "bytes": 2331,
+      "sha256": "0a50134c3f7102f6fb9c6365f20b62b45cb3a480fbd4627268157ccadf44ae52"
+    },
+    "docs/RESEARCH_AUDIT.md": {
+      "bytes": 10426,
+      "sha256": "a50b9fe1a5c9345b663674d71538e998cb19b09f77fe15bc7683e066fbb7576d"
+    },
+    "output/penelope_offline.sqlite": {
+      "bytes": 118784,
+      "sha256": "3fe20e3e74541243b06c3f6c7faed247107b939118f1810b7ec1f7bc9490ab19"
+    },
+    "scripts/build_database.py": {
+      "bytes": 9189,
+      "sha256": "954d3b8aa89ffc78add9fa0a664056367bb6c28becb4f85bcdd5ff086196a3b1"
+    },
+    "scripts/download_sources.py": {
+      "bytes": 4703,
+      "sha256": "01955d19636301981d0b904bbb9e57f8bd4607c251611e4755de417ade5b707c"
+    },
+    "scripts/query_demo.py": {
+      "bytes": 1281,
+      "sha256": "902decec322095aa98c9d4b5cec30ced452b1c31b27a4ab55affdecd9cb1ec37"
+    },
+    "tests/test_offline_package.py": {
+      "bytes": 3641,
+      "sha256": "1b7d4cd0698c66bbba958acdddb4606ed28bed35d54875fe4747dce356eb4242"
+    }
+  }
+}

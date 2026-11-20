@@ -64,6 +64,18 @@ object PromptBuilder {
         appendLine("Explain this result naturally in your own words for this user. Keep every number, unit, code and status exactly as given. Don't add readings, codes or causes that aren't above or in VEHICLE FACTS. If the result says something isn't available or connected, say so and tell them what to do.")
     }
 
+    /** A symptom triage guide from the offline pack: what to ask, which systems to consider. Not a diagnosis. */
+    fun triageGuide(g: com.aicarcompanion.app.diagnostics.knowledge.TriageGuide): String = buildString {
+        appendLine()
+        appendLine("TRIAGE GUIDE FOR A SIMILAR SYMPTOM (Penelope's offline guide; possibilities, not a diagnosis)")
+        appendLine("- Symptom: ${g.symptom}")
+        if (g.questions.isNotEmpty()) appendLine("- Helpful questions: " + g.questions.joinToString(" | "))
+        if (g.systems.isNotEmpty()) appendLine("- Systems to consider: " + g.systems.joinToString(", "))
+        if (g.evidence.isNotEmpty()) appendLine("- Evidence that would help: " + g.evidence.joinToString(", "))
+        g.warning?.let { appendLine("- Warning: $it") }
+        appendLine("Use this to ask ONE good clarifying question. Never present a system here as the confirmed cause.")
+    }
+
     fun vehicleFacts(ctx: VehicleContext, knowledge: DtcKnowledgeSource, mentionedCodes: Set<String>): String = buildString {
         val v = ctx.vehicle
         if (v == null) {
@@ -126,5 +138,9 @@ object PromptBuilder {
     }
 
     private fun codeMeaning(code: String, knowledge: DtcKnowledgeSource): String =
-        knowledge.lookup(code)?.let { " verified meaning: ${it.description}; plain explanation: ${it.simple}; urgency: ${it.severity.label}." } ?: ""
+        knowledge.lookup(code)?.let {
+            (if (it.source == null) " verified meaning: " else " reference meaning (community data): ") +
+                "${it.description}; plain explanation: ${it.simple}; urgency: ${it.severity.label}" +
+                (it.source?.let { s -> "; source: $s; common causes are possibilities, not a diagnosis" } ?: "") + "."
+        } ?: ""
 }

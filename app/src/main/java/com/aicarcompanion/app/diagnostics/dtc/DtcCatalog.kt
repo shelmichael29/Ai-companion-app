@@ -19,6 +19,8 @@ data class DtcInfo(
     val severity: DtcSeverity,
     /** Short plain-language title, e.g. "Engine running lean". */
     val headline: String = description,
+    /** Where this meaning comes from when it isn't Penelope's own text (e.g. the offline community catalog). */
+    val source: String? = null,
 ) {
     /** Back-compat alias used by older call sites. */
     val explanation: String get() = simple
