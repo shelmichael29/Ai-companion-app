@@ -43,7 +43,7 @@ import java.util.concurrent.Executors
  * Each result reports the recognized lines with their boxes plus the upright size of the analyzed
  * image, so the caller can draw a highlight over the preview ([com.aicarcompanion.app.vin.ScanGeometry]).
  */
-@OptIn(ExperimentalGetImage::class)
+@androidx.annotation.OptIn(ExperimentalGetImage::class) // the AndroidX annotation, which is the one Lint checks for
 @Composable
 fun VinCameraView(
     torchOn: Boolean,
