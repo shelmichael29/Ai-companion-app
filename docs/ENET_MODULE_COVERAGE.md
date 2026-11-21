@@ -81,5 +81,8 @@ The 47-candidate scan, individual selection, timing display and cancellation in 
 - Request: expand beyond four F10 modules; add individual/selected/all scanning; review response timing and clarify target changes.
 - Build: 0.3.0-experimental (3).
 - Scope: tester, ENET core and documentation only; no main-app changes.
-- Status: implemented; automated CI pending; **not merged**.
-- After CI: record verified result in the PR. Hardware checks remain pending.
+- Status: **merged with owner approval** on 2026-11-21 (Arizona), into `experiment/bmw-enet-tester` only.
+- Merge order: [#48](https://github.com/shelmichael29/Ai-companion-app/pull/48), then [#52](https://github.com/shelmichael29/Ai-companion-app/pull/52).
+- Code merge: `4a279590e09f94400f78578972ba324be18ae7a5`; resulting code matched the tested feature branch. Main was verified unchanged.
+- Build, unit tests and lint: **PASS**, [branch CI](https://github.com/shelmichael29/Ai-companion-app/actions/runs/44930835696) and [PR CI](https://github.com/shelmichael29/Ai-companion-app/actions/runs/44931119549).
+- Expanded physical scan checks remain pending. PR #49 is a separate alternative implementation and was not merged.
