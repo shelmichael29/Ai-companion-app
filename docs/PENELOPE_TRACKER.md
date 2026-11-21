@@ -69,7 +69,7 @@ Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). 
 | 2026-11-21 | Initial tracker | `docs/penelope-development-tracker-20261121` | Documentation only | PR pending |
 | 2026-11-20 | ENET HSFZ reliability | `experiment/bmw-enet-tester`, #43 | See PR CI | Merged to **experimental** branch |
 | 2026-11-21 | Gemini personal details: automatic scrubbing | `feature/gemini-scrub-personal-details` | 570 tests, 0 failed | PR open, not merged |
-| 2026-11-21 | Device verification recorded: VIN scanner and recalls | `docs/vin-recall-device-verified` | Owner device checks passed; docs only | PR open, not merged |
+| 2026-11-21 | Device verification recorded: VIN scanner and recalls | #50 | Owner device checks passed; docs only | Merged to `main` |
 | 2026-11-21 | Recall accuracy and reporting | #45 | 562 tests, 0 failed; verified on the phone | Merged to `main` |
 | Earlier | VIN camera/decoder/recall implementation | #41 | See `docs/QUALITY_SUMMARY.md` | In `main`; ✅ verified on the phone |
 
