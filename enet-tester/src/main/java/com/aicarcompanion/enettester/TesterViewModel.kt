@@ -52,6 +52,8 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
     val monitor = EthernetMonitor(app).also { it.start() }
 
     var selectedName by mutableStateOf<String?>(null)
+    var targetSelectionNotice by mutableStateOf("No discovered gateway selected. Enter an address or tap Use as target.")
+        private set
     var targetText by mutableStateOf("")
     var includeDoip by mutableStateOf(false)
     var sendTesterPresent by mutableStateOf(true)
@@ -179,8 +181,25 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun runModules(readVin: Boolean) {
+    var selectedModules by mutableStateOf(F10Module.entries.toSet())
+        private set
+
+    fun selectModule(module: F10Module, checked: Boolean) {
         if (running != null) return
+        selectedModules = if (checked) selectedModules + module else selectedModules - module
+    }
+
+    fun selectAllModules(checked: Boolean) {
+        if (running != null) return
+        selectedModules = if (checked) F10Module.entries.toSet() else emptySet()
+    }
+
+    fun scanSelected() = runModules(false, F10Module.entries.filter { it in selectedModules })
+
+    fun runModules(readVin: Boolean, modules: List<F10Module> = F10Module.entries) {
+        if (running != null) return
+        val scanModules = if (readVin) listOf(F10Module.DME) else modules.toList().distinct()
+        if (scanModules.isEmpty()) { moduleStatus = "Select at least one module to scan"; return }
         val iface = selected() ?: return
         val subnet = iface.ipv4 ?: return
         val target = Ipv4Address.parse(targetText) ?: return
@@ -190,15 +209,21 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         moduleBinding = binding
         moduleActive = true
         moduleRows = emptyList()
-        val total = if (readVin) 1 else F10Module.entries.size
+        val total = scanModules.size
         var answered = 0
+        val operationStarted = clock()
+        var moduleStarted = operationStarted
+        log.add("Starting ${if (readVin) "DME VIN read" else "module scan"} on $target: $total selected; 3 s reply timeout per module.")
         moduleStatus = "Connecting to $target"
         running = moduleStatus
         moduleJob = viewModelScope.launch {
             try {
                 ModuleDiagnostics(JvmEnetTransport(binding), clock).run(
                     EnetLink(iface.interfaceName, subnet), target, connectTimeoutMillis, readVin,
+                    selectedModules = scanModules,
                     progress = { module ->
+                        moduleStarted = clock()
+                        log.add("Checking ${module.title} (${module.name}, 0x%02X) on $target".format(module.address))
                         moduleStatus = "Checking ${module.title} (${module.name}), ${moduleRows.size + 1} of $total"
                     },
                     result = { module, reply ->
@@ -211,7 +236,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                             ModuleReply.Pending -> "Answered, final reply timed out"
                         }
                         if (reply !is ModuleReply.GatewayError && reply != ModuleReply.NoResponse) answered++
-                        val line = "${module.title} (${module.name}): $outcome"
+                        val line = "${module.title} (${module.name}): $outcome · ${clock() - moduleStarted} ms including connect"
                         log.add(line)
                         val vin = (reply as? ModuleReply.Positive)?.vin
                         val comparison = when {
@@ -222,7 +247,8 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                         moduleRows = moduleRows + if (vin == null) line else "$line · $vin$comparison"
                     },
                 )
-                moduleStatus = "Finished on $target · $answered answered · ${moduleRows.size} of $total checked"
+                moduleStatus = "Finished on $target · $answered answered · ${moduleRows.size} of $total checked · ${clock() - operationStarted} ms total"
+                log.add(moduleStatus)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
@@ -242,7 +268,19 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         moduleBinding?.close()
     }
 
-    fun useDiscovered(address: Ipv4Address) { targetText = address.toString() }
+    fun setManualTarget(value: String) {
+        if (running != null) return
+        targetText = value
+        targetSelectionNotice = "Manually entered target: ${value.ifBlank { "none" }}"
+    }
+
+    fun useDiscovered(address: Ipv4Address) {
+        if (running != null) return
+        val previous = targetText.ifBlank { "none" }
+        targetText = address.toString()
+        targetSelectionNotice = "Selected discovered gateway: $address"
+        log.add("User selected discovered gateway: $previous -> $address")
+    }
 
     override fun onCleared() { moduleBinding?.close(); monitor.stop() }
 

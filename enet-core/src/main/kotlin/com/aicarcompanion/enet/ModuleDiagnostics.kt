@@ -14,11 +14,54 @@ class VinIdentity(vin: String) {
 }
 
 /** Fixed physical diagnostic addresses for this F10 coverage set. Equipment varies by vehicle. */
-enum class F10Module(val address: Int, val title: String) {
-    DME(0x12, "Engine computer"),
-    EGS(0x18, "Transmission"),
-    DSC(0x29, "Stability and braking"),
-    KOMBI(0x60, "Instrument cluster"),
+enum class F10Module(val address: Int, val title: String, val equipment: String) {
+    DME(0x12, "Engine computer", "Standard"),
+    EGS(0x18, "Transmission", "Automatic transmission"),
+    DSC(0x29, "Stability and braking", "Standard"),
+    KOMBI(0x60, "Instrument cluster", "Standard"),
+    JBE(0x00, "Junction box electronics", "Standard; parking sensors may be integrated"),
+    ACSM(0x01, "Airbag and crash safety", "Standard"),
+    SZL(0x02, "Steering column switches", "Equipment dependent"),
+    TRSVC(0x06, "Surround and rear cameras", "Camera option"),
+    SWW(0x08, "Blind spot warning", "Lane change warning option"),
+    ZGW(0x10, "Central gateway", "Standard"),
+    IAS(0x16, "Active steering actuator", "Integral active steering option"),
+    EKPS(0x17, "Fuel pump controller", "Equipment dependent"),
+    VTG(0x19, "All wheel drive transfer case", "xDrive only"),
+    ICM(0x1C, "Integrated chassis management", "Standard"),
+    RDC(0x20, "Tire pressure monitoring", "Market and equipment dependent"),
+    ACC(0x21, "Adaptive cruise radar", "Active cruise option"),
+    RSE(0x26, "Rear seat entertainment", "Rear entertainment option"),
+    EMF(0x2A, "Electronic parking brake", "Standard"),
+    HSR(0x2B, "Rear wheel steering", "Integral active steering option"),
+    PMA(0x2C, "Parking maneuver assistant", "Parking assistant option"),
+    EPS(0x30, "Electric power steering", "Steering system dependent"),
+    COMBOX(0x36, "Phone and media interface", "Combox option"),
+    AMP(0x37, "Audio amplifier", "Diagnostic capable amplifier option"),
+    VDM(0x39, "Vertical dynamics management", "Adaptive chassis option"),
+    HUD(0x3D, "Head up display", "Head up display option"),
+    CAS(0x40, "Car access and start authorization", "Standard"),
+    FZD(0x56, "Roof electronics", "Equipment dependent"),
+    NVE(0x57, "Night vision", "Night vision option"),
+    KAFAS(0x5D, "Driver assistance camera", "Driver assistance option"),
+    GWS(0x5E, "Gear selector", "Automatic transmission"),
+    FLA(0x5F, "High beam assistant", "High beam assistant option"),
+    ECALL(0x61, "Emergency call interface", "Combox emergency call option"),
+    HU(0x63, "Head unit (CHAMP2 or CIC)", "Standard; shared address"),
+    PDC(0x64, "Parking distance controller", "Separate parking controller if fitted"),
+    ZBE(0x67, "iDrive controller", "Equipment dependent"),
+    HKL(0x6B, "Power trunk controller", "Power trunk option"),
+    SMFA(0x6D, "Driver seat memory", "Seat memory option"),
+    SMBF(0x6E, "Passenger seat memory", "Seat memory option"),
+    AHM(0x71, "Trailer controller", "Trailer option"),
+    FRM(0x72, "Footwell and lighting electronics", "Standard"),
+    CID(0x73, "Central information display", "Equipment dependent"),
+    IHKA(0x78, "Heating and air conditioning", "Standard"),
+    FKA(0x79, "Rear climate control", "Four zone climate option"),
+    EDC_FL(0xA5, "Front left damper controller", "Electronic damper option"),
+    EDC_FR(0xA6, "Front right damper controller", "Electronic damper option"),
+    EDC_RL(0xA7, "Rear left damper controller", "Electronic damper option"),
+    EDC_RR(0xA8, "Rear right damper controller", "Electronic damper option"),
 }
 
 sealed interface ModuleReply {
@@ -34,11 +77,14 @@ class ModuleDiagnostics(private val transport: EnetTransport, private val clock:
     suspend fun run(
         link: EnetLink, target: Ipv4Address, connectTimeout: Long, readVin: Boolean,
         progress: (F10Module) -> Unit, result: (F10Module, ModuleReply) -> Unit,
+        selectedModules: List<F10Module> = F10Module.entries,
     ) {
+        // Freeze and deduplicate the selection before opening any connection.
+        val modules = if (readVin) listOf(F10Module.DME) else selectedModules.toList().distinct()
+        require(modules.isNotEmpty()) { "Select at least one module to scan" }
         for (verdict in listOf(TargetPolicy.checkLocal(link.subnet), TargetPolicy.checkTarget(target, link.subnet))) {
             if (verdict is TargetPolicy.Verdict.Rejected) throw IOException(verdict.reason)
         }
-        val modules = if (readVin) listOf(F10Module.DME) else F10Module.entries
         val request = if (readVin) SafeRequest.READ_VIN else SafeRequest.TESTER_PRESENT
         for (module in modules) {
             currentCoroutineContext().ensureActive()

@@ -61,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aicarcompanion.enet.ConnectionResult
 import com.aicarcompanion.enet.DiscoveryResult
 import com.aicarcompanion.enet.StepOutcome
+import com.aicarcompanion.enet.F10Module
 import com.aicarcompanion.enet.TargetPolicy
 
 class MainActivity : ComponentActivity() {
@@ -136,10 +137,12 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
 
         item {
             Section("2. ENET target") {
+                Text(vm.targetSelectionNotice, style = MaterialTheme.typography.bodySmall)
+                Text("Use the address returned by Discover gateway. The phone network\'s route gateway may be a different address.", style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = vm.targetText,
                     enabled = !busy,
-                    onValueChange = { vm.targetText = it.filter { c -> c.isDigit() || c == '.' }.take(15) },
+                    onValueChange = { vm.setManualTarget(it.filter { c -> c.isDigit() || c == '.' }.take(15)) },
                     label = { Text("Gateway IPv4 address (optional for discovery)") },
                     placeholder = { Text("e.g. 169.254.x.x") },
                     singleLine = true,
@@ -255,10 +258,46 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                 Button(onClick = { vm.runModules(true) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
                     Text("Read Engine Computer VIN")
                 }
-                Text("Scan coverage: " + com.aicarcompanion.enet.F10Module.entries.joinToString { "${it.title} (${it.name})" } +
-                    ". A quiet module may still be installed.")
+                Text("Coverage: ${F10Module.entries.size} F10 module addresses, including optional equipment. This is a candidate list, not your car's installed-module count.")
+                Text("Each module is checked in sequence. Quiet modules get up to 3 seconds for a reply, plus connection time. No response does not mean not installed.")
                 Button(onClick = { vm.runModules(false) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
-                    Text("Scan Modules")
+                    Text("Scan All (${F10Module.entries.size})")
+                }
+                Button(onClick = vm::scanSelected, enabled = enabled && vm.selectedModules.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
+                    Text("Scan Selected (${vm.selectedModules.size})")
+                }
+                var showPicker by rememberSaveable { mutableStateOf(false) }
+                TextButton(onClick = { showPicker = !showPicker }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(if (showPicker) "Hide module selection" else "Choose modules or scan one")
+                }
+                if (showPicker) {
+                    Row {
+                        TextButton(onClick = { vm.selectAllModules(true) }, enabled = !busy) { Text("Select all") }
+                        TextButton(onClick = { vm.selectAllModules(false) }, enabled = !busy) { Text("Clear selection") }
+                    }
+                    F10Module.entries.forEach { module ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                        .toggleable(module in vm.selectedModules, enabled = !busy, role = Role.Checkbox) {
+                                            vm.selectModule(module, it)
+                                        },
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Checkbox(module in vm.selectedModules, onCheckedChange = null, enabled = !busy)
+                                    Text("${module.title} (${module.name}, 0x%02X)".format(module.address))
+                                }
+                                Text(module.equipment, style = MaterialTheme.typography.bodySmall)
+                            }
+                            TextButton(
+                                onClick = { vm.runModules(false, listOf(module)) }, enabled = enabled,
+                                modifier = Modifier.heightIn(min = 48.dp).semantics {
+                                    contentDescription = "Scan ${module.title}, ${module.name} only"
+                                },
+                            ) { Text("Scan") }
+                        }
+                    }
                 }
                 if (vm.moduleActive) {
                     OutlinedButton(onClick = { vm.cancelModules() }) { Text("Cancel diagnostic check") }
