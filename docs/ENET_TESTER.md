@@ -35,7 +35,7 @@ These are community-documented, not official BMW specifications. They come from 
 - Accepts answers only from private or link-local addresses on that subnet.
 
 **Connection test (button "Test connection"):**
-1. **TCP connect to 6801**, with a 3-second timeout and the connect latency measured.
+1. **TCP connect to 6801**, with a 5-second timeout (adjustable under **Advanced settings**) and the connect latency measured.
 2. **Optionally, one UDS TesterPresent (`3E 00`) to the gateway.** The tester waits up to 3 seconds for the acknowledgement and the `7E 00` response, and answers alive checks.
    - A negative response (`7F 3E xx`) still counts as "session reachable".
    - A rejection (NACK) or silence counts as a failure.
@@ -59,7 +59,8 @@ These are community-documented, not official BMW specifications. They come from 
 | Discovery bounds: listen window, response cap, dedupe, foreign and garbage replies ignored | Verified | **Yes:** whether broadcast reaches the ZGW through the Android USB-Ethernet stack |
 | TCP connect, TesterPresent, ACK matching, alive check, NACK, timeouts, refusal | Verified with a simulated gateway, and with real sockets on loopback | **Yes:** real ZGW ACK and response behavior on a 2011 F10 |
 | Ignition status query | Verified against the EdiabasLib format only | **Yes:** may not be supported; reported as "Not supported" |
-| Android Ethernet detection and socket binding | Builds and lints; not run on a device | **Yes** |
+| Android Ethernet detection and socket binding | Builds and lints. The check of where the socket was bound is unit-tested, and the real JVM socket reports its bound address and broadcast flag. Not run on a device. | **Yes:** check that the log shows the 169.254/private address and SO_BROADCAST=true with no WARNING lines |
+| TCP 6801 port check | Verified with a simulated gateway (open, refused, 5-second timeout, no bytes sent) and a real local socket | **Yes** |
 | Getting an IPv4 address on the phone's Ethernet | Not simulated | **Yes:** the biggest unknown; see below |
 
 ## Physical test on the 2011 F10 (N52, inline-six)

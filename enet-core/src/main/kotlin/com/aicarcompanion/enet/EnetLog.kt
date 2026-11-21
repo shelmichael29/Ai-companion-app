@@ -40,7 +40,13 @@ object Redaction {
     /** A MAC keeps the manufacturer prefix only. */
     fun maskMac(mac: String): String = if (mac.length == 12) mac.take(6) + "******" else "******"
 
+    /** HSFZ identification text runs labels and values together ("BMWVINWBA…"), so word boundaries don't apply. */
+    private val LABELED_VIN = Regex("(BMWVIN)([A-HJ-NPR-Z0-9]{17})")
+    private val LABELED_MAC = Regex("(BMWMAC)([0-9A-Fa-f]{12})")
+
     fun redact(text: String): String = text
+        .replace(LABELED_VIN) { it.groupValues[1] + maskVin(it.groupValues[2]) }
+        .replace(LABELED_MAC) { it.groupValues[1] + maskMac(it.groupValues[2]) }
         .replace(VIN) { m -> if (m.value.any { it in 'G'..'Z' }) "${m.groupValues[1]}********${m.groupValues[2]}" else m.value }
         .replace(MAC_COLON) { "${it.groupValues[1]}:**:**:**" }
         .replace(MAC) { "${it.groupValues[1]}******" }

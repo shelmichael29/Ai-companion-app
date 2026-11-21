@@ -132,7 +132,7 @@ class EnetCoreTest {
         assertEquals(35L, gw.latencyMillis)
         assertEquals("WBA********000001", gw.maskedVin)
         assertEquals(4, r.probesSent) // subnet + limited broadcast, HSFZ + DoIP each
-        assertEquals("discovery is bounded by the listen window", 2_000L, currentTime)
+        assertEquals("discovery is bounded by the (default 5 s) listen window", 5_000L, currentTime)
         assertTrue(tester.log.entries.value.any { it.message.contains("No DoIP answer") })
         assertFalse(tester.log.export().contains(Sim.VIN))
     }
@@ -164,7 +164,7 @@ class EnetCoreTest {
             (1..30).map { i -> i.toLong() to Sim.hsfzIdentReply(from = Ipv4Address.parse("169.254.1.$i")!!) }
         val r = tester.discover(Sim.LINK, DiscoveryOptions(includeDoip = false, maxResponses = 4)) as DiscoveryResult.Completed
         assertEquals(4, r.gateways.size)
-        assertTrue(currentTime < 2_000)
+        assertTrue(currentTime < 5_000)
     }
 
     @Test fun `manual target gets a unicast probe, invalid targets send nothing`() = runTest {
@@ -261,7 +261,7 @@ class EnetCoreTest {
         val start = currentTime
         val timeout = tester.testConnection(Sim.LINK, Sim.CAR) as ConnectionResult.Completed
         assertTrue(timeout.steps[0].detail.startsWith("No answer"))
-        assertEquals(3_000L, currentTime - start)
+        assertEquals("default connect timeout is 5 s", 5_000L, currentTime - start)
         assertTrue(fake.tcpWritten.isEmpty())
     }
 
