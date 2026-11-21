@@ -4,7 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
-| 2026-11-21 | Device verification: VIN scanner, decoder and recalls (#41, #45) (docs only) | GATE_RESULT | TESTS_RESULT | LINT_RESULT | DETEKT_RESULT | PASS (owner, Galaxy S26 Ultra, build 0.7.1 (8): paper and in-car scan, recalls online/offline, Penelope, camera indicator) | VERIFIED |
+| 2026-11-21 | Device verification: VIN scanner, decoder and recalls (#41, #45) (docs only) | PASS (local) | 562 run, 0 failed | 0 / 1 | 0 | PASS (owner, Galaxy S26 Ultra, build 0.7.1 (8): paper and in-car scan, recalls online/offline, Penelope, camera indicator) | VERIFIED |
 | 2026-11-21 | Recall accuracy and reporting (v0.7.1, build 8; release gate) | PASS (local) | 562 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-21 | Project memory: VIN scanner, Gemini routing and offline pack marked merged (docs only) | PASS (local) | 506 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
 | 2026-11-20 | VIN scanner, decoder and recalls (release gate) | PASS (local) | 506 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
