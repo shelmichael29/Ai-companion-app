@@ -7,22 +7,22 @@
 > Coordination notes only. Code, `CLAUDE.md`, authoritative `docs/`, and `docs/project-memory/` remain the sources of truth. Statuses here are not claims of completed quality gates.
 
 ## Now / high priority
-- [ ] **Recall result consistency:** verify auto-launch after VIN scan; distinguish model-level campaigns from VIN-specific outstanding recalls; show source/check date and make API errors distinct from zero results. Add regression tests.
+- [x] **Recall result consistency:** verify auto-launch after VIN scan; distinguish model-level campaigns from VIN-specific outstanding recalls; show source/check date and make API errors distinct from zero results. Add regression tests.
 - [ ] **Bluetooth transport expansion:** inspect existing ELM327 Classic support, add BLE GATT transport without breaking Classic; support compatible Bluetooth 5.x / 6.x radios (Bluetooth 6 is a version, not a separate ELM protocol).
 - [ ] **Bluetooth diagnostics:** independently show adapter discovery, Bluetooth link, ELM initialization, ECU response, and useful failure cause.
-- [ ] **Build/update experience:** verify build number/version label changes each build and that app updates install over older builds without uninstalling; document signing and versionCode requirements.
+- [x] **Build/update experience:** verify build number/version label changes each build and that app updates install over older builds without uninstalling; document signing and versionCode requirements.
 - [ ] **PR summaries:** every implementation prompt/PR documents changes, tests, PR number/link, and whether MERGED or NOT MERGED.
 
 ## Device testing / open observations
 - [x] VIN scanner camera reportedly works on Android phone (owner observation; not yet independently confirmed against formal hardware checklist).
-- [ ] Verify decoded year/make/model, including whether vehicle profile autofills.
-- [ ] Verify recall lookup automatically appears after confirmed VIN.
+- [x] Verify decoded year/make/model, including whether vehicle profile autofills.
+- [x] Verify recall lookup automatically appears after confirmed VIN.
 - [ ] Earlier year/make/model entry showed several recall campaigns; later VIN-scanned workflow showed none. **Different input scope; not yet confirmed bug.** Never conflate campaign counts with VIN-specific outstanding repairs.
 - [ ] Test existing low-cost Bluetooth ELM327 clone with a second car; failure on BMW alone doesn't prove app failure.
 - [ ] Test adapter discovery, link, ELM initialization, and ECU communication separately.
 - [ ] Verify BLE on Android; later test iOS via CoreBluetooth, with real BLE-capable hardware.
 - [ ] Check potential low-cost hardware kit adapters for reliable Android **and** iOS interoperability, consistent sourcing, and vehicle coverage.
-- [ ] Verify phone voice, TalkBack, and reconnect behavior on real hardware; refer to `docs/DEVICE_TESTING.md`.
+- [x] Verify phone voice, TalkBack, and reconnect behavior on real hardware; refer to `docs/DEVICE_TESTING.md`.
 
 ## Bluetooth implementation notes
 - Existing implementation is **Bluetooth Classic / RFCOMM ELM327**, with transport interface and read-only OBD commands. See `docs/BLUETOOTH_CONNECTION.md` and `docs/CONNECTION_RECOVERY.md`.
@@ -60,7 +60,7 @@ Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). 
 - [ ] Live diagnostics expansion and symptom-guided interpretation after a reliable physical adapter test.
 - [ ] iOS app using shared communication concepts, not Android-only APIs.
 - [ ] Mechanic handoff report; freeze-frame and extended vehicle diagnostics.
-- [ ] Choose validated adapter for eventual Penelope starter kit.
+- [x] Choose validated adapter for eventual Penelope starter kit.
 - [ ] Vehicle simulation mode remains deferred.
 
 ## Development log — update with every prompt / PR
