@@ -2,6 +2,8 @@ package com.aicarcompanion.app.ui
 
 import android.app.Application
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
@@ -21,6 +23,7 @@ import com.aicarcompanion.app.data.vehicledb.VinDecodeResult
 import com.aicarcompanion.app.data.vehicledb.VpicParser
 import com.aicarcompanion.app.testutil.Fixtures
 import com.aicarcompanion.app.ui.theme.CarCompanionTheme
+import com.aicarcompanion.app.ui.vehicles.RecallPanel
 import com.aicarcompanion.app.ui.vehicles.RecallUiState
 import com.aicarcompanion.app.ui.vehicles.VinConfirmContent
 import com.aicarcompanion.app.ui.vehicles.VinGuideContent
@@ -29,6 +32,9 @@ import com.aicarcompanion.app.ui.vehicles.VinScanContent
 import com.aicarcompanion.app.ui.vehicles.VinTags
 import com.aicarcompanion.app.vin.RecallCampaignInfo
 import com.aicarcompanion.app.vin.RecallLookupResult
+import com.aicarcompanion.app.vin.RecallReport
+import com.aicarcompanion.app.vin.RecallTarget
+import com.aicarcompanion.app.vin.VinRecallStatus
 import com.aicarcompanion.app.vin.RecallSource
 import com.aicarcompanion.app.vin.ScanBox
 import com.aicarcompanion.app.vin.ScanState
@@ -60,6 +66,10 @@ class VinFlowUiTest {
         "11V300000", "BMW", "FUEL SYSTEM, GASOLINE:DELIVERY:FUEL PUMP", "The fuel pump may fail.", "Engine stall.", "Dealers will replace the pump.",
         LocalDate.of(2011, 6, 15), doNotDrive, false, false,
     )
+
+    private val checkedAt = java.time.Instant.parse("2026-11-21T14:15:00Z")
+    private fun done(result: RecallLookupResult, vin: VinRecallStatus = VinRecallStatus.NotChecked) =
+        RecallUiState.Done(RecallReport(RecallTarget(2011, "BMW", "528i"), result, checkedAt, vin))
 
     private fun results(
         recalls: RecallUiState,
@@ -190,13 +200,13 @@ class VinFlowUiTest {
     // ---- results -----------------------------------------------------------------------------------------------
 
     @Test fun `results show the decoded car and say what the VIN could not tell`() {
-        results(RecallUiState.Done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
+        results(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
         compose.onNodeWithText("2011 BMW 528i").assertIsDisplayed()
         compose.onNodeWithText("A VIN can't tell me", substring = true).performScrollTo().assertIsDisplayed()
     }
 
     @Test fun `recalls are shown as campaigns for the model, never as confirmed for the car`() {
-        results(RecallUiState.Done(RecallLookupResult.Found(listOf(campaign()), RecallSource.NhtsaLive)))
+        results(done(RecallLookupResult.Found(listOf(campaign()), RecallSource.NhtsaLive)))
         compose.onNodeWithText("1 recall campaign found", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("can't tell me whether your specific car is included", substring = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Campaign 11V300000", substring = true).performScrollTo().assertIsDisplayed()
@@ -210,18 +220,18 @@ class VinFlowUiTest {
     }
 
     @Test fun `a do-not-drive advisory is badged`() {
-        results(RecallUiState.Done(RecallLookupResult.Found(listOf(campaign(doNotDrive = true)), RecallSource.NhtsaLive)))
+        results(done(RecallLookupResult.Found(listOf(campaign(doNotDrive = true)), RecallSource.NhtsaLive)))
         compose.onNodeWithText("Manufacturer advises not driving", substring = true).performScrollTo().assertIsDisplayed()
     }
 
     @Test fun `no campaigns says it is not a guarantee`() {
-        results(RecallUiState.Done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
+        results(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
         compose.onNodeWithText("doesn't guarantee your car has no recalls", substring = true).performScrollTo().assertIsDisplayed()
     }
 
     @Test fun `recall outage still lets the user save`() {
         var saved = false
-        results(RecallUiState.Done(RecallLookupResult.Unavailable(com.aicarcompanion.app.data.vehicledb.LookupError.OFFLINE)), onSave = { saved = true })
+        results(done(RecallLookupResult.Unavailable(com.aicarcompanion.app.data.vehicledb.LookupError.OFFLINE)), onSave = { saved = true })
         compose.onNodeWithText("I couldn't check recalls right now").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Save this car").performClick()
         assertTrue(saved)
@@ -244,5 +254,100 @@ class VinFlowUiTest {
     @Test fun `without year make and model recalls point to NHTSA`() {
         results(RecallUiState.NotPossible)
         compose.onNodeWithText("nhtsa.gov/recalls", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    // ---- the shared recall panel ----------------------------------------------------------------------------------
+
+    private val bmwTarget = RecallTarget(2011, "BMW", "528i")
+
+    private fun panel(
+        state: RecallUiState, current: RecallTarget? = bmwTarget, hasVin: Boolean = true, onCheck: (() -> Unit)? = {},
+    ) = compose.setContent {
+        CarCompanionTheme {
+            androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) { RecallPanel(state, current, "BMW", hasVin, onCheck, {}, null) }
+        }
+    }
+
+    @Test fun `every result says where it came from and when it was checked`() {
+        panel(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
+        compose.onNodeWithTag("recall_source").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Source: NHTSA recalls API (live). Checked", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun `saved data is labeled as saved, with its date`() {
+        panel(done(RecallLookupResult.Found(listOf(campaign()), RecallSource.SavedSnapshot("2026-10-15"))))
+        compose.onNodeWithText("Source: saved NHTSA data from 2026-10-15", substring = true).performScrollTo().assertIsDisplayed()
+        // Said twice on purpose: in the summary and in the source line.
+        assertTrue(compose.onAllNodes(hasText("may be out of date", substring = true)).fetchSemanticsNodes().size >= 2)
+    }
+
+    @Test fun `a failed check says so, offers Try again, and never says there are no recalls`() {
+        var again = false
+        panel(done(RecallLookupResult.Unavailable(com.aicarcompanion.app.data.vehicledb.LookupError.OFFLINE)), onCheck = { again = true })
+        compose.onNodeWithText("I couldn't check recalls right now").assertIsDisplayed()
+        compose.onNodeWithText("That doesn't mean there are none", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("couldn't be reached. Tried", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Try again").performClick()
+        assertTrue(again)
+        assertEquals(0, compose.onAllNodes(hasText("No recall campaigns", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun `model campaigns and the VIN status are separate sections, and the VIN is not confirmed`() {
+        panel(done(RecallLookupResult.Found(listOf(campaign()), RecallSource.NhtsaLive)))
+        compose.onNodeWithText("Campaigns for this model").assertIsDisplayed()
+        compose.onNodeWithText("Your VIN").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Not confirmed for your VIN").performScrollTo().assertIsDisplayed()
+        // Nothing here comes from a verified VIN source, so nothing may say a recall is open for the VIN.
+        assertEquals(0, compose.onAllNodes(hasText("reported for your VIN", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun `a car without a VIN has no VIN section`() {
+        panel(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)), hasVin = false)
+        compose.onNodeWithText("Not confirmed for your VIN").assertDoesNotExist()
+    }
+
+    @Test fun `a verified VIN source's result is shown as verified, with its source and date`() {
+        val verified = VinRecallStatus.Verified(listOf(campaign()), "NHTSA VIN lookup", checkedAt)
+        panel(done(RecallLookupResult.Found(listOf(campaign()), RecallSource.NhtsaLive), verified))
+        compose.onNodeWithText("1 open recall reported for your VIN").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Reported by NHTSA VIN lookup", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun `the eligibility explanation is shown, and decides nothing`() {
+        panel(done(RecallLookupResult.Found(listOf(campaign()), RecallSource.NhtsaLive)))
+        compose.onNodeWithTag("recall_eligibility").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("first sold at retail", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("manufacturer's policies", substring = true).assertIsDisplayed()
+        for (b in listOf("ineligible", "not eligible", "expired", "too old")) {
+            assertEquals(0, compose.onAllNodes(hasText(b, substring = true, ignoreCase = true)).fetchSemanticsNodes().size)
+        }
+    }
+
+    @Test fun `a typed or searched car gets a Check recalls button, disabled until it has year, make and model`() {
+        var checked = false
+        panel(RecallUiState.Idle, current = bmwTarget, onCheck = { checked = true })
+        compose.onNodeWithText("Check recalls for this car").assertIsEnabled().performClick()
+        assertTrue(checked)
+    }
+
+    @Test fun `without year, make and model the button is disabled`() {
+        panel(RecallUiState.Idle, current = null)
+        compose.onNodeWithText("Check recalls for this car").assertIsNotEnabled()
+        compose.onNodeWithText("Add the year, make and model first.").assertIsDisplayed()
+    }
+
+    @Test fun `results for a car whose details changed are marked out of date, with a way to check again`() {
+        var again = false
+        panel(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)), current = RecallTarget(2011, "BMW", "535i"), onCheck = { again = true })
+        compose.onNodeWithText("These results are for the 2011 BMW 528i", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Check again for the 2011 BMW 535i").performClick()
+        assertTrue(again)
+    }
+
+    @Test fun `the VIN results screen shows the same panel`() {
+        results(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
+        compose.onNodeWithTag("recall_source").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Not confirmed for your VIN").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("recall_eligibility").performScrollTo().assertIsDisplayed()
     }
 }

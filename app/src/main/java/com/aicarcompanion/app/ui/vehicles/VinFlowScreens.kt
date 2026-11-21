@@ -72,7 +72,7 @@ import com.aicarcompanion.app.ui.theme.Penelope
 import com.aicarcompanion.app.vin.RecallCampaignInfo
 import com.aicarcompanion.app.vin.RecallLookupResult
 import com.aicarcompanion.app.vin.RecallMessaging
-import com.aicarcompanion.app.vin.RecallVerificationLinks
+import com.aicarcompanion.app.vin.RecallTarget
 import com.aicarcompanion.app.vin.ScanGeometry
 import com.aicarcompanion.app.vin.ScanState
 import com.aicarcompanion.app.vin.VinCandidate
@@ -155,7 +155,7 @@ fun VinFlowOverlay(viewModel: VehicleEditViewModel, onOpenExisting: (String) -> 
 }
 
 /** Copies the VIN marked sensitive (Android 13+), so the clipboard preview doesn't show it. */
-private fun copyVin(context: android.content.Context, vin: String) {
+internal fun copyVin(context: android.content.Context, vin: String) {
     val clipboard = context.getSystemService(android.content.ClipboardManager::class.java) ?: return
     val clip = android.content.ClipData.newPlainText("VIN", vin)
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -166,7 +166,7 @@ private fun copyVin(context: android.content.Context, vin: String) {
     clipboard.setPrimaryClip(clip)
 }
 
-private fun openLink(context: android.content.Context, url: String) {
+internal fun openLink(context: android.content.Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {
@@ -476,7 +476,6 @@ fun VinResultsContent(
     onBack: () -> Unit,
 ) {
     val t = Penelope.tokens
-    val name = listOfNotNull(vehicle.year?.toString(), vehicle.make, vehicle.model).joinToString(" ")
     Column(Modifier.fillMaxSize().testTag(VinTags.RESULTS)) {
         PenelopeTopBar("Your car", onBack = onBack)
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -489,7 +488,10 @@ fun VinResultsContent(
                 }
             }
             VehicleSummary(vehicle, warnings)
-            RecallSection(name, vehicle.make, recalls, onOpenLink, onCopyVin)
+            RecallPanel(
+                recalls, RecallTarget.of(vehicle.year, vehicle.make, vehicle.model), vehicle.make, hasVin = true,
+                onCheck = null, onOpenLink = onOpenLink, onCopyVin = onCopyVin,
+            )
         }
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (duplicateName != null) {
@@ -537,76 +539,6 @@ private fun VehicleSummary(v: DecodedVehicle, warnings: List<String>) {
             style = MaterialTheme.typography.bodySmall, color = t.textSecondary, modifier = Modifier.padding(top = 8.dp),
         )
     }
-}
-
-@Composable
-private fun RecallSection(name: String, make: String?, state: RecallUiState, onOpenLink: (String) -> Unit, onCopyVin: () -> Unit) {
-    val t = Penelope.tokens
-    Column(Modifier.testTag(VinTags.RECALLS), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Recalls", style = MaterialTheme.typography.titleLarge, color = t.textPrimary, modifier = Modifier.semantics { heading() })
-        when (state) {
-            RecallUiState.Idle, RecallUiState.Loading -> Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-                Text("  Checking NHTSA for recalls…", color = t.textSecondary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-            }
-            RecallUiState.NotPossible -> Text(
-                "I need the year, make and model to look up recalls. Add them when you review the details, or check your VIN at nhtsa.gov/recalls.",
-                style = MaterialTheme.typography.bodyMedium, color = t.textSecondary,
-            )
-            is RecallUiState.Done -> {
-                val status = RecallMessaging.status(state.result, name)
-                GlassPanel(Modifier.fillMaxWidth(), strong = true, contentPadding = 14.dp) {
-                    if (status.urgent) StatusBadge("Important", t.danger, icon = PenelopeIcons.Alert)
-                    Text(
-                        status.headline, style = MaterialTheme.typography.titleMedium, color = t.textPrimary, // the headline is about the model, so it isn't red; the badge carries the advisory
-                        fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = if (status.urgent) 8.dp else 0.dp).semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                    Text(status.body, style = MaterialTheme.typography.bodyMedium, color = t.textSecondary, modifier = Modifier.padding(top = 6.dp))
-                }
-                if (status.showVerifyLink) {
-                    RecallVerificationLinks.forMake(make).forEach { link ->
-                        OutlinedButton(onClick = { onOpenLink(link.url) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(link.label) }
-                    }
-                    TextButton(onClick = onCopyVin, modifier = Modifier.heightIn(min = 48.dp)) { Text("Copy my VIN to paste there") }
-                }
-                (state.result as? RecallLookupResult.Found)?.campaigns?.forEach { RecallCard(it) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecallCard(r: RecallCampaignInfo) {
-    val t = Penelope.tokens
-    var expanded by remember { mutableStateOf(false) }
-    GlassPanel(
-        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { stateDescription = if (expanded) "Details shown" else "Details hidden" },
-        contentPadding = 14.dp,
-    ) {
-        Text(
-            RecallMessaging.friendlyComponent(r.component) ?: "Recall", style = MaterialTheme.typography.titleMedium, color = t.textPrimary,
-            fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() },
-        )
-        val meta = listOfNotNull("Campaign ${r.campaignNumber}", RecallMessaging.dateLabel(r.reportedToNhtsa)?.let { "Reported to NHTSA $it" }).joinToString(" · ")
-        Text(meta, style = MaterialTheme.typography.bodySmall, color = t.textSecondary)
-        if (r.doNotDrive) StatusBadge("Manufacturer advises not driving some affected cars", t.danger, Modifier.padding(top = 6.dp), icon = PenelopeIcons.Alert)
-        if (r.parkOutside) StatusBadge("Park outside advisory for some affected cars", t.warning, Modifier.padding(top = 6.dp), icon = PenelopeIcons.Alert)
-        RecallText("The problem", r.summary, expanded, 3)
-        RecallText("What could happen", r.consequence, expanded, 2)
-        if (expanded) RecallText("The fix", r.remedy, true, Int.MAX_VALUE)
-        TextButton(onClick = { expanded = !expanded }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (expanded) "Show less" else "Show details") }
-    }
-}
-
-@Composable
-private fun RecallText(label: String, text: String?, expanded: Boolean, collapsedLines: Int) {
-    if (text.isNullOrBlank()) return
-    val t = Penelope.tokens
-    Text(label, style = MaterialTheme.typography.labelLarge, color = t.brandColors[2], modifier = Modifier.padding(top = 8.dp))
-    Text(
-        text, style = MaterialTheme.typography.bodyMedium, color = t.textPrimary,
-        maxLines = if (expanded) Int.MAX_VALUE else collapsedLines, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-    )
 }
 
 /** Flashlight line icon. */

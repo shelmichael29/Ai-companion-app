@@ -18,6 +18,7 @@ enum class ReplyBasis(val label: String) {
     CONVERSATION("Assistant"),
     AI_EXPLANATION("AI explanation (Gemini) · not a reading from your car"),
     OFFLINE_REFERENCE("From Penelope's offline vehicle database · not specific to your car"),
+    RECALL_DATA("NHTSA recall data · for your car's model, not confirmed for your VIN"),
 }
 
 /** Something the voice session should do after speaking a reply. */

@@ -20,7 +20,11 @@ import com.aicarcompanion.app.ui.vehicles.RecallUiState
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
 import com.aicarcompanion.app.ui.vehicles.VinStage
 import com.aicarcompanion.app.vin.RecallLookup
+import com.aicarcompanion.app.vin.DefaultRecallService
 import com.aicarcompanion.app.vin.RecallLookupResult
+import com.aicarcompanion.app.vin.RecallReport
+import com.aicarcompanion.app.vin.RecallService
+import com.aicarcompanion.app.vin.RecallTarget
 import com.aicarcompanion.app.vin.RecallSource
 import com.aicarcompanion.app.vin.RecognizedLine
 import com.aicarcompanion.app.vin.ScanBox
@@ -72,15 +76,19 @@ class VinFlowViewModelTest {
     }
 
     private val noRecalls = RecallLookupResult.NoneFound(RecallSource.NhtsaLive)
+    private val checkedAt = java.time.Instant.parse("2026-11-21T14:15:00Z")
+    private fun done(result: RecallLookupResult) = RecallUiState.Done(RecallReport(RecallTarget(2011, "BMW", "528i"), result, checkedAt))
     private val spoken = mutableListOf<String>()
     private lateinit var decoder: FakeDecoder
     private lateinit var recalls: FakeRecalls
+    private lateinit var service: RecallService
     private lateinit var repo: InMemoryVehicleRepository
 
     @Before fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         decoder = FakeDecoder(decoded)
         recalls = FakeRecalls(noRecalls)
+        service = DefaultRecallService(recalls, now = { checkedAt })
         repo = InMemoryVehicleRepository()
         spoken.clear()
     }
@@ -89,7 +97,7 @@ class VinFlowViewModelTest {
 
     private fun vm(existing: List<Vehicle> = emptyList()): VehicleEditViewModel {
         repo = InMemoryVehicleRepository(existing)
-        return VehicleEditViewModel(SavedStateHandle(), repo, FakeCatalog(), decoder, recalls) { spoken += it }
+        return VehicleEditViewModel(SavedStateHandle(), repo, FakeCatalog(), decoder, service) { spoken += it }
     }
 
     private fun VehicleEditViewModel.typeAndLookUp(text: String = vin) {
@@ -107,7 +115,7 @@ class VinFlowViewModelTest {
         assertEquals("2011", vm.form.year); assertEquals("BMW", vm.form.make); assertEquals("528i", vm.form.model)
         assertEquals(vin, vm.form.vin)
         assertEquals(listOf(Triple(2011, "BMW", "528i")), recalls.asked)
-        assertEquals(RecallUiState.Done(noRecalls), vm.recallState)
+        assertEquals(done(noRecalls), vm.recallState)
     }
 
     @Test fun `fields the VIN did not determine are left unknown, not guessed`() {
@@ -123,7 +131,7 @@ class VinFlowViewModelTest {
         val vm = vm()
         vm.typeAndLookUp()
         assertEquals(VinStage.Results, vm.vinStage)
-        assertEquals(RecallUiState.Done(RecallLookupResult.Unavailable(LookupError.OFFLINE)), vm.recallState)
+        assertEquals(done(RecallLookupResult.Unavailable(LookupError.OFFLINE)), vm.recallState)
         var saved = false
         vm.update { it.copy(layout = EngineLayout.INLINE) }
         vm.save { saved = true }
@@ -355,5 +363,80 @@ class VinFlowViewModelTest {
         vm.typeAndLookUp()
         vm.closeVinFlow()
         assertTrue(vm.recallState !is RecallUiState.Loading)
+    }
+
+    // ---- recall accuracy: one service for every way a car is added -----------------------------------------------
+
+    private class RecordingService(private val inner: RecallService) : RecallService {
+        val calls = mutableListOf<Pair<RecallTarget, String?>>()
+        override suspend fun check(target: RecallTarget, vin: String?): RecallReport { calls += target to vin; return inner.check(target, vin) }
+    }
+
+    private fun vmWith(recording: RecordingService): VehicleEditViewModel {
+        repo = InMemoryVehicleRepository()
+        return VehicleEditViewModel(SavedStateHandle(), repo, FakeCatalog(), decoder, recording) { spoken += it }
+    }
+
+    @Test fun `a typed VIN, a scanned VIN and a manually entered car all use the same recall service`() {
+        val recording = RecordingService(service)
+        val typed = vmWith(recording); typed.typeAndLookUp()
+        val scanned = vmWith(recording); scanned.scanning()
+        repeat(3) { scanned.onScanFrame(frame(vin), 1920, 1080) }
+        scanned.useScannedVin(); scanned.decodeVin()
+        val manual = vmWith(recording)
+        manual.update { it.copy(year = "2011", make = "BMW", model = "528i") }
+        manual.checkRecalls()
+        val target = RecallTarget(2011, "BMW", "528i")
+        assertEquals(listOf(target to vin, target to vin, target to null), recording.calls)
+        for (m in listOf(typed, scanned, manual)) assertEquals(done(noRecalls), m.recallState)
+    }
+
+    @Test fun `a manually entered car with details missing is not checked, and not treated as having no recalls`() {
+        val recording = RecordingService(service)
+        val vm = vmWith(recording)
+        vm.update { it.copy(year = "2011", make = "BMW", model = "") }
+        vm.checkRecalls()
+        assertEquals(RecallUiState.NotPossible, vm.recallState)
+        assertTrue(recording.calls.isEmpty())
+    }
+
+    @Test fun `results for a car whose details then changed are recognizably out of date`() {
+        val vm = vm()
+        vm.update { it.copy(year = "2011", make = "BMW", model = "528i") }
+        vm.checkRecalls()
+        val checked = (vm.recallState as RecallUiState.Done).report.target
+        vm.update { it.copy(model = "535i") }
+        assertTrue("the panel compares these to mark the result stale", vm.currentRecallTarget != checked)
+        assertEquals(RecallTarget(2011, "BMW", "535i"), vm.currentRecallTarget)
+    }
+
+    @Test fun `a slow earlier check can never overwrite a newer one`() {
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        var calls = 0
+        val slowThenFast = RecallLookup { _, _, model ->
+            if (++calls == 1) { release.await(); RecallLookupResult.NoneFound(RecallSource.NhtsaLive) }
+            else RecallLookupResult.Found(emptyList(), RecallSource.NhtsaLive).let { RecallLookupResult.Unavailable(LookupError.SERVICE) }
+        }
+        repo = InMemoryVehicleRepository()
+        val vm = VehicleEditViewModel(SavedStateHandle(), repo, FakeCatalog(), decoder, DefaultRecallService(slowThenFast, now = { checkedAt })) { }
+        vm.update { it.copy(year = "2011", make = "BMW", model = "528i") }
+        vm.checkRecalls()                                  // first check waits
+        vm.update { it.copy(model = "535i") }
+        vm.checkRecalls()                                  // second check answers at once
+        release.complete(Unit)                             // the first one finishes late
+        val shown = (vm.recallState as RecallUiState.Done).report
+        assertEquals(RecallTarget(2011, "BMW", "535i"), shown.target)
+        assertEquals(RecallLookupResult.Unavailable(LookupError.SERVICE), shown.result)
+    }
+
+    @Test fun `a failed recall check is shown as failed, then the car can still be saved`() = runTest {
+        recalls.result = RecallLookupResult.Unavailable(LookupError.SERVICE)
+        val vm = vm()
+        vm.update { it.copy(year = "2011", make = "BMW", model = "528i", layout = EngineLayout.INLINE) }
+        vm.checkRecalls()
+        assertTrue((vm.recallState as RecallUiState.Done).report.result is RecallLookupResult.Unavailable)
+        var saved = false
+        vm.save { saved = true }
+        assertTrue(saved)
     }
 }

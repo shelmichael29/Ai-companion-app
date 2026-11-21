@@ -33,16 +33,24 @@ Asked only when the scanner opens (the guide screen already explained why). If i
 - A decode failure (offline, timeout, NHTSA error, unknown VIN) returns to the confirm step with a plain explanation and **Fill in my car's details myself**. Saving a car never needs any lookup.
 
 ## 5. Recalls (NHTSA recalls API)
-`vin/Recalls.kt`. Right after a successful decode: `https://api.nhtsa.gov/recalls/recallsByVehicle?make=…&model=…&modelYear=…`.
+`vin/Recalls.kt` (lookup, parsing, wording) and `vin/RecallService.kt` (the one service). Right after a successful decode: `https://api.nhtsa.gov/recalls/recallsByVehicle?make=…&model=…&modelYear=…`.
 
-### The rule: this is a search by model, not by VIN
-The public API lists recall campaigns for a **year, make and model**. It does **not** say whether a specific VIN is affected or whether its repair was done. So Penelope:
-- never says a recall is "confirmed", "outstanding", "open" or "unrepaired" for the user's car;
-- says "recall campaigns found for the 2011 BMW 528i", that NHTSA's public search can't tell whether this car is included or repaired, and links to the VIN-specific check;
-- with no campaigns returned: "That doesn't guarantee your car has no recalls…";
-- when NHTSA can't be reached: "I couldn't check recalls right now. You can still save your car."
+### One recall service for every car
+`RecallService.check(RecallTarget(year, make, model), vin?)` is the only recall check. It is used by the scanned-VIN and typed-VIN results, by cars added with **Search** or **Manual** (the Add/Edit Vehicle form has the same recall panel: **Check recalls for this car**; a catalog search also checks by itself once the car is chosen), and by Penelope's "any recalls?" answers. The panel (`ui/vehicles/RecallViews.kt`) is the same everywhere, so the wording can't drift apart. Penelope's answer is logged as "NHTSA recall lookup" (or "offline records" if the service isn't available).
 
-Each campaign shows: campaign number, affected component (made readable), problem, what could happen, the manufacturer's remedy, and **"Reported to NHTSA <date>"** (the date NHTSA received the manufacturer's report; not a repair or completion date). NHTSA's `parkIt` / `parkOutSide` flags are shown as advisories ("Manufacturer advises not driving some affected cars"), never as a statement about this car.
+### A failed check is never "no recalls"
+Every outcome is typed (`RecallLookupResult`: found, none found, or unavailable). A reply that isn't a recall list is a **failure**, not an empty result: no `results` list, a `Count` with nothing listed, records without campaign numbers, an HTML page, an empty body, a non-2xx status, a timeout, or any unexpected error. Only a genuine `"results": []` is "none found" (and even that says it isn't a guarantee). A failed check shows "I couldn't check recalls right now… That doesn't mean there are none" with **Try again**; a result for a car whose details have since changed is marked out of date.
+
+### Source and date, always
+Every result shows its source and when it was checked, e.g. "Source: NHTSA recalls API (live). Checked Nov 21, 2026, 2:15 PM." Saved data says "Source: saved NHTSA data from 2026-10-15. The live lookup failed at …, so this may be out of date." A failure says "Tried …". The time is when the check was made, not a publication date. It is shown on screen and isn't stored with the car.
+
+### Model-level campaigns versus the VIN
+The report keeps two things apart:
+- **Campaigns for this model** (what NHTSA's public search can give): never labeled VIN-confirmed or outstanding.
+- **Your VIN** (`VinRecallStatus`): "Not confirmed for your VIN" unless an authoritative VIN-specific source (`VinRecallSource`) answers. Only that source can produce "N open recalls reported for your VIN", and it must name the source and the date. If it fails the status says it couldn't check (not "none open"). **No such source exists today:** NHTSA's public API has no recalls-by-VIN lookup (the address answers 403, checked 2026-11-21), so the status is always "not confirmed" and points to nhtsa.gov/recalls. The VIN goes only to the VIN source (none today), never to the model-level lookup.
+
+### Repair eligibility: explained, never decided
+"Whether a recall can be repaired at no cost can depend on your car's age, when it was first sold at retail, when the campaign was announced, and the manufacturer's policies. I can't tell from here whether a recall applies to your car or whether it's eligible. A dealer or the manufacturer can tell you." This is shown with every result. The app never classes a recall as ineligible, expired or not covered because of mileage, age or build date: `RecallTarget` deliberately has no mileage, date or VIN field, old model years are looked up like any other, and tests guard both.
 
 ### Where the user checks their VIN
 - Always: **nhtsa.gov/recalls** (works for every make with the VIN).
@@ -61,7 +69,7 @@ If NHTSA can't be reached, the already-installed offline knowledge pack's recall
 - TalkBack: the guide's drawings are decorative (text carries all the information); live regions announce scan progress, warnings, recall loading and results; every control is at least 48 dp; the flashlight and voice toggles describe their state; recall cards announce "Details shown / hidden".
 
 ## 8. Tests
-`VinScanningTest` (extraction, I/O/Q, check digit, tracker, geometry), `RecallsTest` (parser, errors, fallback, wording, links, log privacy), `VinFlowViewModelTest` (decode, duplicates, offline, recall outage, never-auto-select, voice never speaks the full VIN), `VinFlowUiTest` (Robolectric Compose: guide, scanner states, permission states, results, recall wording, duplicate banner).
+`VinScanningTest` (extraction, I/O/Q, check digit, tracker, geometry), `RecallsTest` (parser, errors, fallback, wording, links, log privacy), `VinFlowViewModelTest` (decode, duplicates, offline, recall outage, never-auto-select, voice never speaks the full VIN, one service for typed, scanned and manual cars, stale-result race), `RecallAccuracyTest` (every failure mode, source and date wording, model versus VIN, eligibility wording), `RecallAssistantTest` (Penelope's answers), `VinFlowUiTest` (Robolectric Compose: guide, scanner states, permission states, results, recall wording, duplicate banner).
 
 ## 9. Not covered by automated tests: check on the phone
 See `docs/DEVICE_TESTING.md` §1: real camera preview and focus, recognition on a real windshield/door sticker/paper, highlight alignment, flashlight, permission prompt and settings round-trip, CameraX/ML Kit performance and battery, TalkBack, spoken guidance, and the NHTSA calls over real mobile data.

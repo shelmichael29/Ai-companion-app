@@ -49,6 +49,14 @@ See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call f
 - **Results:** the 2011 528i shows 3.0 L / 6-cyl (never V6), "A VIN can't tell me…" (layout, engine code,
   transmission…), manufacturer and plant. Recalls say "for the 2011 BMW 528i", never "your car is affected", with
   campaign number, component, problem, remedy and "Reported to NHTSA <date>". The NHTSA link opens the browser.
+- **Recalls, accuracy (v0.7.1):** each result must show "Source: …" and "Checked <date, time>". Turn on airplane mode, then
+  tap **Check recalls for this car** on a typed car: it must say "I couldn't check recalls right now… doesn't mean
+  there are none" with **Try again**, never "no recalls". Turn the network back on and Try again: it should now show the
+  campaigns. A scanned car's results show "Not confirmed for your VIN", never "open" or "outstanding". Add a car with
+  **Search** (no VIN): recalls check by themselves, or by the button. Ask Penelope "any recalls on my car?" with and
+  without a connection: both answers name their source, and the offline one says it is saved data. For an old car
+  (for example a 1990s model) recalls must be listed normally, with the eligibility note and no "ineligible" wording.
+  The About/home label should read "v0.7.1-beta • Build 8" on a debug build.
 - **Duplicate:** add the same VIN twice: the second time shows "already added", no second car, and "Open my saved car" works.
 - **Offline:** airplane mode: the decode explains it can't reach NHTSA and "Fill in my car's details myself" works.
   Turn airplane mode on after decoding: recalls show the saved snapshot labeled "saved data", or "couldn't check", and

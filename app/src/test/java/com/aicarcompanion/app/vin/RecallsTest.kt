@@ -64,10 +64,13 @@ class RecallsTest {
         assertNull(r.reportedToNhtsa)
     }
 
-    @Test fun `a response with no campaign numbers or no results is empty`() {
+    @Test fun `only a genuine empty answer is empty, anything else that is not a recall list is a failure`() {
         assertTrue(NhtsaRecallParser.parse("""{"Count":0,"results":[]}""").isEmpty())
-        assertTrue(NhtsaRecallParser.parse("""{"results":[{"Summary":"x"}]}""").isEmpty())
-        assertTrue(NhtsaRecallParser.parse("{}").isEmpty())
+        // These used to read as "no recalls". They are failures, and must be reported as such.
+        for (broken in listOf("{}", """{"message":"Service unavailable"}""", """{"results":[{"Summary":"x"}]}""", """{"Count":3,"results":[]}""", "[]")) {
+            val failed = runCatching { NhtsaRecallParser.parse(broken) }.exceptionOrNull()
+            assertTrue("'$broken' must not parse as an empty list", failed is org.json.JSONException)
+        }
     }
 
     @Test fun `lookup sends only year, make and model`() = runTest {

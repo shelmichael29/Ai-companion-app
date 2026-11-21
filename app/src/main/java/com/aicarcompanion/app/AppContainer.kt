@@ -66,6 +66,9 @@ interface AppContainer {
     /** NHTSA recall campaigns for a year/make/model. Never receives the VIN. */
     val recallLookup: com.aicarcompanion.app.vin.RecallLookup
 
+    /** The one recall check, used by every Add Vehicle path and by Penelope's answers. */
+    val recallService: com.aicarcompanion.app.vin.RecallService
+
     /**
      * Speaks [text] through Penelope's voice for on-screen guidance (the VIN scanner). Does nothing
      * while a voice conversation is running, so it never talks over the microphone. Cancel the
@@ -158,6 +161,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val recallLookup: com.aicarcompanion.app.vin.RecallLookup by lazy {
         // Live NHTSA first; the saved offline snapshot (clearly labeled) only if NHTSA can't be reached.
         com.aicarcompanion.app.vin.FallbackRecallLookup(com.aicarcompanion.app.vin.NhtsaRecallLookup(http, connectionLog), offlineKnowledge)
+    }
+    override val recallService: com.aicarcompanion.app.vin.RecallService by lazy {
+        // No authoritative VIN-specific source exists yet (NHTSA's public API has none), so VIN status stays "not checked".
+        com.aicarcompanion.app.vin.DefaultRecallService(recallLookup)
     }
 
     override suspend fun speakGuidance(text: String) {
@@ -261,7 +268,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val assistantName = { settings.settings.value.assistantName }
         val parser = CommandParser(assistantName)
         val recorder = com.aicarcompanion.app.assistant.conversation.ObservationRecorder { historyRepository.saveObservation(it) }
-        val ruleBased = RuleBasedReasoningProvider(parser, vehicleContext, diagnosticCommands, dtcKnowledge, recorder, offline = offlineKnowledge)
+        val ruleBased = RuleBasedReasoningProvider(parser, vehicleContext, diagnosticCommands, dtcKnowledge, recorder, offline = offlineKnowledge, recalls = recallService)
         // Hands-free commands (music, messages, calls) are routed first, so the AI never sees
         // names or message text and never pretends to perform them.
         val reasoning = com.aicarcompanion.app.handsfree.HandsFreeReasoningProvider(

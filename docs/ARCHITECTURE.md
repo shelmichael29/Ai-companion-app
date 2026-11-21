@@ -57,6 +57,7 @@ Guide → Scan → Confirm → Results flow is driven by `VehicleEditViewModel` 
 `VinCameraView` (CameraX + bundled ML Kit) feeds recognized lines to platform-neutral `VinTextExtractor` /
 `VinScanTracker`; the user always confirms the VIN. Recalls come from `RecallLookup` (`NhtsaRecallLookup`, wrapped by
 `FallbackRecallLookup` for the offline snapshot) by year/make/model only; they are never presented as VIN-confirmed.
+`RecallService` (`vin/RecallService.kt`) is the one entry point for every car and for Penelope: it returns a `RecallReport` (target, typed result, time checked, VIN status), turns any failure into "unavailable", and keeps model-level campaigns apart from a (currently absent) VIN-specific source.
 
 Offline: responses are cached in Room (cache-first, 30-day freshness, stale copy used when the
 network fails). Manual entry always works. Another provider (proprietary backend, offline
