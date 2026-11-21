@@ -68,6 +68,7 @@ Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). 
 |---|---|---|---|---|
 | 2026-11-21 | Initial tracker | `docs/penelope-development-tracker-20261121` | Documentation only | PR pending |
 | 2026-11-20 | ENET HSFZ reliability | `experiment/bmw-enet-tester`, #43 | See PR CI | Merged to **experimental** branch |
+| 2026-11-21 | Phase 1 UI redesign | `feature/phase1-ui-redesign` | 667 tests, 0 failed | PR open, not merged |
 | 2026-11-21 | Gemini personal details: automatic scrubbing | `feature/gemini-scrub-personal-details` | 570 tests, 0 failed | PR open, not merged |
 | 2026-11-21 | Device verification recorded: VIN scanner and recalls | #50 | Owner device checks passed; docs only | Merged to `main` |
 | 2026-11-21 | Recall accuracy and reporting | #45 | 562 tests, 0 failed; verified on the phone | Merged to `main` |
