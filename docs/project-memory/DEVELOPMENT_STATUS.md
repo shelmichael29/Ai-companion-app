@@ -1,6 +1,6 @@
 # Development status
 
-Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`.
+Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`.
 
 ## Verified milestones
 **None yet on real hardware.** Everything below passed the automated quality gate and CI, but hasn't been checked on the phone, adapter or car.
@@ -14,12 +14,12 @@ Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 | AGP 9 upgrade; fixed CI signing key | 364 tests, 0 failed |
 | H0: hands-free foundation | 375 tests, 0 failed |
 | Model delegation agents (Haiku / Sonnet / Opus) | Config only; CI green |
+| Gemini primary routing (#37); offline knowledge pack (#40) | CI green at merge |
+| VIN scanner, decoder and recalls (#41) | 506 tests, 0 failed |
 
 ## Active pull requests
 | PR | What | State |
 |---|---|---|
-| Gemini primary routing | Make Gemini the primary intelligence; honest fallbacks; answer-source log | Open, waiting for the owner's review |
-| VIN scanner, decoder and recalls | CameraX + ML Kit VIN scan, guided flow, NHTSA decode and model-level recalls | Open, waiting for the owner's review |
 | #11 | ENET tester (experimental) | Kept open and separate on purpose |
 
 ## Outstanding tasks
@@ -43,5 +43,6 @@ Snapshot as of **2026-11-19**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 - 528i connection recovery and voice auto-resume: `docs/CONNECTION_RECOVERY.md` §4.
 - Hands-free foundation: `docs/HANDS_FREE.md` §4.
 - Gemini routing and answer sources: `docs/GEMINI_ROUTING.md` §6.
+- VIN scanner: camera, recognition on real VIN plates, permissions, rotation, rapid open/close, TalkBack, recalls over mobile data: `docs/DEVICE_TESTING.md` §1c.
 
 When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/QUALITY_SUMMARY.md`.
