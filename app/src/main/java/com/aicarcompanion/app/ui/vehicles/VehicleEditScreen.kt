@@ -11,22 +11,16 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,7 +30,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,10 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -57,25 +50,33 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.aicarcompanion.app.data.vehicledb.VinDecodeResult
 import com.aicarcompanion.app.domain.model.Aspiration
 import com.aicarcompanion.app.domain.model.EngineLayout
 import com.aicarcompanion.app.domain.model.FuelType
 import com.aicarcompanion.app.ui.AppViewModelProvider
-import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SearchableSelector
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun VehicleEditScreen(
     onDone: () -> Unit,
+    onOpenExisting: (String) -> Unit = {},
     viewModel: VehicleEditViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     val detailsRequester = remember { BringIntoViewRequester() }
+    val scroll = rememberScrollState()
+    val inVinFlow = viewModel.vinStage != VinStage.None
 
-    LaunchedEffect(viewModel.detailsAppliedCount) {
-        if (viewModel.detailsAppliedCount > 0) detailsRequester.bringIntoView()
+    // Scroll to the review form after details are applied, once the guided VIN steps (which replace
+    // this form while open) have handed back to it.
+    LaunchedEffect(viewModel.detailsAppliedCount, inVinFlow) {
+        if (viewModel.detailsAppliedCount > 0 && !inVinFlow) detailsRequester.bringIntoView()
+    }
+
+    if (inVinFlow) {
+        VinFlowOverlay(viewModel, onOpenExisting = onOpenExisting, onSaved = onDone)
+        return
     }
 
     Scaffold(
@@ -89,7 +90,7 @@ fun VehicleEditScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -119,7 +120,21 @@ fun VehicleEditScreen(
             }
             DetailsForm(viewModel)
 
-            com.aicarcompanion.app.ui.design.GradientButton("Confirm and save", { viewModel.save(onDone) }, Modifier.fillMaxWidth())
+            viewModel.duplicateOf?.let { saved ->
+                Text(
+                    "You've already added this car as ${saved.displayName}, so I won't save a second copy.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                OutlinedButton(
+                    onClick = { onOpenExisting(saved.id) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                ) { Text("Open my saved car") }
+            }
+            com.aicarcompanion.app.ui.design.GradientButton(
+                "Confirm and save", { viewModel.save(onDone) }, Modifier.fillMaxWidth(), enabled = !viewModel.saving,
+            )
             if (viewModel.isEditing) {
                 OutlinedButton(
                     onClick = { confirmDelete = true },
@@ -197,77 +212,22 @@ private fun CatalogSearch(viewModel: VehicleEditViewModel) {
 
 @Composable
 private fun VinLookup(viewModel: VehicleEditViewModel) {
-    val state = viewModel.vinState
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = viewModel.vinInput,
-            onValueChange = viewModel::updateVin,
-            label = { Text("VIN (17 characters)") },
-            supportingText = {
-                Text(viewModel.vinLocalError ?: "${viewModel.vinInput.length}/17 · Found on the dashboard by the windshield or the driver's door jamb")
-            },
-            isError = viewModel.vinLocalError != null,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Characters,
-                keyboardType = KeyboardType.Ascii,
-                imeAction = ImeAction.Search,
-            ),
-            keyboardActions = KeyboardActions(onSearch = { viewModel.decodeVin() }),
-            modifier = Modifier.fillMaxWidth(),
+        Text(
+            "Scan or type your car's VIN and I'll fill in its details and check for recalls.",
+            style = MaterialTheme.typography.bodyMedium,
         )
-        Button(
-            onClick = viewModel::decodeVin,
-            enabled = viewModel.vinInput.length == 17 && viewModel.vinLocalError == null && state !is VinState.Decoding,
+        com.aicarcompanion.app.ui.design.GradientButton("Scan VIN with the camera", { viewModel.openVinFlow(scan = true) }, Modifier.fillMaxWidth())
+        OutlinedButton(
+            onClick = { viewModel.openVinFlow(scan = false) },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-        ) { Text(if (state is VinState.Decoding) "Decoding…" else "Decode VIN") }
-
-        if (state is VinState.Done) {
-            when (val r = state.result) {
-                is VinDecodeResult.Decoded -> DecodedVinCard(r, viewModel)
-                is VinDecodeResult.NotDecoded -> ErrorText("Couldn't decode this VIN: ${r.reason}")
-                is VinDecodeResult.Failed -> ErrorText(r.error.userMessage)
-            }
-        }
+        ) { Text("Enter VIN") }
         Text(
             "Source: ${viewModel.vinSourceName}. A VIN decode often can't determine the exact trim, engine " +
                 "variant or transmission, so please review the results.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-@Composable
-private fun DecodedVinCard(result: VinDecodeResult.Decoded, viewModel: VehicleEditViewModel) {
-    val v = result.vehicle
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Decoded by NHTSA", fontWeight = FontWeight.SemiBold)
-            LabeledValue("Vehicle", listOfNotNull(v.year?.toString(), v.make, v.model).joinToString(" "))
-            v.series?.let { LabeledValue("Series", it) }
-            v.trim?.let { LabeledValue("Trim", it) }
-            val engine = listOfNotNull(
-                v.displacementLiters?.let { "%.1fL".format(java.util.Locale.US, it) },
-                v.cylinders?.let { v.layout.shortLabel(it) },
-                v.engineCode,
-            ).joinToString(" ")
-            if (engine.isNotEmpty()) LabeledValue("Engine", engine)
-            v.transmission?.let { LabeledValue("Transmission", it) }
-            v.drivetrain?.let { LabeledValue("Drivetrain", it) }
-            v.bodyClass?.let { LabeledValue("Body", it) }
-            if (v.notDetermined.isNotEmpty()) {
-                Text(
-                    "Not determined from the VIN: ${v.notDetermined.joinToString(", ")}. Please fill these in below if you know them.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            result.warnings.forEach { ErrorText(it) }
-            Button(
-                onClick = viewModel::useDecodedVin,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 4.dp),
-            ) { Text("Use these details") }
-        }
     }
 }
 
@@ -352,11 +312,6 @@ private fun DetailsForm(viewModel: VehicleEditViewModel) {
             viewModel.update { it.copy(nickname = v) }
         }
     }
-}
-
-@Composable
-private fun ErrorText(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
 }
 
 @Composable

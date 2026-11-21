@@ -63,4 +63,4 @@ Then run the quality gate. The downloads are never committed (`.gitignore`). The
 - **Review sample accuracy:** about 100 random OBDex codes and the BMW-specific Wal33D meanings, before relying on them for anything beyond explanations.
 - **Production licensing:** the EPA and NHTSA terms are stated by the sources but not legally reviewed.
 - **Server-side only:** service bulletins, investigations, manufacturer communications and complaints.
-- **Not done:** VIN-specific recall status, which needs the online NHTSA API.
+- **Not done:** VIN-specific recall status. NHTSA's public API can't provide it (it searches by year, make and model); the VIN-specific check stays a link to nhtsa.gov/recalls. The saved recall snapshot is used as the offline fallback for the new VIN flow (`docs/VIN_SCANNER.md`).

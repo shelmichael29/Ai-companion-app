@@ -60,7 +60,14 @@ data class DecodedVehicle(
     val transmission: String?,
     val drivetrain: String?,
     val bodyClass: String?,
+    /** Who built it and where, as NHTSA reports it. Null when the VIN doesn't say. */
+    val manufacturerName: String? = null,
+    val plantCity: String? = null,
+    val plantCountry: String? = null,
 ) {
+    /** "Munich, Germany", or whichever part is known. */
+    val builtAt: String? get() = listOfNotNull(plantCity, plantCountry).joinToString(", ").ifEmpty { null }
+
     /** Human-readable names of important fields the decoder could not determine. */
     val notDetermined: List<String>
         get() = buildList {
@@ -82,15 +89,6 @@ sealed interface VinDecodeResult {
 interface VinDecoder {
     val sourceName: String
     suspend fun decode(vin: String): VinDecodeResult
-}
-
-/**
- * Future camera-based VIN capture (e.g. barcode or OCR). No implementation ships yet; the
- * capture result must still go through [VinValidator] and user confirmation.
- */
-interface VinScanner {
-    val isAvailable: Boolean
-    suspend fun scan(): String?
 }
 
 /**
@@ -150,6 +148,9 @@ object VpicParser {
                 ).joinToString(" ").ifEmpty { null },
                 drivetrain = str("DriveType"),
                 bodyClass = str("BodyClass"),
+                manufacturerName = str("Manufacturer")?.let(::tidyName),
+                plantCity = str("PlantCity")?.let(::tidyName),
+                plantCountry = str("PlantCountry")?.let(::tidyName),
             ),
             warnings,
         )
@@ -184,7 +185,12 @@ object VpicParser {
     }
 }
 
-class NhtsaVinDecoder(private val http: HttpClient) : VinDecoder {
+/**
+ * The VIN is sent in the request body (vPIC's batch decoder, one VIN), never in the URL. Verified
+ * 2026-11-21 against the live service: for valid, bad-check-digit and invalid VINs the single-VIN
+ * result is identical to `DecodeVinValues`, and the response doesn't echo the VIN.
+ */
+class NhtsaVinDecoder(private val poster: HttpFormPoster) : VinDecoder {
     override val sourceName = "NHTSA vPIC"
 
     override suspend fun decode(vin: String): VinDecodeResult {
@@ -193,7 +199,7 @@ class NhtsaVinDecoder(private val http: HttpClient) : VinDecoder {
             is VinValidator.Result.Valid -> v.vin
         }
         val response = try {
-            http.get("$BASE/DecodeVinValues/$valid?format=json", emptyMap())
+            poster.postForm("$BASE/DecodeVINValuesBatch/", mapOf("format" to "json", "data" to valid), mapOf("Accept" to "application/json"))
         } catch (e: java.io.IOException) {
             return VinDecodeResult.Failed(LookupError.OFFLINE)
         }

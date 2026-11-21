@@ -15,24 +15,57 @@ fun interface HttpClient {
     suspend fun get(url: String, headers: Map<String, String>): HttpResponse
 }
 
-/** [HttpClient] built on the platform's HttpURLConnection; no extra dependencies. */
-class UrlConnectionHttpClient(private val timeoutMillis: Int = 15_000) : HttpClient {
+/**
+ * Sends values in the request body instead of the address, so they never appear in a URL (and so
+ * not in server or proxy access logs). Used for the VIN.
+ */
+fun interface HttpFormPoster {
+    /** @throws IOException when the network is unavailable or the request fails to complete. */
+    suspend fun postForm(url: String, form: Map<String, String>, headers: Map<String, String>): HttpResponse
+}
+
+/** [HttpClient] and [HttpFormPoster] built on the platform's HttpURLConnection; no extra dependencies. */
+class UrlConnectionHttpClient(private val timeoutMillis: Int = 15_000) : HttpClient, HttpFormPoster {
     override suspend fun get(url: String, headers: Map<String, String>): HttpResponse =
         withContext(Dispatchers.IO) {
-            val connection = URL(url).openConnection() as HttpURLConnection
+            val connection = open(url, headers)
             try {
-                connection.connectTimeout = timeoutMillis
-                connection.readTimeout = timeoutMillis
-                connection.setRequestProperty("User-Agent", "AiCarCompanion-Android")
-                headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
-                val code = connection.responseCode
-                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-                val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-                HttpResponse(code, body)
+                read(connection)
             } finally {
                 connection.disconnect()
             }
         }
+
+    override suspend fun postForm(url: String, form: Map<String, String>, headers: Map<String, String>): HttpResponse =
+        withContext(Dispatchers.IO) {
+            val connection = open(url, headers)
+            try {
+                val payload = form.entries.joinToString("&") { "${it.key.urlEncoded()}=${it.value.urlEncoded()}" }.toByteArray(Charsets.UTF_8)
+                connection.requestMethod = "POST"
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                connection.setFixedLengthStreamingMode(payload.size)
+                connection.outputStream.use { it.write(payload) }
+                read(connection)
+            } finally {
+                connection.disconnect()
+            }
+        }
+
+    private fun open(url: String, headers: Map<String, String>): HttpURLConnection {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = timeoutMillis
+        connection.readTimeout = timeoutMillis
+        connection.setRequestProperty("User-Agent", "AiCarCompanion-Android")
+        headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+        return connection
+    }
+
+    private fun read(connection: HttpURLConnection): HttpResponse {
+        val code = connection.responseCode
+        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+        return HttpResponse(code, stream?.bufferedReader()?.use { it.readText() }.orEmpty())
+    }
 }
 
 internal fun String.urlEncoded(): String = URLEncoder.encode(this, "UTF-8").replace("+", "%20")

@@ -23,6 +23,7 @@ Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified
 ## In progress (🔵)
 | Item | Where |
 |---|---|
+| VIN scanner (CameraX + ML Kit), guided VIN flow, NHTSA decode and model-level recall campaigns; never VIN-confirmed (`docs/VIN_SCANNER.md`) | branch `feature/vin-scanner` (PR open) |
 | Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides (`docs/OFFLINE_KNOWLEDGE.md`) | branch `feature/offline-knowledge` (PR open) |
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 

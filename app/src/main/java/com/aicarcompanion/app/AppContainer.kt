@@ -62,6 +62,16 @@ interface AppContainer {
     val diagnosticsRepository: DiagnosticsRepository
     val vehicleCatalog: VehicleCatalogProvider
     val vinDecoder: VinDecoder
+
+    /** NHTSA recall campaigns for a year/make/model. Never receives the VIN. */
+    val recallLookup: com.aicarcompanion.app.vin.RecallLookup
+
+    /**
+     * Speaks [text] through Penelope's voice for on-screen guidance (the VIN scanner). Does nothing
+     * while a voice conversation is running, so it never talks over the microphone. Cancel the
+     * calling coroutine to stop speaking.
+     */
+    suspend fun speakGuidance(text: String)
     val obdConnection: ObdConnection
     val diagnosticCommands: DiagnosticCommandHandler
     val bluetooth: BluetoothGateway
@@ -145,6 +155,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
         com.aicarcompanion.app.diagnostics.knowledge.KnowledgeDtcSource(GenericDtcCatalog, offlineKnowledge) { activeVehicle.value?.make }
     }
     override val vinDecoder: VinDecoder = NhtsaVinDecoder(http)
+    override val recallLookup: com.aicarcompanion.app.vin.RecallLookup by lazy {
+        // Live NHTSA first; the saved offline snapshot (clearly labeled) only if NHTSA can't be reached.
+        com.aicarcompanion.app.vin.FallbackRecallLookup(com.aicarcompanion.app.vin.NhtsaRecallLookup(http, connectionLog), offlineKnowledge)
+    }
+
+    override suspend fun speakGuidance(text: String) {
+        if (voiceSessionLazy.isInitialized() && voiceSession.state.value !is com.aicarcompanion.app.assistant.VoiceState.Idle) return
+        speechOutput.speak(text)
+    }
     override val bluetooth = BluetoothGateway(appContext)
     override val obdConfig = ObdConfigStore(
         SharedPreferencesKeyValueStore(

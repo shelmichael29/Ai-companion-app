@@ -20,7 +20,7 @@ com.aicarcompanion.app
 ├── AppContainer.kt                 wiring (the only place implementations are chosen)
 ├── domain/model, domain/repository Vehicle, EngineSpec(+EngineLayout), history models, repo interfaces
 ├── data/vehicledb                  VehicleCatalogProvider (FuelEconomy.gov), VinDecoder (NHTSA vPIC),
-│                                   VinValidator, VinScanner (future camera), HttpClient, ResponseCache
+│                                   VinValidator, HttpClient, ResponseCache
 ├── data/local                      Room DB (schema in app/schemas), DAOs, mappers, SettingsStore
 ├── data/memory, data/sample        in-memory repos (tests), labeled demo data
 ├── assistant/voice                 SpeechInput / SpeechOutput + Android implementations
@@ -51,6 +51,12 @@ and the literal body `null` for none; vPIC returns junk fields for invalid VINs,
 error codes (6, 7, 8, 11, 400) discard the result. Neither source reports inline vs V layout
 for the 2011 BMW 528i, so `EngineLayout` defaults to `UNKNOWN` (displayed "6-cyl", never "V6")
 until the user confirms it.
+
+**VIN scanner and recalls** (`vin/`, `ui/vehicles/VinFlowScreens.kt`, `docs/VIN_SCANNER.md`): the guided
+Guide → Scan → Confirm → Results flow is driven by `VehicleEditViewModel` (`VinStage`) and shown in place of the form.
+`VinCameraView` (CameraX + bundled ML Kit) feeds recognized lines to platform-neutral `VinTextExtractor` /
+`VinScanTracker`; the user always confirms the VIN. Recalls come from `RecallLookup` (`NhtsaRecallLookup`, wrapped by
+`FallbackRecallLookup` for the offline snapshot) by year/make/model only; they are never presented as VIN-confirmed.
 
 Offline: responses are cached in Room (cache-first, 30-day freshness, stale copy used when the
 network fails). Manual entry always works. Another provider (proprietary backend, offline

@@ -80,21 +80,37 @@ class VinDecodingTest {
 
     @Test fun `decoder validates locally before calling network`() = runTest {
         var called = false
-        val decoder = NhtsaVinDecoder { _, _ -> called = true; HttpResponse(200, "") }
+        val decoder = NhtsaVinDecoder { _, _, _ -> called = true; HttpResponse(200, "") }
         assertTrue(decoder.decode("TOO-SHORT") is VinDecodeResult.NotDecoded)
         assertFalse(called)
     }
 
     @Test fun `decoder reports offline`() = runTest {
-        val decoder = NhtsaVinDecoder { _, _ -> throw IOException("no network") }
+        val decoder = NhtsaVinDecoder { _, _, _ -> throw IOException("no network") }
         assertEquals(VinDecodeResult.Failed(LookupError.OFFLINE), decoder.decode(bmwVin))
     }
 
     @Test fun `decoder parses network response`() = runTest {
-        val decoder = NhtsaVinDecoder { url, _ ->
-            assertTrue(url.contains(bmwVin))
+        val decoder = NhtsaVinDecoder { _, _, _ -> HttpResponse(200, Fixtures.read("vpic_bmw_528i_2011.json")) }
+        assertTrue(decoder.decode(bmwVin) is VinDecodeResult.Decoded)
+    }
+
+    @Test fun `the VIN goes in the request body and never in the URL or headers`() = runTest {
+        var url = ""; var form = emptyMap<String, String>(); var headers = emptyMap<String, String>()
+        val decoder = NhtsaVinDecoder { u, f, h ->
+            url = u; form = f; headers = h
             HttpResponse(200, Fixtures.read("vpic_bmw_528i_2011.json"))
         }
-        assertTrue(decoder.decode(bmwVin) is VinDecodeResult.Decoded)
+        decoder.decode("wbafr1c5 6bc000001")
+        assertEquals(bmwVin, form["data"])
+        assertEquals("json", form["format"])
+        assertTrue(url.startsWith("https://"))
+        assertFalse("the VIN must not appear in the URL", url.contains(bmwVin, ignoreCase = true) || url.contains("wbafr", ignoreCase = true))
+        assertFalse(headers.values.any { it.contains(bmwVin) })
+    }
+
+    @Test fun `server errors and malformed bodies are typed failures`() = runTest {
+        assertEquals(VinDecodeResult.Failed(LookupError.SERVICE), NhtsaVinDecoder { _, _, _ -> HttpResponse(503, "") }.decode(bmwVin))
+        assertEquals(VinDecodeResult.Failed(LookupError.MALFORMED), NhtsaVinDecoder { _, _, _ -> HttpResponse(200, "<html>") }.decode(bmwVin))
     }
 }
