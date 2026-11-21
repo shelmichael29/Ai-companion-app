@@ -18,13 +18,13 @@ Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified
 | Connection stages, protocol fallback, bounded recovery; Gemini reliability fixes | Phase 7 | `docs/CONNECTION_RECOVERY.md` |
 | Adapter discovery, bounded connect, auto-reconnect, voice announcements | Bluetooth foundation | `docs/BLUETOOTH_CONNECTION.md` |
 | Hands-free foundation: routing, honest "not yet" replies, voice/audio diagnostics | H0 | `docs/HANDS_FREE.md` |
+| VIN scanner (CameraX + on-device ML Kit), guided Add Vehicle flow, NHTSA decode, model-level recall campaigns (never labeled VIN-confirmed); VIN sent by POST body | #41 | `docs/VIN_SCANNER.md` |
+| Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides | #40 | `docs/OFFLINE_KNOWLEDGE.md` |
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 
 ## In progress (🔵)
 | Item | Where |
 |---|---|
-| VIN scanner (CameraX + ML Kit), guided VIN flow, NHTSA decode and model-level recall campaigns; never VIN-confirmed (`docs/VIN_SCANNER.md`) | branch `feature/vin-scanner` (PR open) |
-| Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides (`docs/OFFLINE_KNOWLEDGE.md`) | branch `feature/offline-knowledge` (PR open) |
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)

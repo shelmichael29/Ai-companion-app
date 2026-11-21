@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-21 | Project memory: VIN scanner, Gemini routing and offline pack marked merged (docs only) | PASS (local) | 506 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
 | 2026-11-20 | VIN scanner, decoder and recalls (release gate) | PASS (local) | 506 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Offline knowledge pack | PASS (local) | 429 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Chat screen layout, scrolling and compact voice bar | PASS (local) | 409 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
