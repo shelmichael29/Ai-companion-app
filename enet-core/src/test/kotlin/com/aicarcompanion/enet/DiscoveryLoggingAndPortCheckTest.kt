@@ -23,13 +23,13 @@ class DiscoveryLoggingAndPortCheckTest {
 
     // ---- Timeout -----------------------------------------------------------------------------------
 
-    @Test fun `discovery listens 5 seconds by default and the window is configurable within bounds`() = runTest {
+    @Test fun `discovery listens 9 seconds by default and the window is configurable within bounds`() = runTest {
         val (fake, tester) = setup()
-        fake.udpReplies[Ipv4Address.LIMITED_BROADCAST to Hsfz.IDENT_PORT] = listOf(4_200L to Sim.hsfzIdentReply())
+        fake.udpReplies[Ipv4Address.LIMITED_BROADCAST to Hsfz.IDENT_PORT] = listOf(8_200L to Sim.hsfzIdentReply())
         val r = tester.discover(Sim.LINK) as DiscoveryResult.Completed
-        assertEquals("a reply after 4.2 s is caught with the 5 s default", 1, r.gateways.size)
-        assertEquals(5_000L, r.listenMillis)
-        assertEquals(5_000L, currentTime)
+        assertEquals("a reply after 8.2 s is caught with the 9 s default", 1, r.gateways.size)
+        assertEquals(9_000L, r.listenMillis)
+        assertEquals(9_000L, currentTime)
 
         val (fake2, tester2) = setup()
         fake2.udpReplies[Ipv4Address.LIMITED_BROADCAST to Hsfz.IDENT_PORT] = listOf(9_000L to Sim.hsfzIdentReply())
@@ -60,7 +60,7 @@ class DiscoveryLoggingAndPortCheckTest {
         val (fake, tester) = setup()
         fake.udpReplies[Ipv4Address.LIMITED_BROADCAST to Hsfz.IDENT_PORT] = listOf(30L to Sim.hsfzIdentReply())
         fake.udpReplies[Ipv4Address.LIMITED_BROADCAST to Doip.PORT] = listOf(40L to Sim.doipAnnouncement())
-        tester.discover(Sim.LINK)
+        tester.discover(Sim.LINK, DiscoveryOptions(includeDoip = true))
         val log = tester.logText()
         assertTrue(log, log.contains("← UDP 169.254.42.17:6811 → 169.254.10.2:50123 after 30 ms: 56 bytes, header [00 00 00 32 00 11] payload \"DIAGADR10BMWMAC001A37******BMWVINWBA********000001\""))
         assertTrue(log, log.contains("vehicle announcement (VIN/EID not shown)"))
