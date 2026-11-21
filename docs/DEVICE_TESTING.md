@@ -56,7 +56,7 @@ See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call f
   **Search** (no VIN): recalls check by themselves, or by the button. Ask Penelope "any recalls on my car?" with and
   without a connection: both answers name their source, and the offline one says it is saved data. For an old car
   (for example a 1990s model) recalls must be listed normally, with the eligibility note and no "ineligible" wording.
-  The About/home label should read "v0.7.1-beta • Build 8" on a debug build.
+  The home label should read "v0.7.1-beta • Build 8 • <8-character revision>" on a debug build.
 - **Duplicate:** add the same VIN twice: the second time shows "already added", no second car, and "Open my saved car" works.
 - **Offline:** airplane mode: the decode explains it can't reach NHTSA and "Fill in my car's details myself" works.
   Turn airplane mode on after decoding: recalls show the saved snapshot labeled "saved data", or "couldn't check", and
