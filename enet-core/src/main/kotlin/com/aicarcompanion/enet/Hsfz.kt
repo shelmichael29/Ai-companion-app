@@ -61,6 +61,7 @@ object Hsfz {
  */
 enum class SafeRequest(val label: String, val uds: ByteArray, val positiveResponse: ByteArray) {
     /** UDS TesterPresent (0x3E, sub-function 0x00): "are you there?", requires a response. */
+    READ_VIN("Read VIN", byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()), byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte())),
     TESTER_PRESENT("TesterPresent (3E 00)", byteArrayOf(0x3E, 0x00), byteArrayOf(0x7E, 0x00)),
 }
 
