@@ -48,6 +48,8 @@ class RuleBasedReasoningProvider(
     private val now: () -> Instant = Instant::now,
     /** The offline knowledge pack: recalls, crash ratings and symptom triage guides. */
     private val offline: com.aicarcompanion.app.diagnostics.knowledge.OfflineKnowledge = com.aicarcompanion.app.diagnostics.knowledge.NoOfflineKnowledge,
+    /** The same recall check the Add Vehicle screens use. Without it, recall answers come from the offline pack only. */
+    private val recalls: com.aicarcompanion.app.vin.RecallService? = null,
 ) : ReasoningProvider {
 
     /** What the last answer was about, so it can be re-explained at another level. */
@@ -476,11 +478,27 @@ class RuleBasedReasoningProvider(
     }
 
     /** Recall campaigns or crash ratings for the selected car's year/make/model, from the offline pack. */
-    private fun vehicleRecord(ctx: VehicleContext, recalls: Boolean): AssistantReply {
+    private suspend fun vehicleRecord(ctx: VehicleContext, recalls: Boolean): AssistantReply {
         val v = ctx.vehicle ?: return reply(
             "Add your car first (year, make and model), and I can look up " + (if (recalls) "recall campaigns." else "its crash-test ratings."),
             ReplyBasis.NOT_AVAILABLE,
         )
+        if (recalls) {
+            val service = this.recalls
+            if (service != null) {
+                val target = com.aicarcompanion.app.vin.RecallTarget.of(v.year, v.make, v.model) ?: return reply(
+                    "I need your car's year, make and model to look up recalls. Add them by editing the vehicle, or check your VIN at nhtsa.gov/recalls.",
+                    ReplyBasis.NOT_AVAILABLE,
+                )
+                // Same service as the screens. The VIN is not passed: this answer only needs the model.
+                val report = service.check(target)
+                val basis = if (report.completed) ReplyBasis.RECALL_DATA else ReplyBasis.NOT_AVAILABLE // a failed check isn't recall data
+                return reply(
+                    com.aicarcompanion.app.vin.RecallMessaging.assistantAnswerText(report), basis,
+                    spoken = com.aicarcompanion.app.vin.RecallMessaging.assistantAnswer(report),
+                )
+            }
+        }
         if (!offline.available) {
             return reply(
                 if (recalls) "My recall data isn't available right now. You can check your VIN at nhtsa.gov/recalls." else "My crash-rating data isn't available right now.",

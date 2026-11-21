@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-21 | Recall accuracy and reporting (v0.7.1, build 8; release gate) | PASS (local) | 562 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-21 | Project memory: VIN scanner, Gemini routing and offline pack marked merged (docs only) | PASS (local) | 506 run, 0 failed | 0 / 1 | 0 | NOT RUN (no app change) | PASS |
 | 2026-11-20 | VIN scanner, decoder and recalls (release gate) | PASS (local) | 506 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-19 | Offline knowledge pack | PASS (local) | 429 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
@@ -34,6 +35,8 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 - **Chat screen on the phone:** layout, scrolling, keyboard, 200% font, TalkBack (`docs/DEVICE_TESTING.md` §0b). Pending.
 
 - **Offline knowledge on the phone:** first-launch install time, storage, recall/rating answers, adding a car offline (`docs/OFFLINE_KNOWLEDGE.md` §5). Pending.
+
+- **Recall accuracy on the phone:** airplane-mode failure wording and Try again, source and date on every result, search/manual cars, Penelope's recall answer online and offline, an old model year (`docs/DEVICE_TESTING.md` §1c). Pending.
 
 - **VIN scanner on the phone:** real camera, recognition on a windshield/door sticker/paper, flashlight, permission prompts, rotation, rapid open/close, TalkBack, spoken guidance, recalls over mobile data (`docs/DEVICE_TESTING.md` §1c). Pending.
 

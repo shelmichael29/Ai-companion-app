@@ -120,6 +120,18 @@ fun VehicleEditScreen(
             }
             DetailsForm(viewModel)
 
+            // The same recall check and wording as the VIN flow, for cars added by search or manual entry too.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val vin = viewModel.form.vin.takeIf { it.isNotBlank() }
+            RecallPanel(
+                state = viewModel.recallState,
+                currentTarget = viewModel.currentRecallTarget,
+                hasVin = vin != null,
+                onCheck = viewModel::checkRecalls,
+                onOpenLink = { openLink(context, it) },
+                onCopyVin = vin?.let { v -> { copyVin(context, v) } },
+            )
+
             viewModel.duplicateOf?.let { saved ->
                 Text(
                     "You've already added this car as ${saved.displayName}, so I won't save a second copy.",

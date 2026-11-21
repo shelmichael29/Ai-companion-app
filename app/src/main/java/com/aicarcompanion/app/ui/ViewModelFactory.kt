@@ -51,7 +51,7 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            VehicleEditViewModel(createSavedStateHandle(), c.vehicleRepository, c.vehicleCatalog, c.vinDecoder, c.recallLookup, c::speakGuidance)
+            VehicleEditViewModel(createSavedStateHandle(), c.vehicleRepository, c.vehicleCatalog, c.vinDecoder, c.recallService, c::speakGuidance)
         }
     }
 }

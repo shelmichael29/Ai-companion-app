@@ -58,11 +58,16 @@ object AiRouting {
         else -> Route.AI
     }
 
-    /** The source to record for a deterministic answer. */
-    fun deterministicSource(intent: AssistantIntent): ResponseSource = when (intent) {
+    /** The source to record for a deterministic answer. A recall answer is a live lookup only when it says so. */
+    fun deterministicSource(intent: AssistantIntent, reply: AssistantReply? = null): ResponseSource = when (intent) {
         AssistantIntent.EndConversation, AssistantIntent.PauseConversation, AssistantIntent.Repeat -> ResponseSource.CONVERSATION_CONTROL
         AssistantIntent.ConnectionStatus -> ResponseSource.DEVICE_COMMAND
-        AssistantIntent.Recalls, AssistantIntent.SafetyRating -> ResponseSource.OFFLINE_REFERENCE
+        AssistantIntent.Recalls -> when (reply?.basis) {
+            ReplyBasis.RECALL_DATA -> ResponseSource.RECALL_LOOKUP
+            ReplyBasis.NOT_AVAILABLE -> ResponseSource.RECALL_LOOKUP_FAILED
+            else -> ResponseSource.OFFLINE_REFERENCE
+        }
+        AssistantIntent.SafetyRating -> ResponseSource.OFFLINE_REFERENCE
         else -> ResponseSource.SAFETY
     }
 }
@@ -179,7 +184,7 @@ class GeminiReasoningProvider(
         val route = AiRouting.route(intent, parser.normalize(request.utterance))
         if (route == AiRouting.Route.DETERMINISTIC) {
             val reply = deterministic.respond(request)
-            sources.record(ResponseRecord(AiRouting.deterministicSource(intent), clockMillis() - started))
+            sources.record(ResponseRecord(AiRouting.deterministicSource(intent, reply), clockMillis() - started))
             return remember(request.utterance, reply)
         }
         if (!aiEnabled() || !client.isConfigured) {

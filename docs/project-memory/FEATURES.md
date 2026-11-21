@@ -19,6 +19,7 @@ Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified
 | Adapter discovery, bounded connect, auto-reconnect, voice announcements | Bluetooth foundation | `docs/BLUETOOTH_CONNECTION.md` |
 | Hands-free foundation: routing, honest "not yet" replies, voice/audio diagnostics | H0 | `docs/HANDS_FREE.md` |
 | VIN scanner (CameraX + on-device ML Kit), guided Add Vehicle flow, NHTSA decode, model-level recall campaigns (never labeled VIN-confirmed); VIN sent by POST body | #41 | `docs/VIN_SCANNER.md` |
+| Recall accuracy: one recall service for scanned, typed, searched and manual cars and for Penelope; failures never read as "no recalls"; source and date checked on every result; model-level vs VIN-verified kept apart; eligibility explained, never decided (v0.7.1) | This PR | `docs/VIN_SCANNER.md` §5 |
 | Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides | #40 | `docs/OFFLINE_KNOWLEDGE.md` |
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 

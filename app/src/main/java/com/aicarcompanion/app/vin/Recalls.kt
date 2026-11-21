@@ -8,8 +8,11 @@ import com.aicarcompanion.app.data.vehicledb.urlEncoded
 import com.aicarcompanion.app.diagnostics.knowledge.OfflineKnowledge
 import org.json.JSONException
 import org.json.JSONObject
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 /*
@@ -51,7 +54,7 @@ sealed interface RecallLookupResult {
     data class Unavailable(val error: LookupError) : RecallLookupResult
 }
 
-interface RecallLookup {
+fun interface RecallLookup {
     suspend fun forVehicle(year: Int, make: String, model: String): RecallLookupResult
 }
 
@@ -59,8 +62,21 @@ interface RecallLookup {
 object NhtsaRecallParser {
     private val DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.US)
 
+    /**
+     * @throws JSONException when [body] isn't a recall response. A reply without a `results` list, or
+     * whose records are all unusable, is a failure: it must never read as "no campaigns".
+     */
     fun parse(body: String): List<RecallCampaignInfo> {
-        val results = JSONObject(body).optJSONArray("results") ?: return emptyList()
+        val root = JSONObject(body)
+        val results = root.optJSONArray("results") ?: throw JSONException("no results list")
+        val expected = root.optInt("Count", -1)
+        if (expected > 0 && results.length() == 0) throw JSONException("count without results")
+        val campaigns = parseRecords(results)
+        if (results.length() > 0 && campaigns.isEmpty()) throw JSONException("no usable campaigns")
+        return campaigns
+    }
+
+    private fun parseRecords(results: org.json.JSONArray): List<RecallCampaignInfo> {
         val seen = mutableSetOf<String>()
         return (0 until results.length()).mapNotNull { results.optJSONObject(it) }.mapNotNull { r ->
             fun text(key: String) = r.optString(key).replace(Regex("\\s+"), " ").trim().takeIf { it.isNotEmpty() && it != "null" }
@@ -100,6 +116,10 @@ class NhtsaRecallLookup(private val http: HttpClient, private val log: Connectio
             RecallLookupResult.Unavailable(LookupError.OFFLINE)
         } catch (e: JSONException) {
             RecallLookupResult.Unavailable(LookupError.MALFORMED)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: RuntimeException) {
+            RecallLookupResult.Unavailable(LookupError.SERVICE) // never an empty list for an unexpected failure
         }
         // Categories and counts only. No VIN, make or model.
         log?.record(
@@ -129,7 +149,8 @@ class FallbackRecallLookup(private val live: RecallLookup, private val offline: 
     override suspend fun forVehicle(year: Int, make: String, model: String): RecallLookupResult {
         val result = live.forVehicle(year, make, model)
         if (result !is RecallLookupResult.Unavailable || !offline.available) return result
-        val saved = offline.recalls(year, make, model, limit = 50)
+        // The local database query runs off the main thread, and isn't cut short: a count must be the real count.
+        val saved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { offline.recalls(year, make, model, limit = 500) }
         // Zero saved campaigns may only mean the model name didn't match, so it isn't shown as "none".
         if (saved.isEmpty()) return result
         val snapshot = RecallSource.SavedSnapshot(offline.info?.recallSnapshot)
@@ -152,6 +173,7 @@ data class RecallStatus(val headline: String, val body: String, val urgent: Bool
 
 object RecallMessaging {
     const val VERIFY_HINT = "To find out whether any apply to your car, and whether they've been repaired, check your VIN with NHTSA."
+    private const val VERIFY_ALOUD = "To find out whether any apply to your car, and whether they've been repaired, check your VIN at nhtsa.gov/recalls."
 
     fun status(result: RecallLookupResult, vehicleName: String): RecallStatus = when (result) {
         is RecallLookupResult.Found -> {
@@ -175,8 +197,108 @@ object RecallMessaging {
         )
         is RecallLookupResult.Unavailable -> RecallStatus(
             headline = "I couldn't check recalls right now",
-            body = "You can still save your car. Check recalls any time with your VIN at nhtsa.gov/recalls.",
+            body = "That doesn't mean there are none: the check just didn't finish. You can still save your car. " +
+                "Check recalls any time with your VIN at nhtsa.gov/recalls.",
         )
+    }
+
+    /**
+     * Repair eligibility is never worked out here: this app has no mileage, age or date rule for it, and
+     * must not invent one. Only explains what it can depend on, and who can say.
+     */
+    const val ELIGIBILITY_NOTE =
+        "Whether a recall can be repaired at no cost can depend on your car's age, when it was first sold at retail, " +
+            "when the campaign was announced, and the manufacturer's policies. I can't tell from here whether a recall " +
+            "applies to your car or whether it's eligible. A dealer or the manufacturer can tell you."
+
+    /** One line for voice: the same message, shorter. */
+    private const val ELIGIBILITY_SPOKEN =
+        "Whether a repair is free can depend on your car's age, when it was first sold, and the manufacturer's policies, so ask a dealer."
+
+    /** "Nov 21, 2026, 2:15 PM" in the phone's language and time zone. */
+    fun checkedLabel(at: Instant, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
+        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(locale).withZone(zone).format(at)
+
+    /** Where the model-level list came from and when it was checked. Shown with every result and every failure. */
+    fun sourceLine(report: RecallReport, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String {
+        val at = checkedLabel(report.checkedAt, zone, locale)
+        val source = when (val r = report.result) {
+            is RecallLookupResult.Found -> r.source
+            is RecallLookupResult.NoneFound -> r.source
+            is RecallLookupResult.Unavailable -> return "Source: the NHTSA recalls API, which couldn't be reached. Tried $at."
+        }
+        return when (source) {
+            RecallSource.NhtsaLive -> "Source: NHTSA recalls API (live). Checked $at."
+            is RecallSource.SavedSnapshot ->
+                "Source: saved NHTSA data" + (source.asOf?.let { " from $it" }.orEmpty()) +
+                    ". The live lookup failed at $at, so this may be out of date."
+        }
+    }
+
+    /** The VIN-specific part, kept apart from the model-level list. Only a verified source can say "open for your VIN". */
+    data class VinSection(val headline: String, val body: String, val verified: Boolean)
+
+    fun vinSection(status: VinRecallStatus, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): VinSection = when (status) {
+        VinRecallStatus.NotChecked -> VinSection(
+            "Not confirmed for your VIN",
+            "NHTSA's public data lists campaigns by year, make and model only. I can't tell whether your specific car has an " +
+                "open recall or whether one was already repaired. Check your VIN with NHTSA to find out.",
+            verified = false,
+        )
+        is VinRecallStatus.Unavailable -> VinSection(
+            "I couldn't check your VIN",
+            "That doesn't mean there are no open recalls: the check didn't finish. Check your VIN with NHTSA.",
+            verified = false,
+        )
+        is VinRecallStatus.Verified -> {
+            val at = checkedLabel(status.checkedAt, zone, locale)
+            val n = status.open.size
+            VinSection(
+                if (n == 0) "No open recalls reported for your VIN" else "$n open ${if (n == 1) "recall" else "recalls"} reported for your VIN",
+                "Reported by ${status.source}, checked $at. New recalls are added over time, so check again before you rely on this.",
+                verified = true,
+            )
+        }
+    }
+
+    /**
+     * Penelope's spoken and written answer to "any recalls on my car?". Same data and same caveats as the
+     * screens. Never says there are none when the check failed.
+     */
+    fun assistantAnswer(report: RecallReport): String {
+        val name = report.target.displayName
+        return when (val r = report.result) {
+            is RecallLookupResult.Unavailable ->
+                "I couldn't check recalls for the $name just now, so I can't tell you whether there are any. " +
+                    "Try again in a little while, or check your VIN at nhtsa.gov/recalls."
+            is RecallLookupResult.NoneFound ->
+                "NHTSA's recall search returned no recall campaigns for the $name${sourceClause(r.source)}. That doesn't guarantee your car " +
+                    "has no recalls: new ones are added over time and model names don't always match. $VERIFY_ALOUD $ELIGIBILITY_SPOKEN"
+            is RecallLookupResult.Found -> {
+                val n = r.campaigns.size
+                val examples = r.campaigns.take(3).joinToString("; ") { c ->
+                    listOfNotNull(
+                        friendlyComponent(c.component),
+                        c.consequence?.let { "risk: ${it.trimEnd('.')}" },
+                    ).joinToString(", ").ifEmpty { "recall" } + " (campaign ${c.campaignNumber})"
+                }
+                val urgent = if (r.campaigns.any { it.doNotDrive }) {
+                    " For at least one, the manufacturer advises that some affected vehicles shouldn't be driven, so please check your VIN soon."
+                } else ""
+                "NHTSA lists $n ${if (n == 1) "recall campaign" else "recall campaigns"} for the $name${sourceClause(r.source)}. " +
+                    "For example: $examples. These are for the model, not confirmed for your car.$urgent $VERIFY_ALOUD $ELIGIBILITY_SPOKEN"
+            }
+        }
+    }
+
+    /** The written answer: the spoken one plus where it came from and when, so the transcript shows it. */
+    fun assistantAnswerText(report: RecallReport, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
+        assistantAnswer(report) + " " + sourceLine(report, zone, locale)
+
+    private fun sourceClause(source: RecallSource): String = when (source) {
+        RecallSource.NhtsaLive -> ", checked just now"
+        is RecallSource.SavedSnapshot ->
+            ", from saved NHTSA data" + (source.asOf?.let { " dated $it" }.orEmpty()) + " because I couldn't reach NHTSA just now, so it may be out of date"
     }
 
     private fun savedNote(source: RecallSource): String? = (source as? RecallSource.SavedSnapshot)?.let {

@@ -38,6 +38,7 @@ All 12 core and extended sources downloaded successfully. Each file's SHA-256 is
   - The answer always says these cover the **model, not necessarily this car**, and to check the VIN at **nhtsa.gov/recalls**.
   - The **exact** model name is matched first. A longer name is used only when there's just one ("F-150"), so a Mustang never gets the Mustang Mach-E's recalls.
   - With no match, Penelope says that doesn't mean there are none.
+  - **Since v0.7.1** the answer comes from the shared recall service (`docs/VIN_SCANNER.md` §5): live NHTSA first, and this offline snapshot only as a labeled fallback when NHTSA can't be reached. A failed lookup is never answered as "no recalls", and every answer says its source.
   - The 2011 BMW 528i has 4 campaigns on record.
 - **Crash ratings** ("what's my car's crash test rating?"): a built-in answer with NCAP stars by year, make and model. When versions differ, Penelope gives the range and asks which one you have. The 2011 528i sedan: 5 stars overall.
 - **Symptom guides:** for a described symptom, Gemini gets the matching guide's questions and systems to consider, as possibilities to ask about, never a diagnosis. Offline, the built-in answer asks the guide's first question when it has no question of its own.

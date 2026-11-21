@@ -16,6 +16,7 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 | Model delegation agents (Haiku / Sonnet / Opus) | Config only; CI green |
 | Gemini primary routing (#37); offline knowledge pack (#40) | CI green at merge |
 | VIN scanner, decoder and recalls (#41) | 506 tests, 0 failed |
+| Recall accuracy and reporting (v0.7.1, build 8) | see `docs/QUALITY_SUMMARY.md` |
 
 ## Active pull requests
 | PR | What | State |
@@ -43,6 +44,7 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 - 528i connection recovery and voice auto-resume: `docs/CONNECTION_RECOVERY.md` §4.
 - Hands-free foundation: `docs/HANDS_FREE.md` §4.
 - Gemini routing and answer sources: `docs/GEMINI_ROUTING.md` §6.
+- Recall accuracy: offline/failure wording, source and date on screen and in Penelope's answers: `docs/DEVICE_TESTING.md` §1c.
 - VIN scanner: camera, recognition on real VIN plates, permissions, rotation, rapid open/close, TalkBack, recalls over mobile data: `docs/DEVICE_TESTING.md` §1c.
 
 When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/QUALITY_SUMMARY.md`.
