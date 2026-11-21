@@ -1,6 +1,12 @@
 # Features
 
-Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified yet:** no feature has been confirmed on the phone, adapter or car.
+Status labels are explained in [README.md](README.md). Only the features under **Verified** have been confirmed on real hardware; everything under **Built** still needs the phone, adapter or car.
+
+## Verified (✅ in `main`, automated tests, and checked on real hardware)
+| Feature | Since | Verified on | Details |
+|---|---|---|---|
+| VIN scanner (CameraX + on-device ML Kit), guided Add Vehicle flow, NHTSA decode, model-level recall campaigns (never labeled VIN-confirmed); VIN sent by POST body | #41 | Galaxy S26 Ultra, build 0.7.1 (8), 2026-11-21, by the owner: VIN scanned from paper and from the 528i (windshield plate and door sticker), confirmed and saved; camera indicator turns off every time. Still to check: flashlight, camera permission prompts and the settings round trip, rotation, TalkBack, spoken guidance | `docs/VIN_SCANNER.md` |
+| Recall accuracy: one recall service for scanned, typed, searched and manual cars and for Penelope; failures never read as "no recalls"; source and date checked on every result; model-level vs VIN-verified kept apart; eligibility explained, never decided (v0.7.1) | #45 | Galaxy S26 Ultra, build 0.7.1 (8), 2026-11-21, by the owner: recall results with source and date; airplane mode says it couldn't check (never "no recalls"); Penelope's recall answer. Still to check: Try again after a failure, a car added by Search or Manual, an old model year | `docs/VIN_SCANNER.md` §5 |
 
 ## Built (🟢 in `main`, automated tests, not device-verified)
 | Feature | Since | Details |
@@ -18,8 +24,6 @@ Status labels are explained in [README.md](README.md). **Nothing is ✅ Verified
 | Connection stages, protocol fallback, bounded recovery; Gemini reliability fixes | Phase 7 | `docs/CONNECTION_RECOVERY.md` |
 | Adapter discovery, bounded connect, auto-reconnect, voice announcements | Bluetooth foundation | `docs/BLUETOOTH_CONNECTION.md` |
 | Hands-free foundation: routing, honest "not yet" replies, voice/audio diagnostics | H0 | `docs/HANDS_FREE.md` |
-| VIN scanner (CameraX + on-device ML Kit), guided Add Vehicle flow, NHTSA decode, model-level recall campaigns (never labeled VIN-confirmed); VIN sent by POST body | #41 | `docs/VIN_SCANNER.md` |
-| Recall accuracy: one recall service for scanned, typed, searched and manual cars and for Penelope; failures never read as "no recalls"; source and date checked on every result; model-level vs VIN-verified kept apart; eligibility explained, never decided (v0.7.1) | This PR | `docs/VIN_SCANNER.md` §5 |
 | Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides | #40 | `docs/OFFLINE_KNOWLEDGE.md` |
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 
