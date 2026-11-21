@@ -126,7 +126,6 @@ fun VehicleEditScreen(
             RecallPanel(
                 state = viewModel.recallState,
                 currentTarget = viewModel.currentRecallTarget,
-                make = viewModel.form.make.ifBlank { null },
                 hasVin = vin != null,
                 onCheck = viewModel::checkRecalls,
                 onOpenLink = { openLink(context, it) },

@@ -147,6 +147,7 @@ fun VinFlowOverlay(viewModel: VehicleEditViewModel, onOpenExisting: (String) -> 
                         onOpenLink = { url -> openLink(context, url) },
                         onCopyVin = { copyVin(context, decoded.vehicle.vin) },
                         onBack = vm::closeVinFlow,
+                        onRecheck = vm::checkRecalls,
                     )
                 }
             }
@@ -474,6 +475,8 @@ fun VinResultsContent(
     onOpenLink: (String) -> Unit,
     onCopyVin: () -> Unit,
     onBack: () -> Unit,
+    /** Runs the recall check again (after a failure). */
+    onRecheck: (() -> Unit)? = null,
 ) {
     val t = Penelope.tokens
     Column(Modifier.fillMaxSize().testTag(VinTags.RESULTS)) {
@@ -489,8 +492,8 @@ fun VinResultsContent(
             }
             VehicleSummary(vehicle, warnings)
             RecallPanel(
-                recalls, RecallTarget.of(vehicle.year, vehicle.make, vehicle.model), vehicle.make, hasVin = true,
-                onCheck = null, onOpenLink = onOpenLink, onCopyVin = onCopyVin,
+                recalls, RecallTarget.of(vehicle.year, vehicle.make, vehicle.model), hasVin = true,
+                onCheck = onRecheck, onOpenLink = onOpenLink, onCopyVin = onCopyVin,
             )
         }
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

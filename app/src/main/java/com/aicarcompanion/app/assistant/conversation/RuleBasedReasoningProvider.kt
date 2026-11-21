@@ -485,11 +485,18 @@ class RuleBasedReasoningProvider(
         )
         if (recalls) {
             val service = this.recalls
-            val target = com.aicarcompanion.app.vin.RecallTarget.of(v.year, v.make, v.model)
-            if (service != null && target != null) {
+            if (service != null) {
+                val target = com.aicarcompanion.app.vin.RecallTarget.of(v.year, v.make, v.model) ?: return reply(
+                    "I need your car's year, make and model to look up recalls. Add them by editing the vehicle, or check your VIN at nhtsa.gov/recalls.",
+                    ReplyBasis.NOT_AVAILABLE,
+                )
                 // Same service as the screens. The VIN is not passed: this answer only needs the model.
                 val report = service.check(target)
-                return reply(com.aicarcompanion.app.vin.RecallMessaging.assistantAnswer(report), ReplyBasis.RECALL_DATA)
+                val basis = if (report.completed) ReplyBasis.RECALL_DATA else ReplyBasis.NOT_AVAILABLE // a failed check isn't recall data
+                return reply(
+                    com.aicarcompanion.app.vin.RecallMessaging.assistantAnswerText(report), basis,
+                    spoken = com.aicarcompanion.app.vin.RecallMessaging.assistantAnswer(report),
+                )
             }
         }
         if (!offline.available) {

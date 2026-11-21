@@ -56,7 +56,6 @@ import com.aicarcompanion.app.vin.RecallVerificationLinks
 fun RecallPanel(
     state: RecallUiState,
     currentTarget: RecallTarget?,
-    make: String?,
     hasVin: Boolean,
     onCheck: (() -> Unit)?,
     onOpenLink: (String) -> Unit,
@@ -87,7 +86,7 @@ fun RecallPanel(
                 "I need the year, make and model to look up recalls. Add them when you review the details, or check your VIN at nhtsa.gov/recalls.",
                 style = MaterialTheme.typography.bodyMedium, color = t.textSecondary,
             )
-            is RecallUiState.Done -> Done(state.report, currentTarget, make, hasVin, onCheck, onOpenLink, onCopyVin)
+            is RecallUiState.Done -> Done(state.report, currentTarget, hasVin, onCheck, onOpenLink, onCopyVin)
         }
     }
 }
@@ -105,7 +104,6 @@ private fun Checking() {
 private fun Done(
     report: RecallReport,
     currentTarget: RecallTarget?,
-    make: String?,
     hasVin: Boolean,
     onCheck: (() -> Unit)?,
     onOpenLink: (String) -> Unit,
@@ -113,14 +111,18 @@ private fun Done(
 ) {
     val t = Penelope.tokens
     val status = RecallMessaging.status(report.result, report.target.displayName)
-    val stale = currentTarget != null && currentTarget != report.target
+    // A result belongs to the car it was checked for. If the details have changed (or are now incomplete), say so.
+    val stale = currentTarget == null || !currentTarget.sameCarAs(report.target)
     if (stale) {
         GlassPanel(Modifier.fillMaxWidth(), strong = true, contentPadding = 14.dp) {
             Text(
-                "These results are for the ${report.target.displayName}, but the details have changed.",
+                "These results are for the ${report.target.displayName}, but the details have changed." +
+                    if (currentTarget == null) " Add the year, make and model to check again." else "",
                 style = MaterialTheme.typography.bodyMedium, color = t.warning, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
-            if (onCheck != null) TextButton(onClick = onCheck, modifier = Modifier.heightIn(min = 48.dp)) { Text("Check again for the ${currentTarget?.displayName}") }
+            if (onCheck != null && currentTarget != null) {
+                TextButton(onClick = onCheck, modifier = Modifier.heightIn(min = 48.dp)) { Text("Check again for the ${currentTarget.displayName}") }
+            }
         }
     }
     // 1. Model-level campaigns: what NHTSA's public search can say.
@@ -150,7 +152,7 @@ private fun Done(
         }
     }
     if (status.showVerifyLink) {
-        RecallVerificationLinks.forMake(make).forEach { link ->
+        RecallVerificationLinks.forMake(report.target.make).forEach { link ->
             OutlinedButton(onClick = { onOpenLink(link.url) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(link.label) }
         }
         if (onCopyVin != null) TextButton(onClick = onCopyVin, modifier = Modifier.heightIn(min = 48.dp)) { Text("Copy my VIN to paste there") }

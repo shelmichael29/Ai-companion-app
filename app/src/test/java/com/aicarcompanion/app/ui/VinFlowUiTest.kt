@@ -264,7 +264,7 @@ class VinFlowUiTest {
         state: RecallUiState, current: RecallTarget? = bmwTarget, hasVin: Boolean = true, onCheck: (() -> Unit)? = {},
     ) = compose.setContent {
         CarCompanionTheme {
-            androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) { RecallPanel(state, current, "BMW", hasVin, onCheck, {}, null) }
+            androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) { RecallPanel(state, current, hasVin, onCheck, {}, null) }
         }
     }
 
@@ -349,5 +349,42 @@ class VinFlowUiTest {
         compose.onNodeWithTag("recall_source").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Not confirmed for your VIN").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("recall_eligibility").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun `results shown for a car whose details are now incomplete are still marked out of date`() {
+        panel(done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)), current = null)
+        compose.onNodeWithText("These results are for the 2011 BMW 528i", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Add the year, make and model to check again", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun `the VIN results screen offers Try again after a failed recall check`() {
+        var again = false
+        compose.setContent {
+            CarCompanionTheme {
+                VinResultsContent(
+                    decoded.vehicle, decoded.warnings,
+                    done(RecallLookupResult.Unavailable(com.aicarcompanion.app.data.vehicledb.LookupError.SERVICE)),
+                    null, {}, {}, {}, {}, {}, {}, onRecheck = { again = true },
+                )
+            }
+        }
+        compose.onNodeWithText("Try again").performScrollTo().performClick()
+        assertTrue(again)
+    }
+
+    @Test fun `the manufacturer link follows the car the results are for`() {
+        compose.setContent {
+            CarCompanionTheme {
+                androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) {
+                    RecallPanel(
+                        done(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)).let {
+                            RecallUiState.Done(it.report.copy(target = RecallTarget(2018, "Toyota", "Camry")))
+                        },
+                        RecallTarget(2018, "Toyota", "Camry"), hasVin = false, onCheck = null, onOpenLink = {}, onCopyVin = null,
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Check my VIN with Toyota").performScrollTo().assertIsDisplayed()
     }
 }

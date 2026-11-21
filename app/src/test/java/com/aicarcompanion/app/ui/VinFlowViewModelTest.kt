@@ -439,4 +439,77 @@ class VinFlowViewModelTest {
         vm.save { saved = true }
         assertTrue(saved)
     }
+
+    // ---- review findings: VIN pairing, late catalog results, timeouts ---------------------------------------------
+
+    @Test fun `the VIN is only sent with the car it was decoded for`() {
+        val recording = RecordingService(service)
+        val vm = vmWith(recording)
+        vm.typeAndLookUp()                                  // decoded 2011 BMW 528i, check sent with its VIN
+        vm.reviewDetails()
+        vm.update { it.copy(model = "535i") }               // the form now describes a different car
+        vm.checkRecalls()
+        vm.update { it.copy(model = "528i") }               // back to the decoded car
+        vm.checkRecalls()
+        val target = RecallTarget(2011, "BMW", "528i")
+        assertEquals(
+            listOf(target to vin, RecallTarget(2011, "BMW", "535i") to null, target to vin),
+            recording.calls,
+        )
+    }
+
+    @Test fun `a catalog car picked after a VIN decode does not inherit the VIN`() {
+        val recording = RecordingService(service)
+        val vm = vmWith(recording)
+        vm.typeAndLookUp(); vm.reviewDetails()
+        vm.update { it.copy(year = "2020", make = "Audi", model = "A4", source = com.aicarcompanion.app.domain.model.IdentificationSource.CATALOG) }
+        vm.checkRecalls()
+        assertNull(recording.calls.last().second)
+    }
+
+    private class ControlledCatalog(val specsGate: kotlinx.coroutines.CompletableDeferred<Unit>) : VehicleCatalogProvider {
+        override val sourceName = "controlled"
+        private val config = VehicleConfiguration("c1", "Auto, 4 cyl, 2.0 L", "Auto", 4, 2.0, emptyList())
+        override suspend fun years() = LookupResult.Success(listOf(2020))
+        override suspend fun makes(year: Int) = LookupResult.Success(listOf("Audi"))
+        override suspend fun models(year: Int, make: String) = LookupResult.Success(listOf("A4"))
+        override suspend fun configurations(year: Int, make: String, model: String) = LookupResult.Success(listOf(config))
+        override suspend fun specs(configurationId: String): LookupResult<CatalogVehicleSpecs> {
+            specsGate.await()
+            return LookupResult.Success(CatalogVehicleSpecs("c1", 2020, "Audi", "A4", "A4", 2.0, 4, "Auto", "FWD", null, null, null, null))
+        }
+        fun config() = config
+    }
+
+    @Test fun `a search result that arrives after the user moved on to a VIN does not overwrite the decoded car`() {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val catalog = ControlledCatalog(gate)
+        repo = InMemoryVehicleRepository()
+        val vm = VehicleEditViewModel(SavedStateHandle(), repo, catalog, decoder, service) { }
+        vm.selection.selectYear(2020); vm.selection.selectMake("Audi"); vm.selection.selectModel("A4")
+        vm.selection.selectConfiguration(catalog.config())   // specs still loading
+        vm.selectMode(IdentifyMode.VIN)
+        vm.typeAndLookUp()                                    // decoded 2011 BMW 528i
+        gate.complete(Unit)                                   // the Audi's specs arrive late
+        assertEquals("BMW", vm.form.make)
+        assertEquals("528i", vm.form.model)
+        assertEquals(RecallTarget(2011, "BMW", "528i"), (vm.recallState as RecallUiState.Done).report.target)
+    }
+
+    @Test fun `a lookup that never answers ends as a failed check instead of hanging`() = runTest {
+        val never = RecallLookup { _, _, _ -> kotlinx.coroutines.awaitCancellation() }
+        val report = DefaultRecallService(never, timeoutMillis = 1_000, now = { checkedAt }).check(RecallTarget(2011, "BMW", "528i"))
+        assertTrue(report.result is RecallLookupResult.Unavailable)
+        assertEquals(checkedAt, report.checkedAt)
+    }
+
+    @Test fun `a failed VIN decode keeps the recall result already shown for the form's car`() {
+        val vm = vm()
+        vm.update { it.copy(year = "2011", make = "BMW", model = "528i") }
+        vm.checkRecalls()
+        val before = vm.recallState
+        decoder.result = VinDecodeResult.Failed(LookupError.OFFLINE)
+        vm.openVinFlow(scan = false); vm.typeInstead(); vm.updateVin(vin); vm.decodeVin()
+        assertEquals(before, vm.recallState)
+    }
 }

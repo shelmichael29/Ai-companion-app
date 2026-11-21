@@ -114,6 +114,9 @@ class VehicleEditViewModel(
     private val scanTracker = VinScanTracker()
     private var vinJob: Job? = null
     private var recallJob: Job? = null
+    /** The VIN that was decoded, and the car it described. A recall check may use the VIN only for that same car. */
+    private var decodedVin: String? = null
+    private var decodedTarget: RecallTarget? = null
     private var speakJob: Job? = null
 
     /** Bumped whenever looked-up details are applied, so the UI can bring the review form into view. */
@@ -138,6 +141,8 @@ class VehicleEditViewModel(
             selection.state.collect { s ->
                 val config = s.configuration ?: return@collect
                 if (s.specs is Options.Loading || config.id == appliedCatalogId) return@collect
+                // A search result that arrives after the user moved on (to a VIN, say) must not overwrite their car.
+                if (mode != IdentifyMode.SEARCH || vinStage != VinStage.None) return@collect
                 form = form.withCatalogSelection(
                     year = s.year ?: return@collect,
                     make = s.make ?: return@collect,
@@ -147,7 +152,10 @@ class VehicleEditViewModel(
                 )
                 appliedCatalogId = config.id
                 detailsAppliedCount++
-                checkRecalls()
+                // Picking another configuration of the car already checked doesn't need another request.
+                val shown = (recallState as? RecallUiState.Done)?.report
+                val target = currentRecallTarget
+                if (shown == null || !shown.completed || target == null || !target.sameCarAs(shown.target)) checkRecalls()
             }
         }
     }
@@ -277,7 +285,6 @@ class VehicleEditViewModel(
         vinProblem = null
         vinState = VinState.Decoding
         vinStage = VinStage.Working
-        recallState = RecallUiState.Idle
         vinJob?.cancel()
         vinJob = viewModelScope.launch {
             val result = vinDecoder.decode(vin)
@@ -289,7 +296,10 @@ class VehicleEditViewModel(
                     form = form.withDecodedVin(result.vehicle)
                     detailsAppliedCount++
                     vinStage = VinStage.Results
-                    startRecallCheck(RecallTarget.of(result.vehicle.year, result.vehicle.make, result.vehicle.model), result.vehicle.vin)
+                    val target = RecallTarget.of(result.vehicle.year, result.vehicle.make, result.vehicle.model)
+                    decodedVin = result.vehicle.vin
+                    decodedTarget = target
+                    startRecallCheck(target, result.vehicle.vin)
                 }
                 is VinDecodeResult.NotDecoded -> {
                     vinProblem = "Couldn't decode this VIN: ${result.reason}"
@@ -323,7 +333,14 @@ class VehicleEditViewModel(
         get() = RecallTarget.of(form.year.toIntOrNull(), form.make, form.model)
 
     /** "Check recalls" for a car added by search or manual entry (a scanned VIN's check runs by itself). */
-    fun checkRecalls() = startRecallCheck(currentRecallTarget, form.vin.takeIf { it.isNotBlank() })
+    fun checkRecalls() {
+        val target = currentRecallTarget
+        // The VIN goes along only if the form still describes the car that VIN was decoded for.
+        val vin = decodedVin?.takeIf { v ->
+            target != null && decodedTarget?.sameCarAs(target) == true && VinValidator.normalize(form.vin) == v
+        }
+        startRecallCheck(target, vin)
+    }
 
     /** Couldn't decode: keep the VIN and fill in the car by hand. Saving a car never needs the lookup. */
     fun continueWithoutDecoding() {

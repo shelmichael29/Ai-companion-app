@@ -149,7 +149,8 @@ class FallbackRecallLookup(private val live: RecallLookup, private val offline: 
     override suspend fun forVehicle(year: Int, make: String, model: String): RecallLookupResult {
         val result = live.forVehicle(year, make, model)
         if (result !is RecallLookupResult.Unavailable || !offline.available) return result
-        val saved = offline.recalls(year, make, model, limit = 50)
+        // The local database query runs off the main thread, and isn't cut short: a count must be the real count.
+        val saved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { offline.recalls(year, make, model, limit = 500) }
         // Zero saved campaigns may only mean the model name didn't match, so it isn't shown as "none".
         if (saved.isEmpty()) return result
         val snapshot = RecallSource.SavedSnapshot(offline.info?.recallSnapshot)
@@ -289,6 +290,10 @@ object RecallMessaging {
             }
         }
     }
+
+    /** The written answer: the spoken one plus where it came from and when, so the transcript shows it. */
+    fun assistantAnswerText(report: RecallReport, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
+        assistantAnswer(report) + " " + sourceLine(report, zone, locale)
 
     private fun sourceClause(source: RecallSource): String = when (source) {
         RecallSource.NhtsaLive -> ", checked just now"

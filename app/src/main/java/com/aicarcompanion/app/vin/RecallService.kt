@@ -2,6 +2,7 @@ package com.aicarcompanion.app.vin
 
 import com.aicarcompanion.app.data.vehicledb.LookupError
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 
 /*
@@ -22,6 +23,10 @@ import java.time.Instant
 /** What a recall check is about. Deliberately no VIN, mileage or dates. */
 data class RecallTarget(val year: Int, val make: String, val model: String) {
     val displayName: String get() = "$year $make $model"
+
+    /** The same car, ignoring capitalization and stray spaces ("BMW" and "bmw " are one make). */
+    fun sameCarAs(other: RecallTarget): Boolean =
+        year == other.year && make.trim().equals(other.make.trim(), ignoreCase = true) && model.trim().equals(other.model.trim(), ignoreCase = true)
 
     companion object {
         /** The target for a car's year, make and model, or null when any is missing. */
@@ -85,11 +90,14 @@ interface RecallService {
 class DefaultRecallService(
     private val lookup: RecallLookup,
     private val vinSource: VinRecallSource = NoVinRecallSource,
+    private val timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
     private val now: () -> Instant = Instant::now,
 ) : RecallService {
     override suspend fun check(target: RecallTarget, vin: String?): RecallReport {
         val result = try {
-            lookup.forVehicle(target.year, target.make, target.model)
+            // Never waits forever: a lookup that doesn't answer is a failed check, shown as such.
+            withTimeoutOrNull(timeoutMillis) { lookup.forVehicle(target.year, target.make, target.model) }
+                ?: RecallLookupResult.Unavailable(LookupError.OFFLINE)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -100,7 +108,7 @@ class DefaultRecallService(
             VinRecallStatus.NotChecked
         } else {
             try {
-                vinSource.open(vin, target)
+                withTimeoutOrNull(timeoutMillis) { vinSource.open(vin, target) } ?: VinRecallStatus.Unavailable(LookupError.OFFLINE)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -108,5 +116,10 @@ class DefaultRecallService(
             }
         }
         return RecallReport(target, result, now(), vinStatus)
+    }
+
+    private companion object {
+        /** Longer than the HTTP connect plus read timeouts, so a slow network fails by itself first. */
+        const val DEFAULT_TIMEOUT_MILLIS = 35_000L
     }
 }

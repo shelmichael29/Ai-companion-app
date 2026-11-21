@@ -278,4 +278,26 @@ class RecallAccuracyTest {
         assertNull(RecallTarget.of(1700, "BMW", "528i"))
         assertEquals(RecallTarget(2011, "BMW", "528i"), RecallTarget.of(2011, " BMW ", " 528i "))
     }
+
+    @Test fun `the same car is recognized whatever its capitalization`() {
+        assertTrue(RecallTarget(2011, "BMW", "528i").sameCarAs(RecallTarget(2011, "bmw ", " 528I")))
+        assertFalse(RecallTarget(2011, "BMW", "528i").sameCarAs(RecallTarget(2012, "BMW", "528i")))
+        assertFalse(RecallTarget(2011, "BMW", "528i").sameCarAs(RecallTarget(2011, "BMW", "535i")))
+    }
+
+    @Test fun `the saved snapshot is not cut short, so its count is the real count`() = runTest {
+        var asked = 0
+        val big = object : OfflineKnowledge by NoOfflineKnowledge {
+            override val available = true
+            override val info = KnowledgeInfo("2026-11-01T00:00:00Z", "2026-10-15")
+            override fun recalls(year: Int, make: String, model: String, limit: Int): List<RecallCampaign> {
+                asked = limit
+                return (1..80).map { RecallCampaign("V$it", null, null, null, null, null) }.take(limit)
+            }
+        }
+        val down = RecallLookup { _, _, _ -> RecallLookupResult.Unavailable(LookupError.OFFLINE) }
+        val r = FallbackRecallLookup(down, big).forVehicle(2011, "BMW", "528i") as RecallLookupResult.Found
+        assertEquals(80, r.campaigns.size)
+        assertTrue(asked >= 100)
+    }
 }

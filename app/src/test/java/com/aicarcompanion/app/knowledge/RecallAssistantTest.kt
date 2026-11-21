@@ -60,7 +60,8 @@ class RecallAssistantTest {
             val reply = ask(provider(RecallLookupResult.Unavailable(failure)))
             assertTrue(reply.text.contains("can't tell you whether there are any"))
             assertFalse(reply.text.lowercase().contains("no recall campaigns"))
-            assertEquals(ReplyBasis.RECALL_DATA, reply.basis)
+            // A failed check is not "NHTSA recall data": it must not carry that label.
+            assertEquals(ReplyBasis.NOT_AVAILABLE, reply.basis)
         }
     }
 
@@ -92,5 +93,26 @@ class RecallAssistantTest {
         assertEquals(ResponseSource.RECALL_LOOKUP, AiRouting.deterministicSource(AssistantIntent.Recalls, live))
         assertEquals(ResponseSource.OFFLINE_REFERENCE, AiRouting.deterministicSource(AssistantIntent.Recalls, offline))
         assertEquals(ResponseSource.OFFLINE_REFERENCE, AiRouting.deterministicSource(AssistantIntent.Recalls))
+    }
+
+    @Test fun `the written answer gives the source and the time, the spoken one stays short`() = runTest {
+        val live = ask(provider(RecallLookupResult.NoneFound(RecallSource.NhtsaLive)))
+        assertTrue(live.text.contains("Source: NHTSA recalls API (live). Checked"))
+        assertFalse(live.spokenText.contains("Source:"))
+        val failed = ask(provider(RecallLookupResult.Unavailable(LookupError.OFFLINE)))
+        assertTrue(failed.text.contains("couldn't be reached. Tried"))
+    }
+
+    @Test fun `an incomplete car asks for details instead of falling back to a different recall source`() = runTest {
+        val asked = mutableListOf<RecallTarget>()
+        val reply = ask(provider(RecallLookupResult.NoneFound(RecallSource.NhtsaLive), asked, bmw.copy(model = " ")))
+        assertTrue(reply.text.contains("year, make and model"))
+        assertEquals(ReplyBasis.NOT_AVAILABLE, reply.basis)
+        assertTrue(asked.isEmpty())
+    }
+
+    @Test fun `a failed lookup is logged as a failed lookup, not as recall data`() {
+        val failed = AssistantReply("x", ReplyBasis.NOT_AVAILABLE)
+        assertEquals(ResponseSource.RECALL_LOOKUP_FAILED, AiRouting.deterministicSource(AssistantIntent.Recalls, failed))
     }
 }

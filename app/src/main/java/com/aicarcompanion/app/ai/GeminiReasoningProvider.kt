@@ -62,8 +62,11 @@ object AiRouting {
     fun deterministicSource(intent: AssistantIntent, reply: AssistantReply? = null): ResponseSource = when (intent) {
         AssistantIntent.EndConversation, AssistantIntent.PauseConversation, AssistantIntent.Repeat -> ResponseSource.CONVERSATION_CONTROL
         AssistantIntent.ConnectionStatus -> ResponseSource.DEVICE_COMMAND
-        AssistantIntent.Recalls ->
-            if (reply?.basis == ReplyBasis.RECALL_DATA) ResponseSource.RECALL_LOOKUP else ResponseSource.OFFLINE_REFERENCE
+        AssistantIntent.Recalls -> when (reply?.basis) {
+            ReplyBasis.RECALL_DATA -> ResponseSource.RECALL_LOOKUP
+            ReplyBasis.NOT_AVAILABLE -> ResponseSource.RECALL_LOOKUP_FAILED
+            else -> ResponseSource.OFFLINE_REFERENCE
+        }
         AssistantIntent.SafetyRating -> ResponseSource.OFFLINE_REFERENCE
         else -> ResponseSource.SAFETY
     }
