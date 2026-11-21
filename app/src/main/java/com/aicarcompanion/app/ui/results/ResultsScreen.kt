@@ -26,10 +26,12 @@ import com.aicarcompanion.app.ui.theme.Penelope
 /** Car health: each trouble code shown as a beginner-first result card. */
 @Composable
 fun ResultsScreen(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onOpenAdapter: () -> Unit,
     onAsk: () -> Unit,
     viewModel: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory),
+    /** Extra bottom space when shown as a tab, so the floating nav doesn't cover content. */
+    bottomInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     val t = Penelope.tokens
     val ui by viewModel.state.collectAsStateWithLifecycle()
@@ -37,7 +39,7 @@ fun ResultsScreen(
     Column(Modifier.fillMaxSize()) {
         PenelopeTopBar("Car health", onBack)
         LazyColumn(
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp + bottomInset),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (ui.codes.isEmpty()) {

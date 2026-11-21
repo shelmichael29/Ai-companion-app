@@ -52,6 +52,8 @@ fun VehicleListScreen(
     onAddVehicle: () -> Unit,
     onOpenAdapter: () -> Unit,
     contentPadding: PaddingValues,
+    /** Null when Garage is a tab; set when it's opened from elsewhere. */
+    onBack: (() -> Unit)? = null,
     viewModel: VehicleListViewModel = viewModel(factory = AppViewModelProvider.Factory),
     home: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
@@ -61,7 +63,7 @@ fun VehicleListScreen(
     val versions by home.photoVersions.collectAsStateWithLifecycle()
 
     Column {
-        PenelopeTopBar("Garage", onBack = null)
+        PenelopeTopBar("Garage", onBack = onBack)
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),

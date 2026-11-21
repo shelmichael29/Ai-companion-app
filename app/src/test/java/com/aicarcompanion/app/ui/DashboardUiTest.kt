@@ -12,8 +12,8 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onFirst
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -85,13 +85,13 @@ class DashboardUiTest {
         assertTrue(extrasOpened)
     }
 
-    @Test fun advancedHomeAddsTechnicalShortcutsAndKeepsTheOrb() {
+    @Test fun advancedHomeAddsTechnicalShortcutsWithoutAnOrb() {
         home(ExplanationLevel.ADVANCED)
         compose.onNodeWithContentDescription("Connection, protocol, timing and adapter test").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("Adapter, Not connected").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("Extras, optional tools").performScrollTo().assertIsDisplayed()
-        // The orb and the Talk button both start a conversation; the orb is the first.
-        compose.onAllNodesWithContentDescription("Talk to Penelope").onFirst().assertExists()
+        // Penelope stays one tap away: the compact mic button is the only "Talk to Penelope" control.
+        compose.onAllNodesWithContentDescription("Talk to Penelope").assertCountEquals(1)
     }
 
     @Test fun customLayoutOrderIsShownOnHome() {

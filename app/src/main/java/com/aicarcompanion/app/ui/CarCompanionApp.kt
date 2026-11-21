@@ -3,44 +3,22 @@ package com.aicarcompanion.app.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -56,9 +34,17 @@ import com.aicarcompanion.app.ui.adapter.AdapterScreen
 import com.aicarcompanion.app.ui.adapter.AdvancedConnectionScreen
 import com.aicarcompanion.app.ui.assistant.AssistantScreen
 import com.aicarcompanion.app.ui.design.PenelopeBackground
-import com.aicarcompanion.app.ui.design.PenelopeIcons
 import com.aicarcompanion.app.ui.design.PenelopeTopBar
 import com.aicarcompanion.app.ui.history.HistoryScreen
+import com.aicarcompanion.app.ui.navigation.DriveScreen
+import com.aicarcompanion.app.ui.navigation.FloatingNavBar
+import com.aicarcompanion.app.ui.navigation.LevelNavigation
+import com.aicarcompanion.app.ui.navigation.LiveDataScreen
+import com.aicarcompanion.app.ui.navigation.MoreAction
+import com.aicarcompanion.app.ui.navigation.MoreScreen
+import com.aicarcompanion.app.ui.navigation.NavRoutes
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import com.aicarcompanion.app.ui.home.HomeScreen
 import com.aicarcompanion.app.ui.results.ResultsScreen
 import com.aicarcompanion.app.ui.settings.SettingsScreen
@@ -72,8 +58,12 @@ import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleListScreen
 
 private object Routes {
-    const val HOME = "home"
-    const val GARAGE = "garage"
+    const val HOME = NavRoutes.HOME
+    const val GARAGE = NavRoutes.GARAGE
+    const val DRIVE = NavRoutes.DRIVE
+    const val DIAGNOSTICS = NavRoutes.DIAGNOSTICS
+    const val LIVE_DATA = NavRoutes.LIVE_DATA
+    const val MORE = NavRoutes.MORE
     const val CHAT = "chat"
     const val HISTORY = "history"
     const val SETTINGS = "settings"
@@ -86,13 +76,6 @@ private object Routes {
     fun vehicleEdit(id: String?) = if (id == null) "vehicle/edit" else "vehicle/edit?${VehicleEditViewModel.VEHICLE_ID_ARG}=$id"
 }
 
-internal enum class Tab(val route: String, val label: String, val icon: ImageVector) {
-    HOME(Routes.HOME, "Home", PenelopeIcons.Home),
-    GARAGE(Routes.GARAGE, "Garage", PenelopeIcons.Garage),
-    CHAT(Routes.CHAT, "Chat", PenelopeIcons.Chat),
-    HISTORY(Routes.HISTORY, "History", PenelopeIcons.History),
-}
-
 /** Height reserved at the bottom of tab screens so content isn't hidden behind the floating nav. */
 private val NAV_SPACE = 104.dp
 
@@ -101,19 +84,30 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
     val t = Penelope.tokens
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
-    val tab = Tab.entries.firstOrNull { it.route == currentRoute }
     val settings by (LocalContext.current.applicationContext as CarCompanionApplication)
         .container.settings.settings.collectAsStateWithLifecycle()
+    val level = settings.explanationLevel
+    val tabs = LevelNavigation.tabs(level)
+    val isTab = LevelNavigation.isTab(level, currentRoute)
+
+    // Changing the knowledge level only changes which tabs exist: keep the user on a valid one.
+    // (Keyed on the level alone so opening a non-tab screen later is never bounced back.)
+    LaunchedEffect(level) {
+        LevelNavigation.routeAfterLevelChange(level, navController.currentDestination?.route)?.let { navController.navigateTab(it) }
+    }
 
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val tabPadding = PaddingValues(top = statusTop, bottom = NAV_SPACE + navBottom)
+    // Screens opened from More or a shortcut (no floating nav) only need to clear the system bar.
+    val plainPadding = PaddingValues(top = statusTop, bottom = navBottom)
+    val garageIsTab = LevelNavigation.isTab(level, Routes.GARAGE)
 
     val enter: EnterTransition = if (t.reducedMotion) EnterTransition.None else fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 24 }
     val exit: ExitTransition = if (t.reducedMotion) ExitTransition.None else fadeOut(tween(180))
 
-    // The Everyday dashboard uses only the soft atmospheric light, as in its design references.
-    PenelopeBackground(waves = currentRoute == Routes.HOME && settings.explanationLevel != com.aicarcompanion.app.data.local.ExplanationLevel.EVERYDAY) {
+    // Only the DIY dashboard has the animated waves. Everyday uses soft light; Advanced paints its own plain background.
+    PenelopeBackground(waves = currentRoute == Routes.HOME && level == com.aicarcompanion.app.data.local.ExplanationLevel.DIY) {
         NavHost(
             navController,
             startDestination = Routes.HOME,
@@ -126,15 +120,17 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             composable(Routes.HOME) {
                 HomeScreen(
                     contentPadding = tabPadding,
-                    onOpenChat = { navController.navigateTab(Routes.CHAT) },
-                    onOpenGarage = { navController.navigateTab(Routes.GARAGE) },
+                    onOpenChat = { navController.navigate(Routes.CHAT) },
+                    onOpenGarage = { if (garageIsTab) navController.navigateTab(Routes.GARAGE) else navController.navigate(Routes.GARAGE) },
                     onOpenAdapter = { navController.navigate(Routes.ADAPTER) },
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                     onOpenResults = { navController.navigate(Routes.RESULTS) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
-                    onOpenHistory = { navController.navigateTab(Routes.HISTORY) },
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
                     onOpenExtras = { navController.navigate(Routes.EXTRAS) },
                     onOpenConnectionSettings = { navController.navigate(Routes.ADAPTER_ADVANCED) },
+                    onOpenDiagnostics = { navController.navigateOrTab(Routes.DIAGNOSTICS, LevelNavigation.isTab(level, Routes.DIAGNOSTICS)) },
+                    onOpenLiveData = { navController.navigateOrTab(Routes.LIVE_DATA, LevelNavigation.isTab(level, Routes.LIVE_DATA)) },
                 )
             }
             composable(Routes.GARAGE) {
@@ -142,20 +138,48 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                     onEditVehicle = { navController.navigate(Routes.vehicleEdit(it)) },
                     onAddVehicle = { navController.navigate(Routes.vehicleEdit(null)) },
                     onOpenAdapter = { navController.navigate(Routes.ADAPTER) },
-                    contentPadding = tabPadding,
+                    contentPadding = if (garageIsTab) tabPadding else plainPadding,
+                    onBack = if (garageIsTab) null else ({ navController.popBackStack() }),
                 )
             }
+            composable(Routes.DRIVE) {
+                DriveScreen(settings.assistantName, tabPadding, onTalk = { navController.navigate(Routes.CHAT) })
+            }
+            composable(Routes.DIAGNOSTICS) {
+                ResultsScreen(
+                    onBack = null,
+                    onOpenAdapter = { navController.navigate(Routes.ADAPTER) },
+                    onAsk = { navController.navigate(Routes.CHAT) },
+                    bottomInset = NAV_SPACE + navBottom,
+                )
+            }
+            composable(Routes.LIVE_DATA) {
+                LiveDataScreen(level, tabPadding)
+            }
+            composable(Routes.MORE) {
+                MoreScreen(level, settings.assistantName, tabPadding) { action ->
+                    when (action) {
+                        MoreAction.CHAT -> navController.navigate(Routes.CHAT)
+                        MoreAction.HISTORY -> navController.navigate(Routes.HISTORY)
+                        MoreAction.SETTINGS -> navController.navigate(Routes.SETTINGS)
+                        MoreAction.ADAPTER -> navController.navigate(Routes.ADAPTER)
+                        MoreAction.CONNECTION -> navController.navigate(Routes.ADAPTER_ADVANCED)
+                        MoreAction.EXTRAS -> navController.navigate(Routes.EXTRAS)
+                        MoreAction.GARAGE -> navController.navigate(Routes.GARAGE)
+                    }
+                }
+            }
             composable(Routes.CHAT) {
-                AssistantScreen(contentPadding = tabPadding, onBackHome = { navController.navigateTab(Routes.HOME) })
+                AssistantScreen(contentPadding = plainPadding, onBackHome = { if (!navController.popBackStack()) navController.navigateTab(Routes.HOME) })
             }
             composable(Routes.HISTORY) {
-                HistoryScreen(onBack = null, contentPadding = tabPadding, onOpenResults = { navController.navigate(Routes.RESULTS) })
+                HistoryScreen(onBack = { navController.popBackStack() }, contentPadding = plainPadding, onOpenResults = { navController.navigate(Routes.RESULTS) })
             }
             composable(Routes.RESULTS) {
                 ResultsScreen(
                     onBack = { navController.popBackStack() },
                     onOpenAdapter = { navController.navigate(Routes.ADAPTER) },
-                    onAsk = { navController.navigateTab(Routes.CHAT) },
+                    onAsk = { navController.navigate(Routes.CHAT) },
                 )
             }
             composable(Routes.ADAPTER) {
@@ -184,7 +208,7 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                         onChangeDashboard = vm::setDashboard,
                         onOpenTool = { tool ->
                             when (tool) {
-                                ExtraTool.MILEAGE_LOG, ExtraTool.SERVICE_RECORDS -> navController.navigateTab(Routes.HISTORY)
+                                ExtraTool.MILEAGE_LOG, ExtraTool.SERVICE_RECORDS -> navController.navigate(Routes.HISTORY)
                                 ExtraTool.SAMPLE_DATA -> navController.navigate(Routes.SETTINGS)
                                 else -> Unit // Planned tools aren't clickable.
                             }
@@ -222,53 +246,17 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
         }
 
         AnimatedVisibility(
-            visible = tab != null,
+            visible = isTab,
             enter = if (t.reducedMotion) EnterTransition.None else fadeIn() + slideInVertically { it },
             exit = if (t.reducedMotion) ExitTransition.None else fadeOut() + slideOutVertically { it },
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            FloatingNavBar(tab ?: Tab.HOME, settings.assistantName) { navController.navigateTab(it.route) }
+            FloatingNavBar(tabs, currentRoute, plain = settings.explanationLevel == com.aicarcompanion.app.data.local.ExplanationLevel.ADVANCED) { navController.navigateTab(it.route) }
         }
     }
 }
 
-@Composable
-internal fun FloatingNavBar(selected: Tab, assistantName: String, onSelect: (Tab) -> Unit) {
-    val t = Penelope.tokens
-    val shape = RoundedCornerShape(32.dp)
-    Row(
-        Modifier
-            .navigationBarsPadding()
-            .padding(horizontal = 18.dp, vertical = 12.dp)
-            .fillMaxWidth()
-            .shadow(18.dp, shape, ambientColor = t.brandColors[2].copy(alpha = 0.25f), spotColor = t.brandColors[1].copy(alpha = 0.25f))
-            .clip(shape)
-            .background(t.glassStrong)
-            .border(1.dp, t.glassBorder, shape)
-            .padding(6.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-    ) {
-        Tab.entries.forEach { tab ->
-            val isSelected = tab == selected
-            val tint by animateColorAsState(if (isSelected) Color.White else t.textSecondary, label = "tabTint")
-            val label = if (tab == Tab.CHAT) assistantName else tab.label
-            Column(
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = 60.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .then(if (isSelected) Modifier.background(t.brandGradient) else Modifier)
-                    .selectable(isSelected, role = Role.Tab, onClick = { onSelect(tab) })
-                    .padding(vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(tab.icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-                Text(label, style = MaterialTheme.typography.labelSmall, color = tint, maxLines = 1)
-            }
-        }
-    }
-}
+private fun NavHostController.navigateOrTab(route: String, isTab: Boolean) = if (isTab) navigateTab(route) else navigate(route)
 
 private fun NavHostController.navigateTab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }

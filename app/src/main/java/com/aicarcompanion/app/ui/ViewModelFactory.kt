@@ -10,6 +10,7 @@ import com.aicarcompanion.app.ui.adapter.AdvancedConnectionViewModel
 import com.aicarcompanion.app.ui.assistant.AssistantViewModel
 import com.aicarcompanion.app.ui.home.HomeViewModel
 import com.aicarcompanion.app.ui.history.HistoryViewModel
+import com.aicarcompanion.app.ui.navigation.LiveDataViewModel
 import com.aicarcompanion.app.ui.settings.SettingsViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleListViewModel
@@ -19,7 +20,11 @@ object AppViewModelProvider {
     val Factory = viewModelFactory {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos)
+            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos, c.maintenanceRepository)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            LiveDataViewModel(c.vehicleRepository, c.diagnosticsRepository, c.obdConnection)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

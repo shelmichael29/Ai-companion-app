@@ -30,6 +30,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 ## In progress (🔵)
 | Item | Where |
 |---|---|
+| Phase 1 UI redesign: distinct Everyday / DIY / Advanced (black-and-grey) dashboards, per-level navigation, Drive placeholder, Live Data, More (`docs/PHASE1_UI.md`) | branch `feature/phase1-ui-redesign` (PR open) |
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)

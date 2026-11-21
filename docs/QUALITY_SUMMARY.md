@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-21 | Phase 1 UI redesign: three interfaces (release gate) | PASS (local) | 667 run, 0 failed | 0 / 1 | 0 | NOT RUN (rendered screenshots only; no emulator) | NEEDS MANUAL VERIFICATION |
 | 2026-11-21 | Gemini: scrub personal details before sending (owner decision, option 2) | PASS (local) | 570 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-21 | Device verification: VIN scanner, decoder and recalls (#41, #45) (docs only) | PASS (local) | 562 run, 0 failed | 0 / 1 | 0 | PASS (owner, Galaxy S26 Ultra, build 0.7.1 (8): paper and in-car scan, recalls online/offline, Penelope, camera indicator) | VERIFIED |
 | 2026-11-21 | Recall accuracy and reporting (v0.7.1, build 8; release gate) | PASS (local) | 562 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
