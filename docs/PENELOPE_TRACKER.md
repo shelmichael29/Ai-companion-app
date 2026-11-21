@@ -33,6 +33,24 @@
 - Adapter identification and communication capability must be verified per SKU/revision; an Amazon listing or customer experience alone does not prove firmware consistency.
 - Never send code-clear (Mode 04), coding, adaptations, or any vehicle-modifying commands during these tests.
 
+
+## BMW / cheap ELM327 research — imported notes (review pending)
+Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). These are **research leads**, not independently hardware-verified results or approved architecture decisions. Preserve explicit REPORTED-BUT-UNVERIFIED labels. See `docs/project-memory/IMPORT_REVIEW.md` before promoting outside findings to authoritative memory.
+
+**Core distinction:** a low-cost clone may read *generic emissions OBD-II* from a BMW F10 even when BMW-specific tools cannot connect. A successful Bluetooth pairing is not proof that ELM AT commands, the vehicle protocol, or module-level diagnostics work.
+
+- [ ] **Clone capability probe (read-only):** identify responses to `ATI`, `AT@1`, `ATDP`/`ATDPN`, `ATRV`; check support for documented `ATAL`, `ATPP` and `ATPPS` without assuming the reported version string is trustworthy. Verify any actual command syntax against the ELM327 datasheet before implementing. `?` indicates unsupported syntax/command.
+- [ ] **Generic ECU probe:** start at automatic protocol detection (`ATSP 0`), test 11-bit 500 kbps ISO 15765-4 CAN (`ATSP 6`) only as a documented fallback, and report actual selected protocol; a 29-bit 500 kbps alternative (`ATSP 7`) is a *diagnostic experiment*, not a known F10 default.
+- [ ] **Multi-frame integrity:** test Mode 09 PID 02 VIN read without recording the VIN; detect truncated/invalid messages, `NO DATA`, `BUFFER FULL`, timeouts and disconnects distinctly. Do not assume reported clone corruption percentages apply to every device.
+- [ ] **OBD data validation:** supported-PID bitmap before optional oil-temp PID `01 5C`; log which Mode 01 / Mode 03 / Mode 07 / Mode 09 functions actually work. Generic functionality does not imply access to ABS, airbag, CAS or other BMW modules.
+- [ ] **Driver-friendly recovery:** detect adapter-paired-but-no-ECU; offer power-cycle, close competing OBD apps, verify ignition, and test protocol fallback with strict bounded attempts. Never mislabel an unsupported BMW diagnostic function as a Bluetooth failure.
+- [ ] **Cross-platform hardware matrix:** record exact product SKU/revision, Bluetooth Classic SPP vs BLE GATT vs Wi-Fi, Android/iOS app outcomes, adapter AT capabilities, vehicle model, and repeated reconnection reliability. Vgate vLinker BM+ and Veepeak OBDCheck BLE/BLE+ are candidate references in the guide, not yet Penelope-certified.
+- [ ] **BMW baseline:** compare the same generic read-only data on the F10 using a known-good adapter. ENET/ISTA full BMW diagnostics remain separate from generic ELM327; ENET tester stays experimental.
+- [ ] **Unverified research follow-up:** inspect EdiabasLib/Deep OBD stock PIC18F25K80 D-CAN support and replacement firmware before any architectural reuse. Do **not** propose reflashing customer hardware as an onboarding fix; no writing, coding or adaptation resets through cheap clones.
+- [ ] **Research review:** independently check primary sources for clone firmware claims, specific AT behavior, vendor support lists and replacement-firmware limitations. The uploaded guide includes single-source figures and unresolved conflicting reports.
+
+**Safety:** all app and automated diagnostic tests remain read-only. The guide discusses Mode 04 and reflashing as background; neither is permission to add vehicle-modifying commands to Penelope.
+
 ## Experimental BMW ENET — separate track
 - Primary tester branch: `experiment/bmw-enet-tester`.
 - Reliability improvements merged into that branch (HSFZ-first discovery, 9-second default, gateway errors); **not** merged into Penelope `main`.
