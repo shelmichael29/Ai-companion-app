@@ -14,12 +14,15 @@ import com.aicarcompanion.app.ui.theme.Penelope
 object AppBuildInfo {
     val versionName: String = BuildConfig.VERSION_NAME
     val versionCode: Int = BuildConfig.VERSION_CODE
+    val sourceRevision: String = BuildConfig.SOURCE_REVISION
 
     /** Shown on the home screen in debug/beta builds only; release builds can hide or move it. */
     val showOnHome: Boolean = BuildConfig.SHOW_BUILD_LABEL
 
-    fun label(name: String = versionName, code: Int = versionCode) = "v$name • Build $code"
-    fun spoken(name: String = versionName, code: Int = versionCode) = "App version $name, build $code"
+    fun label(name: String = versionName, code: Int = versionCode, revision: String = sourceRevision) =
+        "v$name • Build $code • $revision"
+    fun spoken(name: String = versionName, code: Int = versionCode, revision: String = sourceRevision) =
+        "App version $name, build $code, revision $revision"
 }
 
 /** Small, unobtrusive version label for testers. */
