@@ -14,7 +14,7 @@
 - [ ] **PR summaries:** every implementation prompt/PR documents changes, tests, PR number/link, and whether MERGED or NOT MERGED.
 
 ## Device testing / open observations
-- [x] VIN scanner camera reportedly works on Android phone (owner observation; not yet independently confirmed against formal hardware checklist).
+- [x] VIN scanner verified on the S26 Ultra, build 0.7.1 (8), 2026-11-21, (owner): paper and in-car scan, recalls online and offline, Penelope's recall answer, camera indicator. Still to check from `docs/DEVICE_TESTING.md` §1c: flashlight, camera permission prompts and the settings round trip, rotation, TalkBack, spoken guidance; and for recalls, Try again after a failure, a car added by Search or Manual, an old model year.
 - [x] Verify decoded year/make/model, including whether vehicle profile autofills.
 - [x] Verify recall lookup automatically appears after confirmed VIN.
 - [ ] Earlier year/make/model entry showed several recall campaigns; later VIN-scanned workflow showed none. **Different input scope; not yet confirmed bug.** Never conflate campaign counts with VIN-specific outstanding repairs.
@@ -68,7 +68,9 @@ Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). 
 |---|---|---|---|---|
 | 2026-11-21 | Initial tracker | `docs/penelope-development-tracker-20261121` | Documentation only | PR pending |
 | 2026-11-20 | ENET HSFZ reliability | `experiment/bmw-enet-tester`, #43 | See PR CI | Merged to **experimental** branch |
-| Earlier | VIN camera/decoder/recall implementation | #41 | See `docs/QUALITY_SUMMARY.md` | In `main`; device validation partial |
+| 2026-11-21 | Device verification recorded: VIN scanner and recalls | `docs/vin-recall-device-verified` | Owner device checks passed; docs only | PR open, not merged |
+| 2026-11-21 | Recall accuracy and reporting | #45 | 562 tests, 0 failed; verified on the phone | Merged to `main` |
+| Earlier | VIN camera/decoder/recall implementation | #41 | See `docs/QUALITY_SUMMARY.md` | In `main`; ✅ verified on the phone |
 
 ## How to maintain
 1. Add each newly agreed task with an unchecked box and priority.
