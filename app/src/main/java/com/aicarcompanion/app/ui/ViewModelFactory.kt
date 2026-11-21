@@ -52,6 +52,10 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
+            com.aicarcompanion.app.ui.results.ClearCodesViewModel(c.codeClearing, c.vehicleRepository, c.settings, c.obdConnection)
+        }
+        initializer {
+            val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
             AdvancedConnectionViewModel(c.obdConfig, c.obdControls, c.obdConnection, c.settings)
         }
         initializer {

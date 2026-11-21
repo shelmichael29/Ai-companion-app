@@ -38,6 +38,9 @@ class FakeElmAdapter(
         "07" to "43 00".replace("43", "47"),
     ).apply { putAll(overrides) }
 
+    /** Test hook: runs when a command is written, e.g. to change what "03" returns after a clear. */
+    var onCommand: ((String) -> Unit)? = null
+
     private var pending: String? = null
 
     override suspend fun write(text: String) {
@@ -45,6 +48,7 @@ class FakeElmAdapter(
         failAfterWrites?.let { if (written.size >= it) throw IOException("link lost") }
         val cmd = text.trim()
         written += cmd
+        onCommand?.invoke(cmd)
         pending = when {
             !vehicleOn && cmd.matches(Regex("^0[1-9A].*")) -> "SEARCHING...\rUNABLE TO CONNECT"
             else -> responses[cmd] ?: "?"

@@ -16,6 +16,7 @@
 - **Not supported yet:** Bluetooth Low Energy-only adapters are refused with a clear message. Wi-Fi and USB are 📋 proposed.
 
 ## Safety limits (permanent)
+- **Mode 04 (clear codes)** is sent only by the user-confirmed Clear-codes gate (DIY and Advanced; `docs/CLEAR_CODES.md`), never automatically and never from tests against real hardware.
 - **Never sent** from automatic features or tests: Mode 04 (clear codes), resets, coding, programming, actuator tests or unreviewed raw commands.
 - **Automatic recovery** only ever sends read-only commands.
 - **Tests** use `FakeElmAdapter`; no automated test talks to a real car.

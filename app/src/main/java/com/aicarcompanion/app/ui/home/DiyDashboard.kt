@@ -217,6 +217,7 @@ private fun HealthCard(ui: HomeUiState, actions: ProDashboardActions) {
             style = MaterialTheme.typography.labelMedium, color = t.textSecondary, modifier = Modifier.padding(top = 8.dp),
         )
         GradientButton("Read codes", actions.onOpenResults, Modifier.padding(top = 12.dp), leading = PenelopeIcons.Engine)
+        actions.clearCodes?.let { slot -> Column(Modifier.padding(top = 8.dp)) { slot() } }
     }
 }
 

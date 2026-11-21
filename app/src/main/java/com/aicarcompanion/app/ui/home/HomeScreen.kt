@@ -100,6 +100,7 @@ fun HomeScreen(
         aiStatus = aiStatus,
         onSelectVehicle = home::select,
         onPhotoPicked = { uri -> vehicleId?.let { home.savePhoto(it, uri) } },
+        clearCodes = if (kind == DashboardKind.WORKSHOP) ({ com.aicarcompanion.app.ui.results.ClearCodesControl() }) else null,
     )
 }
 
@@ -141,6 +142,8 @@ fun HomeContent(
     onOpenLiveData: (() -> Unit)? = null,
     /** Time used to judge whether readings are stale. */
     now: java.time.Instant = java.time.Instant.now(),
+    /** The DIY dashboard's "Clear codes…" button; supplied by [HomeScreen]. */
+    clearCodes: (@Composable () -> Unit)? = null,
 ) {
     if (kind == DashboardKind.COMPANION) {
         EverydayDriverDashboard(
@@ -168,6 +171,7 @@ fun HomeContent(
         onOpenLiveData = onOpenLiveData ?: onOpenAdapter, onOpenAdapter = onOpenAdapter, onOpenHistory = onOpenHistory,
         onOpenGarage = onOpenGarage, onOpenSettings = onOpenSettings, onOpenExtras = onOpenExtras,
         onOpenConnectionSettings = onOpenConnectionSettings, onAddVehicle = onAddVehicle, onOpenAppSettings = onOpenAppSettings,
+        clearCodes = clearCodes,
     )
     when (kind) {
         DashboardKind.COMPANION -> Unit

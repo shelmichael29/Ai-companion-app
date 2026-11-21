@@ -18,7 +18,7 @@ Follow `docs/DEVELOPMENT_QUALITY_GATES.md`. In short:
 5. **Compiling is not testing.**
 
 ## Safety rules
-- **Vehicle commands:** never send clear-code (Mode 04), reset, coding, actuator or any vehicle-modifying command from automated tests. Tests use `FakeElmAdapter`. The read-only allowlist is `ReadOnlyCommandPolicy`.
+- **Vehicle commands:** never send clear-code (Mode 04), reset, coding, actuator or any vehicle-modifying command from automated tests. Tests use `FakeElmAdapter`. The read-only allowlist is `ReadOnlyCommandPolicy`. Mode 04 is allowed solely through the confirmed Clear-codes gate (`VehicleWriteGate`, owner decision 2026-11-21, `docs/CLEAR_CODES.md`) and never from automated tests against real hardware.
 - **Secrets and personal data:** never print or commit API keys, tokens, `google-services.json`, keystores, App Check debug tokens, VINs or saved `.logcat` files.
 - **Crash reports:** never attach user identifiers to them.
 - **Gemini:** never embed the API key in the app. Gemini goes through Firebase AI Logic with App Check enforced; don't bypass enforcement.

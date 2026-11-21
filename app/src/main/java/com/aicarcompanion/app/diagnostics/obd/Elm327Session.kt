@@ -79,6 +79,28 @@ class Elm327Session(
         throw lastTimeout ?: ObdTimeoutException("No response")
     }
 
+    /**
+     * Sends Mode 04 (clear trouble codes). The ONLY vehicle-modifying request this class can send,
+     * and only with a [ClearCodesPermit] from [VehicleWriteGate]. Never retried: a repeat after a
+     * timeout could clear codes twice without the user knowing. Returns the cleaned response.
+     */
+    suspend fun sendClearCodes(permit: ClearCodesPermit): String = mutex.withLock {
+        check(permit.vehicleId.isNotEmpty())
+        val started = System.nanoTime()
+        try {
+            link.write("04\r")
+            val cleaned = clean(link.readUntilPrompt(CLEAR_TIMEOUT), "04")
+            observer?.onExchange("04", cleaned, elapsed(started), outcomeOf(cleaned))
+            cleaned
+        } catch (e: ObdTimeoutException) {
+            observer?.onExchange("04", null, elapsed(started), ExchangeOutcome.TIMEOUT)
+            throw e
+        } catch (e: IOException) {
+            observer?.onExchange("04", null, elapsed(started), ExchangeOutcome.LINK_LOST)
+            throw e
+        }
+    }
+
     /** Initializes with the recommended, fully automatic configuration. */
     suspend fun initialize(): ElmInitResult = initialize(ObdConnectionConfig.RECOMMENDED)
 
@@ -188,6 +210,7 @@ class Elm327Session(
         const val DEFAULT_TIMEOUT = 3_000L
         const val RESET_TIMEOUT = 5_000L
         const val SEARCH_TIMEOUT = 12_000L
+        const val CLEAR_TIMEOUT = 8_000L
 
         val PROTOCOL_NAMES = mapOf(
             "1" to "SAE J1850 PWM", "2" to "SAE J1850 VPW", "3" to "ISO 9141-2",

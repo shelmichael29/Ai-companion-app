@@ -26,11 +26,12 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | Hands-free foundation: routing, honest "not yet" replies, voice/audio diagnostics | H0 | `docs/HANDS_FREE.md` |
 | Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides | #40 | `docs/OFFLINE_KNOWLEDGE.md` |
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
+| Phase 1 UI redesign: distinct Everyday / DIY / Advanced (black-and-grey) dashboards, per-level navigation, Drive placeholder, Live Data, More | #53 | `docs/PHASE1_UI.md` |
 
 ## In progress (🔵)
 | Item | Where |
 |---|---|
-| Phase 1 UI redesign: distinct Everyday / DIY / Advanced (black-and-grey) dashboards, per-level navigation, Drive placeholder, Live Data, More (`docs/PHASE1_UI.md`) | branch `feature/phase1-ui-redesign` (PR open) |
+| Clear codes (Mode 04) for DIY and Advanced: confirmation gate, engine-off check, re-read and history note (`docs/CLEAR_CODES.md`) | branch `feature/clear-codes` (PR open; safety review and device test pending) |
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)

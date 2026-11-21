@@ -53,6 +53,7 @@ import com.aicarcompanion.app.ui.AppViewModelProvider
 import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SectionCard
+import com.aicarcompanion.app.ui.results.ClearCodesControl
 
 @Composable
 fun AdapterScreen(
@@ -291,6 +292,7 @@ private fun LiveDataCard(viewModel: AdapterViewModel) {
                 modifier = Modifier.heightIn(min = 48.dp),
             ) { Text("Save snapshot") }
         }
+        if (!everyday) ClearCodesControl(Modifier.padding(top = 8.dp))
     }
 }
 
