@@ -83,9 +83,9 @@ class UiPolishTest {
     }
 
     @Test fun `version label comes from the build configuration`() {
-        assertEquals("v${BuildConfig.VERSION_NAME} • Build ${BuildConfig.VERSION_CODE}", AppBuildInfo.label())
-        assertEquals("v0.6.0-beta • Build 12", AppBuildInfo.label("0.6.0-beta", 12))
-        assertEquals("App version 0.6.0-beta, build 12", AppBuildInfo.spoken("0.6.0-beta", 12))
+        assertEquals("v${BuildConfig.VERSION_NAME} • Build ${BuildConfig.VERSION_CODE} • ${BuildConfig.SOURCE_REVISION}", AppBuildInfo.label())
+        assertEquals("v0.6.0-beta • Build 12 • abc12345", AppBuildInfo.label("0.6.0-beta", 12, "abc12345"))
+        assertEquals("App version 0.6.0-beta, build 12, revision abc12345", AppBuildInfo.spoken("0.6.0-beta", 12, "abc12345"))
         // Unit tests run against the debug variant: the label is visible there.
         assertEquals(BuildConfig.DEBUG, AppBuildInfo.showOnHome)
     }
