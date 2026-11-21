@@ -68,6 +68,9 @@ Every answer writes one line to the diagnostic log: `AI: Answer (source=…, ms=
   - **Everyone:** Settings → Connection status → **"Last answer came from"**.
   - **DIY and Advanced:** the full technical log.
 
+## 5a. Personal details (owner decision 2026-11-21)
+Owner-entered text in Gemini's background facts (the last 5 service titles and the last 3 problem descriptions) goes through `PersonalDetailScrubber` first: phone numbers, email addresses, street addresses, web links, VIN-like codes and licence plates written after "plate"/"tag"/"registration" become "[removed]". Trouble codes, engine codes, sizes, mileage and dates stay. It runs before the 160-character cut, so no partial detail slips through. Limits: people's names aren't detected, and phone numbers are matched in North American formats. The user's own question is sent as asked. Tests: `PersonalDetailScrubberTest`.
+
 ## 6. Testing on the Galaxy S26 Ultra
 1. **Install** the CI APK from this PR. Make sure **App Check** is set up for its signing key:
    - with the `DEBUG_KEYSTORE_BASE64` secret set, it's a one-time step;

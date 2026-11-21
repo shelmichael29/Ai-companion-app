@@ -4,6 +4,7 @@ Approved product and technical decisions. Dates are when the change merged into 
 
 | Date | Decision | Source |
 |---|---|---|
+| 2026-11-21 | **Gemini and personal details: automatic scrubbing (option 2).** Before service titles and problem descriptions go into Gemini's background facts, phone numbers, email addresses, street addresses, web links, VIN-like codes and labelled licence plates are replaced with "[removed]"; trouble codes, engine codes, sizes, mileage and dates are kept. People's names are not detected. What the user asks is still sent as asked. Raised 2026-11-16 (code scanning, PR #24) | Owner decision; scrubbing PR (`PersonalDetailScrubber`) |
 | 2026-11-21 | **Recall accuracy:** one `RecallService` for every car and for Penelope's answers. A failed or unreadable check is always "couldn't check", never "no recalls". Every result shows its source and when it was checked. Model-level campaigns and VIN-specific status are separate; only an authoritative VIN source may say a recall is open for a VIN (none exists: NHTSA has no public recalls-by-VIN API). Repair eligibility (age, first retail sale, campaign timing, manufacturer policy) is explained but never decided: no mileage, date or VIN input to recall checks | This PR, `docs/VIN_SCANNER.md` §5 |
 | 2026-11-20 | **VIN scanner and recalls:** on-device ML Kit (bundled) + CameraX, never saves images; a scanned VIN is never selected without the user's confirmation; the VIN goes only to NHTSA vPIC (never to the recalls API, Gemini, logs or crash reports; voice says the last four digits only). Recalls are searched by year/make/model and are **never labeled VIN-confirmed or outstanding**; the VIN-specific check is a link (NHTSA, plus Toyota/Lexus, Volkswagen, Mazda pages confirmed reachable). Offline falls back to the saved recall snapshot, labeled. The VIN is sent to vPIC by POST body, never in a URL. Manufacturer links stay a short verified list (owner decided, 2026-11-21) | PR #41, `docs/VIN_SCANNER.md` |
 | 2026-11-19 | **Offline knowledge pack** ships in the app (codes, EPA vehicles, recall campaigns, crash ratings, symptom guides). Service bulletins, investigations, manufacturer communications and owner complaints stay off the phone (size, copyright, unverified). Recalls are always "for the model"; VIN check at nhtsa.gov/recalls. Safety stays built-in | PR #40, `docs/OFFLINE_KNOWLEDGE.md` |
@@ -24,6 +25,4 @@ Approved product and technical decisions. Dates are when the change merged into 
 | Owner rules | Never merge without the owner's approval; one PR per stage from the latest `main` | `CLAUDE.md` |
 
 ## ❓ Waiting for the owner
-| Raised | Question | Options |
-|---|---|---|
-| 2026-11-16 | Gemini and personal details: should symptoms and service titles be scrubbed before they're sent to Gemini? (code scanning, PR #24) | 1) keep as is; 2) automatic scrubbing (recommended); 3) opt-in; 4) both |
+None right now. (The Gemini personal-details question was decided on 2026-11-21: automatic scrubbing.)
