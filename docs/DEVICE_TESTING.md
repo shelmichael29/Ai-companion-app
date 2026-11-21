@@ -25,6 +25,9 @@ See `docs/GEMINI_ROUTING.md` §6: check "Last answer came from" in Settings → 
 ## 0. Hands-free foundation (Phase H0)
 See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call focus loss, and "not yet" replies for music, messages and calls.
 
+## 0c. Phase 1: three interfaces
+See `docs/PHASE1_UI.md`, "Manual check on the phone" (level switching keeps data, Easy/Customizable per level, Advanced black-and-grey with header mic, Live Data states, 200% font, TalkBack, light theme).
+
 ## 1. Vehicle identification (needs internet)
 - Vehicles → **+** → **Search**: 2011 → BMW → 528i. Engine (3.0L 6-cyl) and transmission
   (Automatic, 8-speed) auto-select and the review form fills in.
