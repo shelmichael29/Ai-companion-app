@@ -50,6 +50,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -73,6 +74,8 @@ import com.aicarcompanion.app.ui.design.PenelopeIcons
 import com.aicarcompanion.app.ui.design.StatusBadge
 import com.aicarcompanion.app.ui.design.VoiceOrb
 import com.aicarcompanion.app.ui.theme.Penelope
+
+const val EVERYDAY_DASHBOARD_TAG = "dashboard_everyday"
 
 /** Everything the Everyday Driver dashboard does when tapped. All of these open real features. */
 data class EverydayActions(
@@ -117,6 +120,7 @@ fun EverydayDriverDashboard(
     val t = Penelope.tokens
     Column(
         Modifier
+            .testTag(EVERYDAY_DASHBOARD_TAG)
             .verticalScroll(rememberScrollState())
             .padding(contentPadding)
             .padding(horizontal = 20.dp),

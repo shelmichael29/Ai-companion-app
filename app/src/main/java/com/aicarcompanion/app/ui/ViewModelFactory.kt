@@ -20,7 +20,7 @@ object AppViewModelProvider {
     val Factory = viewModelFactory {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos)
+            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos, c.maintenanceRepository)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

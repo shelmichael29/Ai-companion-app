@@ -9,9 +9,12 @@ import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DiagnosticTroubleCode
 import com.aicarcompanion.app.domain.model.DtcSeverity
+import com.aicarcompanion.app.domain.model.MaintenanceRecord
+import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.model.TroubleCodeRead
 import com.aicarcompanion.app.domain.model.Vehicle
 import com.aicarcompanion.app.domain.repository.DiagnosticsRepository
+import com.aicarcompanion.app.domain.repository.MaintenanceRepository
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
 import com.aicarcompanion.app.domain.repository.VehicleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +34,10 @@ data class HomeUiState(
     val codes: List<DiagnosticTroubleCode> = emptyList(),
     val lastRead: TroubleCodeRead? = null,
     val loaded: Boolean = false,
+    /** Live (or sample) sensor readings for the DIY and Advanced dashboards. Empty when none exist. */
+    val readings: List<SensorReading> = emptyList(),
+    /** Most recent service record, for the DIY maintenance summary. */
+    val lastService: MaintenanceRecord? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -40,19 +47,25 @@ class HomeViewModel(
     history: VehicleHistoryRepository,
     obd: ObdConnection,
     val photos: VehiclePhotoStore,
+    maintenance: MaintenanceRepository,
 ) : ViewModel() {
 
     val state: StateFlow<HomeUiState> = vehicles.activeVehicleId.flatMapLatest { id ->
         if (id == null) {
             combine(vehicles.vehicles, obd.state) { all, o -> HomeUiState(null, all, o, loaded = true) }
         } else {
+            val extras = combine(diagnostics.sensorReadings(id), maintenance.history(id)) { r, m ->
+                r to m.maxByOrNull { it.date }
+            }
             combine(
                 vehicles.vehicles,
                 vehicles.observeVehicle(id),
                 diagnostics.troubleCodes(id),
                 history.latestTroubleCodeRead(id),
-                obd.state,
-            ) { all, v, codes, read, o -> HomeUiState(v, all, o, codes, read, loaded = true) }
+                combine(obd.state, extras) { o, e -> o to e },
+            ) { all, v, codes, read, (o, e) ->
+                HomeUiState(v, all, o, codes, read, loaded = true, readings = e.first, lastService = e.second)
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
