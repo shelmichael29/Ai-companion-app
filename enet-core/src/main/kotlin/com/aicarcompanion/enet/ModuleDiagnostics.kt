@@ -40,14 +40,15 @@ class ModuleDiagnostics(private val transport: EnetTransport, private val clock:
         }
         val modules = if (readVin) listOf(F10Module.DME) else F10Module.entries
         val request = if (readVin) SafeRequest.READ_VIN else SafeRequest.TESTER_PRESENT
-        transport.connectTcp(link.subnet.address, target, Hsfz.DIAG_PORT,
-            connectTimeout.coerceIn(ConnectionOptions.CONNECT_TIMEOUT_RANGE)).use { tcp ->
-            val reader = HsfzFrameReader()
-            for (module in modules) {
-                currentCoroutineContext().ensureActive()
-                progress(module)
+        for (module in modules) {
+            currentCoroutineContext().ensureActive()
+            progress(module)
+            // Gateway routing errors may omit the ECU address. A fresh stream prevents a late
+            // error for a previous module from being attributed to the current one.
+            transport.connectTcp(link.subnet.address, target, Hsfz.DIAG_PORT,
+                connectTimeout.coerceIn(ConnectionOptions.CONNECT_TIMEOUT_RANGE)).use { tcp ->
                 tcp.write(Hsfz.diagnosticFrame(request, module.address))
-                result(module, receive(tcp, reader, module, request))
+                result(module, receive(tcp, HsfzFrameReader(), module, request))
             }
         }
     }

@@ -62,7 +62,7 @@ class ModuleDiagnosticsTest {
         ModuleDiagnostics(fake) { currentTime }.run(Sim.LINK, Sim.CAR, 1000, false, {}, { module, reply -> results[module] = reply })
         assertEquals(F10Module.entries, results.keys.toList())
         assertEquals(listOf(ModuleReply.Positive(), ModuleReply.Rejected(0x11), ModuleReply.GatewayError(0x43), ModuleReply.NoResponse), results.values.toList())
-        assertEquals(1, fake.tcpClosed)
+        assertEquals(F10Module.entries.size, fake.tcpClosed)
     }
 
     @Test fun cancellationClosesChannelAndStopsSending() = runTest {

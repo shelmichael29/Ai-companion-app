@@ -191,6 +191,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         moduleActive = true
         moduleRows = emptyList()
         val total = if (readVin) 1 else F10Module.entries.size
+        var answered = 0
         moduleStatus = "Connecting to $target"
         running = moduleStatus
         moduleJob = viewModelScope.launch {
@@ -209,6 +210,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                             ModuleReply.InvalidVin -> "Answered with an invalid VIN"
                             ModuleReply.Pending -> "Answered, final reply timed out"
                         }
+                        if (reply !is ModuleReply.GatewayError && reply != ModuleReply.NoResponse) answered++
                         val line = "${module.title} (${module.name}): $outcome"
                         log.add(line)
                         val vin = (reply as? ModuleReply.Positive)?.vin
@@ -220,7 +222,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                         moduleRows = moduleRows + if (vin == null) line else "$line · $vin$comparison"
                     },
                 )
-                moduleStatus = "Finished · ${moduleRows.size} of $total checked"
+                moduleStatus = "Finished on $target · $answered answered · ${moduleRows.size} of $total checked"
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {

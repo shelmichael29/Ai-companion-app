@@ -116,7 +116,7 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                 interfaces.values.sortedBy { it.interfaceName }.forEach { iface ->
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                            .selectable(iface.interfaceName == vm.selectedName, role = Role.RadioButton) { vm.selectedName = iface.interfaceName },
+                            .selectable(iface.interfaceName == vm.selectedName, enabled = !busy, role = Role.RadioButton) { vm.selectedName = iface.interfaceName },
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(iface.interfaceName == vm.selectedName, onClick = null)
@@ -138,6 +138,7 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
             Section("2. ENET target") {
                 OutlinedTextField(
                     value = vm.targetText,
+                    enabled = !busy,
                     onValueChange = { vm.targetText = it.filter { c -> c.isDigit() || c == '.' }.take(15) },
                     label = { Text("Gateway IPv4 address (optional for discovery)") },
                     placeholder = { Text("e.g. 169.254.x.x") },
@@ -181,7 +182,7 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                                     Text("${gw.address} · ${gw.protocol.label}", style = MaterialTheme.typography.titleSmall)
                                     Text("Answered in ${gw.latencyMillis} ms · diag address ${gw.diagAddress ?: "?"}", style = MaterialTheme.typography.bodySmall)
                                     gw.maskedVin?.let { Text("VIN $it", style = MaterialTheme.typography.bodySmall) }
-                                    TextButton(onClick = { vm.useDiscovered(gw.address) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Use as target") }
+                                    TextButton(onClick = { vm.useDiscovered(gw.address) }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("Use as target") }
                                 }
                             }
                         }
@@ -269,7 +270,7 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
             }
         }
 
-        vm.running?.let { msg ->
+        vm.running?.takeUnless { vm.moduleActive }?.let { msg ->
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                     CircularProgressIndicator(Modifier.padding(end = 12.dp))
