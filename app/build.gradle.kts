@@ -17,6 +17,14 @@ if (firebaseConfigured) {
     apply(plugin = "com.google.firebase.crashlytics")
 }
 
+// Identifies the exact source revision installed on a tester's device.
+// The human-facing release version stays independent of individual commits.
+val sourceRevision = runCatching {
+    providers.exec {
+        commandLine("git", "rev-parse", "--short=8", "HEAD")
+    }.standardOutput.asText.get().trim().ifEmpty { "local" }
+}.getOrDefault("local")
+
 android {
     namespace = "com.aicarcompanion.app"
     compileSdk = 37
@@ -29,6 +37,7 @@ android {
         versionCode = 7
         versionName = "0.7.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
+        buildConfigField("String", "SOURCE_REVISION", "\"$sourceRevision\"")
     }
 
     buildTypes {
