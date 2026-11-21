@@ -74,7 +74,9 @@ Until this works, release builds can't pass App Check, so they fall back to buil
 
 ## 5. Data and billing
 What's sent to Gemini and what never is: see Settings → Smarter answers → "What is sent to
-Google?" (also `PromptBuilder.kt`). Under Google's Gemini API terms, on the **free (Spark)**
+Google?" (also `PromptBuilder.kt`). Service titles and described problems are scrubbed first
+(`PersonalDetailScrubber`: phone numbers, emails, street addresses, links, VINs and labelled plates
+are removed; names are not detected). Under Google's Gemini API terms, on the **free (Spark)**
 tier Google may use prompts and responses to improve its products and humans may review them;
 on a **paid (Blaze)** project they aren't used for that. Recommended before public launch: move
 to Blaze with a **budget alert**, and describe this in the Play **Data safety** form and privacy

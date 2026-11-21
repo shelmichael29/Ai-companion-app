@@ -238,7 +238,9 @@ fun SettingsScreen(
                     "When this is on, these go to Google's Gemini API through Firebase so ${settings.assistantName} can answer: " +
                         "what you say or type to her (speech is turned into text first), the recent conversation, your car's " +
                         "year, make, model, trim and engine details, odometer, saved warning codes with their dates, recent " +
-                        "service titles and dates, problems you've described, adapter connection status and your detail level.",
+                        "service titles and dates, problems you've described, adapter connection status and your detail level. " +
+                        "Before your service titles and described problems are sent, phone numbers, email addresses, street " +
+                        "addresses, web links, VINs and licence plates are removed from them.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(

@@ -14,7 +14,8 @@ import java.util.Locale
 /**
  * Builds Gemini's system instruction: Penelope's persona and rules plus a block of facts the
  * app has verified. Deliberately excluded: VIN, nickname, photos, receipts, costs, shop names,
- * service notes, location and any account details.
+ * service notes, location and any account details. The owner-entered text that is included (service
+ * titles, problem descriptions) is passed through [PersonalDetailScrubber] first.
  */
 object PromptBuilder {
     private val dateFmt = DateTimeFormatter.ofPattern("MMMM d, yyyy", Locale.US).withZone(ZoneId.systemDefault())
@@ -128,12 +129,12 @@ object PromptBuilder {
         } else {
             appendLine("- Recorded service history (owner-entered" + if (service.any { it.origin == DataOrigin.SAMPLE }) ", some SAMPLE)" else ")")
             service.forEach { r ->
-                appendLine("  * ${r.title} on ${r.date}" + (r.odometerMiles?.let { " at $it miles" } ?: ""))
+                appendLine("  * ${PersonalDetailScrubber.scrub(r.title)} on ${r.date}" + (r.odometerMiles?.let { " at $it miles" } ?: ""))
             }
         }
         val symptoms = ctx.recentSymptoms.take(3)
         if (symptoms.isNotEmpty()) {
-            appendLine("- Problems the owner described recently: " + symptoms.joinToString("; ") { "\"${it.take(160)}\"" })
+            appendLine("- Problems the owner described recently: " + symptoms.joinToString("; ") { "\"${PersonalDetailScrubber.scrub(it).take(160)}\"" })
         }
     }
 
