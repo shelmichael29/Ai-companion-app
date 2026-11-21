@@ -57,13 +57,13 @@ sealed interface ConnectionResult {
 
 data class DiscoveryOptions(
     val manualTarget: Ipv4Address? = null,
-    val includeDoip: Boolean = true,
+    val includeDoip: Boolean = false,
     /** How long to wait for HSFZ/DoIP answers after sending. Clamped to [LISTEN_RANGE]. */
     val listenMillis: Long = DEFAULT_LISTEN_MILLIS,
     val maxResponses: Int = 16,
 ) {
     companion object {
-        const val DEFAULT_LISTEN_MILLIS = 5_000L
+        const val DEFAULT_LISTEN_MILLIS = 9_000L
         val LISTEN_RANGE = 1_000L..15_000L
     }
 }
@@ -339,6 +339,22 @@ class EnetTester(
                     Hsfz.CTRL_NACK -> {
                         log.add("← Negative acknowledgement")
                         return StepResult(ConnectionResult.STEP_SESSION, StepOutcome.FAIL, "The gateway rejected the message (HSFZ NACK).", clock() - t0)
+                    }
+                    in 0x0040..0x0045 -> {
+                        // BMW HSFZ transport-level rejection, not a UDS response or a timeout.
+                        val description = when (f.control) {
+                            0x0040 -> "wrong tester address"
+                            0x0041 -> "wrong control word"
+                            0x0042 -> "wrong frame format"
+                            0x0043 -> "unknown destination"
+                            0x0044 -> "message too large"
+                            else -> "gateway not ready"
+                        }
+                        log.add("← Gateway HSFZ error 0x%04X ($description)".format(f.control))
+                        return StepResult(
+                            ConnectionResult.STEP_SESSION, StepOutcome.FAIL,
+                            "Gateway answered with HSFZ error 0x%04X ($description).".format(f.control), clock() - t0,
+                        )
                     }
                     Hsfz.CTRL_DIAG -> {
                         val p = f.payload

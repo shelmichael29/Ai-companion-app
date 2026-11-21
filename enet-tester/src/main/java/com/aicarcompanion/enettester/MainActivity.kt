@@ -266,7 +266,7 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                 if (open) {
                     SecondsSlider("Discovery listen time", vm.listenMillis, DiscoveryOptions.LISTEN_RANGE, vm::updateListenMillis)
                     SecondsSlider("TCP connect timeout", vm.connectTimeoutMillis, ConnectionOptions.CONNECT_TIMEOUT_RANGE, vm::updateConnectTimeout)
-                    TextButton(onClick = vm::restoreAdvancedDefaults, modifier = Modifier.heightIn(min = 48.dp)) { Text("Restore defaults (5 s / 5 s)") }
+                    TextButton(onClick = vm::restoreAdvancedDefaults, modifier = Modifier.heightIn(min = 48.dp)) { Text("Restore defaults (9 s / 5 s)") }
                 }
             }
         }
