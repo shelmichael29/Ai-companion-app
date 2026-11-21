@@ -31,12 +31,12 @@ These are community-documented, not official BMW specifications. They come from 
   - `255.255.255.255`;
   - an optional typed target.
 - All sends go through a socket bound to that interface.
-- Listens for 2 seconds or up to 16 answers.
+- Listens for 9 seconds by default (adjustable 1–15 seconds) or up to 16 answers; HSFZ-only by default, with optional DoIP.
 - Accepts answers only from private or link-local addresses on that subnet.
 
 **Connection test (button "Test connection"):**
 1. **TCP connect to 6801**, with a 5-second timeout (adjustable under **Advanced settings**) and the connect latency measured.
-2. **Optionally, one UDS TesterPresent (`3E 00`) to the gateway.** The tester waits up to 3 seconds for the acknowledgement and the `7E 00` response, and answers alive checks.
+2. **Optionally, one UDS TesterPresent (`3E 00`) to the gateway.** The tester waits up to 3 seconds for the acknowledgement and the `7E 00` response, answers alive checks, and reports HSFZ gateway errors `0x0040`–`0x0045`.
    - A negative response (`7F 3E xx`) still counts as "session reachable".
    - A rejection (NACK) or silence counts as a failure.
 3. **Optional, experimental read-only ignition-status query** on control port 6811.
