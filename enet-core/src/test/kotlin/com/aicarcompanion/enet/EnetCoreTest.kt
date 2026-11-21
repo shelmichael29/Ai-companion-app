@@ -124,7 +124,7 @@ class EnetCoreTest {
     @Test fun `discovers an F10 gateway over HSFZ and notes no DoIP`() = runTest {
         val (fake, tester) = setup()
         fake.udpReplies[Ipv4Address.parse("169.254.255.255")!! to Hsfz.IDENT_PORT] = listOf(35L to Sim.hsfzIdentReply())
-        val r = tester.discover(Sim.LINK) as DiscoveryResult.Completed
+        val r = tester.discover(Sim.LINK, DiscoveryOptions(includeDoip = true)) as DiscoveryResult.Completed
         assertEquals(1, r.gateways.size)
         val gw = r.gateways.single()
         assertEquals(Sim.CAR, gw.address)
@@ -132,7 +132,7 @@ class EnetCoreTest {
         assertEquals(35L, gw.latencyMillis)
         assertEquals("WBA********000001", gw.maskedVin)
         assertEquals(4, r.probesSent) // subnet + limited broadcast, HSFZ + DoIP each
-        assertEquals("discovery is bounded by the (default 5 s) listen window", 5_000L, currentTime)
+        assertEquals("discovery is bounded by the (default 9 s) listen window", 9_000L, currentTime)
         assertTrue(tester.log.entries.value.any { it.message.contains("No DoIP answer") })
         assertFalse(tester.log.export().contains(Sim.VIN))
     }
@@ -141,7 +141,7 @@ class EnetCoreTest {
         val (fake, tester) = setup()
         fake.udpReplies[Ipv4Address.LIMITED_BROADCAST to Hsfz.IDENT_PORT] = listOf(10L to Sim.hsfzIdentReply(), 20L to Sim.hsfzIdentReply())
         fake.udpReplies[Ipv4Address.LIMITED_BROADCAST to Doip.PORT] = listOf(15L to Sim.doipAnnouncement())
-        val r = tester.discover(Sim.LINK) as DiscoveryResult.Completed
+        val r = tester.discover(Sim.LINK, DiscoveryOptions(includeDoip = true)) as DiscoveryResult.Completed
         assertEquals(setOf(GatewayProtocol.HSFZ, GatewayProtocol.DOIP), r.gateways.map { it.protocol }.toSet())
         assertEquals(2, r.gateways.size)
     }
@@ -164,7 +164,7 @@ class EnetCoreTest {
             (1..30).map { i -> i.toLong() to Sim.hsfzIdentReply(from = Ipv4Address.parse("169.254.1.$i")!!) }
         val r = tester.discover(Sim.LINK, DiscoveryOptions(includeDoip = false, maxResponses = 4)) as DiscoveryResult.Completed
         assertEquals(4, r.gateways.size)
-        assertTrue(currentTime < 5_000)
+        assertTrue(currentTime < 9_000)
     }
 
     @Test fun `manual target gets a unicast probe, invalid targets send nothing`() = runTest {
@@ -195,6 +195,15 @@ class EnetCoreTest {
         runCurrent()
         assertTrue(tester.discover(Sim.LINK) is DiscoveryResult.Refused)
         assertTrue(first.await() is DiscoveryResult.Completed)
+    }
+
+    @Test fun `F10 discovery defaults to HSFZ only and waits nine seconds`() = runTest {
+        val (fake, tester) = setup()
+        val r = tester.discover(Sim.LINK) as DiscoveryResult.Completed
+        assertEquals(2, r.probesSent)
+        assertEquals(9_000L, r.listenMillis)
+        assertEquals(9_000L, currentTime)
+        assertTrue(fake.udpSent.all { it.port == Hsfz.IDENT_PORT })
     }
 
     // ---- Connection test ------------------------------------------------------------------------------
@@ -285,6 +294,30 @@ class EnetCoreTest {
         assertEquals("F10 has no DoIP: reported as not supported, not a failure", StepOutcome.NOT_SUPPORTED, doip.outcome)
         assertTrue(fake.tcpWritten.filter { it.first == Hsfz.CONTROL_PORT }.all { it.second.contentEquals(Hsfz.IGNITION_REQUEST) })
         assertTrue("no DoIP bytes are sent", fake.tcpWritten.none { it.first == Doip.PORT })
+    }
+
+    @Test fun `HSFZ gateway error frames report specific failures rather than silence`() = runTest {
+        val causes = mapOf(
+            0x0040 to "wrong tester address",
+            0x0041 to "wrong control word",
+            0x0042 to "wrong frame format",
+            0x0043 to "unknown destination",
+            0x0044 to "message too large",
+            0x0045 to "gateway not ready",
+        )
+        causes.forEach { (code, cause) ->
+            val (fake, tester) = setup()
+            fake.tcpConnect[Hsfz.DIAG_PORT] = FakeTransport.Connect.OK to 5L
+            fake.tcpResponder[Hsfz.DIAG_PORT] = { request ->
+                listOf(2L to Sim.ack(request), 10L to Hsfz.frame(code, ByteArray(0)))
+            }
+            val result = tester.testConnection(Sim.LINK, Sim.CAR) as ConnectionResult.Completed
+            assertTrue(result.transportOk)
+            assertEquals(StepOutcome.FAIL, result.steps[1].outcome)
+            assertTrue(result.steps[1].detail, result.steps[1].detail.contains(cause))
+            assertTrue(result.steps[1].detail.contains("0x%04X".format(code)))
+            assertEquals(1, fake.tcpClosed)
+        }
     }
 
     @Test fun `TesterPresent can be turned off - TCP check only`() = runTest {
