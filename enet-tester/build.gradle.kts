@@ -6,6 +6,11 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Identifies the exact source revision installed on a tester's phone.
+val sourceRevision = runCatching {
+    providers.exec { commandLine("git", "rev-parse", "--short=8", "HEAD") }.standardOutput.asText.get().trim().ifEmpty { "local" }
+}.getOrDefault("local")
+
 android {
     namespace = "com.aicarcompanion.enettester"
     compileSdk = 35
@@ -14,8 +19,9 @@ android {
         applicationId = "com.aicarcompanion.enettester"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-experimental"
+        versionCode = 2
+        versionName = "0.2.0-experimental"
+        buildConfigField("String", "SOURCE_REVISION", "\"$sourceRevision\"")
     }
 
     buildTypes {
@@ -34,6 +40,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }

@@ -14,7 +14,16 @@ import com.aicarcompanion.enet.DiscoveryOptions
 import com.aicarcompanion.enet.DiscoveryResult
 import com.aicarcompanion.enet.EnetLink
 import com.aicarcompanion.enet.EnetLog
+import com.aicarcompanion.enet.EngineVinOptions
+import com.aicarcompanion.enet.EngineVinResult
 import com.aicarcompanion.enet.EnetTester
+import com.aicarcompanion.enet.ModuleScanEntry
+import com.aicarcompanion.enet.ModuleScanResult
+import com.aicarcompanion.enet.ScanOptions
+import com.aicarcompanion.enet.ScanProgress
+import com.aicarcompanion.enet.vinReference
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import com.aicarcompanion.enet.Ipv4Address
 import com.aicarcompanion.enet.JvmEnetTransport
 import com.aicarcompanion.enet.PortCheckResult
@@ -44,6 +53,19 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     val monitor = EthernetMonitor(app).also { it.start() }
+
+    init {
+        // The cable coming out (the selected Ethernet network disappearing) stops whatever is running and frees the connection.
+        viewModelScope.launch {
+            monitor.interfaces.collect { interfaces ->
+                val net = selectedNetwork
+                if (net != null && net !in interfaces && job?.isActive == true) {
+                    log.add("Ethernet network $net lost (cable removed?): stopping the running operation and releasing the connection.")
+                    stop("The Ethernet connection was lost, so the operation stopped and the connection was released.")
+                }
+            }
+        }
+    }
 
     var selectedName by mutableStateOf<String?>(null)
     var targetText by mutableStateOf("")
@@ -80,6 +102,22 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
 
     var running by mutableStateOf<String?>(null)
         private set
+
+    /** The one running operation, so Cancel and a pulled cable can stop it and release its connection. */
+    private var job: Job? = null
+
+    var engineVin by mutableStateOf<EngineVinResult?>(null)
+        private set
+    var scanProgress by mutableStateOf<ScanProgress?>(null)
+        private set
+    var scanResult by mutableStateOf<ModuleScanResult?>(null)
+        private set
+
+    /** Why the last operation stopped early (cancelled, cable removed), shown with the partial results. */
+    var stoppedNotice by mutableStateOf<String?>(null)
+        private set
+
+    val canCancel: Boolean get() = job?.isActive == true
     var discovery by mutableStateOf<DiscoveryResult?>(null)
         private set
     var connection by mutableStateOf<ConnectionResult?>(null)
@@ -108,28 +146,23 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
     fun checkPort() {
         val link = link() ?: return
         val target = Ipv4Address.parse(targetText) ?: return
-        running = "Checking TCP port 6801 on $target…"
-        viewModelScope.launch {
+        start("Checking TCP port 6801 on $target…") {
             portCheck = tester.checkTcpPort(link, target, timeoutMillis = connectTimeoutMillis)
-            running = null
         }
     }
 
     fun discover() {
         val link = link() ?: return
         val manual = targetText.takeIf { it.isNotBlank() }?.let(Ipv4Address::parse)
-        running = "Discovering gateways…"
-        viewModelScope.launch {
+        start("Discovering gateways…") {
             discovery = tester.discover(link, DiscoveryOptions(manualTarget = manual, includeDoip = includeDoip, listenMillis = listenMillis))
-            running = null
         }
     }
 
     fun testConnection() {
         val link = link() ?: return
         val target = Ipv4Address.parse(targetText) ?: return
-        running = "Testing connection to $target…"
-        viewModelScope.launch {
+        start("Testing connection to $target…") {
             connection = tester.testConnection(
                 link, target,
                 ConnectionOptions(
@@ -137,7 +170,51 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                     connectTimeoutMillis = connectTimeoutMillis,
                 ),
             )
-            running = null
+        }
+    }
+
+    /** Runs one operation as the single cancellable job. */
+    private fun start(message: String, block: suspend () -> Unit) {
+        stoppedNotice = null
+        running = message
+        job = viewModelScope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                running = null
+            }
+        }
+    }
+
+    /** Stops the running operation (Cancel button or lost cable). Its connection is closed by the operation itself. */
+    fun stop(notice: String = "Cancelled. The connection was released.") {
+        val active = job?.takeIf { it.isActive } ?: return
+        stoppedNotice = notice
+        active.cancel()
+        running = null
+    }
+
+    /** Reads the VIN from the engine computer through the gateway, and compares it with the gateway's own VIN if discovery found one. */
+    fun readEngineVin() {
+        val link = link() ?: return
+        val target = Ipv4Address.parse(targetText) ?: return
+        val gatewayVin = (discovery as? DiscoveryResult.Completed)?.gateways?.firstOrNull { it.address == target }?.vinReference()
+        engineVin = null
+        start("Asking the engine computer for its VIN…") {
+            engineVin = tester.readEngineVin(link, target, EngineVinOptions(gatewayVin = gatewayVin, connectTimeoutMillis = connectTimeoutMillis))
+        }
+    }
+
+    /** Checks the documented F10 modules one at a time. Progress is shown as it goes; Cancel stops it. */
+    fun scanModules() {
+        val link = link() ?: return
+        val target = Ipv4Address.parse(targetText) ?: return
+        scanResult = null
+        scanProgress = null
+        start("Scanning modules…") {
+            scanResult = tester.scanModules(link, target, ScanOptions(connectTimeoutMillis = connectTimeoutMillis)) { scanProgress = it }
         }
     }
 

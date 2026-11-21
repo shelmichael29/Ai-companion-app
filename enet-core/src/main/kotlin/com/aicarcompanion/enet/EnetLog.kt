@@ -37,6 +37,10 @@ object Redaction {
     /** A VIN keeps its maker code and last 6 characters (enough to tell cars apart, not to identify one publicly). */
     fun maskVin(vin: String): String = if (vin.length == 17) vin.take(3) + "*".repeat(8) + vin.takeLast(6) else "*".repeat(vin.length)
 
+    /** A one-way fingerprint so two VINs can be compared without keeping either one. */
+    fun vinDigest(vin: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(vin.trim().uppercase().toByteArray()).joinToString("") { "%02x".format(it) }
+
     /** A MAC keeps the manufacturer prefix only. */
     fun maskMac(mac: String): String = if (mac.length == 12) mac.take(6) + "******" else "******"
 

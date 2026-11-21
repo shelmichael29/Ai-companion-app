@@ -32,6 +32,8 @@ class FakeTransport(private val now: () -> Long) : EnetTransport {
     val tcpWritten = mutableListOf<Pair<Int, ByteArray>>()
     val tcpConnectAttempts = mutableListOf<Pair<Ipv4Address, Int>>()
     var tcpClosed = 0
+    /** Simulates the cable being pulled: after this many writes, writing fails like a reset connection. */
+    var tcpDropAfterWrites: Int? = null
 
     private class Pending(val at: Long, val payload: Any)
 
@@ -75,6 +77,8 @@ class FakeTransport(private val now: () -> Long) : EnetTransport {
             override val info = SocketInfo(local, 40001, null, "simulated network binding (eth0)")
 
             override suspend fun write(data: ByteArray) {
+                val limit = tcpDropAfterWrites
+                if (limit != null && tcpWritten.count { it.first == port } >= limit) throw java.net.SocketException("Connection reset")
                 tcpWritten += port to data
                 tcpResponder[port]?.invoke(data).orEmpty().forEach { (d, b) -> inbox += Pending(now() + d, b) }
             }
