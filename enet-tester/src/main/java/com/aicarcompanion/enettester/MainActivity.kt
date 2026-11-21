@@ -102,7 +102,7 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
         item {
             Text("BMW ENET Connection Tester", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
             Text(
-                "Experimental. Discovery and connection checks only: it never codes, programs, clears codes or activates anything. " +
+                "Experimental build ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}). Read-only diagnostics. " +
                     "Nothing is sent until you tap a button.",
                 style = MaterialTheme.typography.bodyMedium,
             )
@@ -245,6 +245,27 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                         }
                     }
                 }
+            }
+        }
+
+        item {
+            Section("6. Engine VIN and F10 modules") {
+                val enabled = !busy && localOk && vm.targetText.isNotBlank() && targetProblem == null
+                Button(onClick = { vm.runModules(true) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+                    Text("Read Engine Computer VIN")
+                }
+                Text("Scan coverage: " + com.aicarcompanion.enet.F10Module.entries.joinToString { "${it.title} (${it.name})" } +
+                    ". A quiet module may still be installed.")
+                Button(onClick = { vm.runModules(false) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+                    Text("Scan Modules")
+                }
+                if (vm.moduleActive) {
+                    OutlinedButton(onClick = { vm.cancelModules() }) { Text("Cancel diagnostic check") }
+                }
+                if (vm.moduleStatus.isNotEmpty()) {
+                    Text(vm.moduleStatus, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                }
+                vm.moduleRows.forEach { Text(it) }
             }
         }
 

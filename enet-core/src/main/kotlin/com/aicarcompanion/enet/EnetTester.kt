@@ -20,6 +20,7 @@ data class DiscoveredGateway(
     val maskedVin: String?,
     /** Masked; manufacturer prefix only. */
     val maskedMac: String?,
+    val vinIdentity: VinIdentity? = null,
 )
 
 sealed interface DiscoveryResult {
@@ -167,10 +168,10 @@ class EnetTester(
                 }
                 val gw = when (d.fromPort) {
                     Hsfz.IDENT_PORT -> HsfzIdentParser.parse(d.data)?.let {
-                        DiscoveredGateway(d.from, GatewayProtocol.HSFZ, latency, it.diagAddress, it.vin?.let(Redaction::maskVin), it.mac?.let(Redaction::maskMac))
+                        DiscoveredGateway(d.from, GatewayProtocol.HSFZ, latency, it.diagAddress, it.vin?.let(Redaction::maskVin), it.mac?.let(Redaction::maskMac), it.vin?.let(::VinIdentity))
                     }
                     Doip.PORT -> DoipParser.parseAnnouncement(d.data)?.let {
-                        DiscoveredGateway(d.from, GatewayProtocol.DOIP, latency, "0x%04X".format(it.logicalAddress), Redaction.maskVin(it.vin), Redaction.maskMac(it.eid))
+                        DiscoveredGateway(d.from, GatewayProtocol.DOIP, latency, "0x%04X".format(it.logicalAddress), Redaction.maskVin(it.vin), Redaction.maskMac(it.eid), VinIdentity(it.vin))
                     }
                     else -> null
                 }

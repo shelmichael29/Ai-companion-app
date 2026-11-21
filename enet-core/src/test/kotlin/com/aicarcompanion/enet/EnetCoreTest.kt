@@ -66,7 +66,7 @@ class EnetCoreTest {
     }
 
     @Test fun `only fixed read-only requests exist`() {
-        assertEquals(listOf(SafeRequest.TESTER_PRESENT), SafeRequest.entries)
+        assertEquals(listOf(SafeRequest.READ_VIN, SafeRequest.TESTER_PRESENT), SafeRequest.entries)
         // No service that writes, resets, clears codes, controls actuators or programs.
         val forbidden = setOf(0x04, 0x10, 0x11, 0x14, 0x27, 0x28, 0x2E, 0x2F, 0x31, 0x34, 0x36, 0x37, 0x3D, 0x85)
         SafeRequest.entries.forEach { assertFalse(it.name, (it.uds[0].toInt() and 0xFF) in forbidden) }
