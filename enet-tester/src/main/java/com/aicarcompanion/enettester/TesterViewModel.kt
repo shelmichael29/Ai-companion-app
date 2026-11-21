@@ -47,13 +47,13 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
 
     var selectedName by mutableStateOf<String?>(null)
     var targetText by mutableStateOf("")
-    var includeDoip by mutableStateOf(true)
+    var includeDoip by mutableStateOf(false)
     var sendTesterPresent by mutableStateOf(true)
     var queryIgnition by mutableStateOf(false)
     var checkDoipPort by mutableStateOf(false)
     private val prefs = app.getSharedPreferences("enet_tester", android.content.Context.MODE_PRIVATE)
 
-    /** Advanced: how long discovery listens for HSFZ/DoIP answers (default 5 s). */
+    /** Advanced: how long discovery listens for HSFZ/DoIP answers (default 9 s). */
     var listenMillis by mutableLongStateOf(prefs.getLong(KEY_LISTEN, DiscoveryOptions.DEFAULT_LISTEN_MILLIS).coerceIn(DiscoveryOptions.LISTEN_RANGE))
         private set
 
