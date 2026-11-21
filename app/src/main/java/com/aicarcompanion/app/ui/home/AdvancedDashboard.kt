@@ -217,7 +217,7 @@ private fun AdvLinkLine(k: AdvancedTokens, ui: HomeUiState) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (up) k.ok else k.tertiary))
             Spacer(Modifier.width(8.dp))
-            Text("Link: $link", style = MaterialTheme.typography.labelMedium.copy(fontFamily = Mono), color = k.secondary)
+            Text("Link: $link", style = MaterialTheme.typography.labelMedium, color = k.secondary)
         }
         if (isSampleData(ui)) {
             Text(
@@ -253,19 +253,23 @@ private fun AdvStatusStrip(k: AdvancedTokens, ui: HomeUiState, shown: List<Senso
         else -> StripCell("CHECK ENGINE", plain("Off", k.ok), "No stored codes", "Check engine: off, no stored codes")
     }
     val codes = if (!read) {
-        StripCell("CODES", dash, "Stored · Pend · Perm", "Codes: not read yet")
+        StripCell("CODES", dash, "Not read yet", "Codes: not read yet")
     } else {
-        val value = buildAnnotatedString {
-            withStyle(SpanStyle(fontFamily = Mono)) {
-                withStyle(SpanStyle(color = if (counts.stored > 0) k.fault else k.primary)) { append(counts.stored.toString()) }
-                withStyle(SpanStyle(color = k.tertiary)) { append(" · ") }
-                withStyle(SpanStyle(color = if (counts.pending > 0) k.warn else k.primary)) { append(counts.pending.toString()) }
-                withStyle(SpanStyle(color = k.tertiary)) { append(" · ") }
-                withStyle(SpanStyle(color = if (counts.permanent > 0) k.fault else k.primary)) { append(counts.permanent.toString()) }
-            }
+        // One clear number (colored by the most serious status) and the breakdown in words.
+        val total = counts.stored + counts.pending + counts.permanent
+        val color = when {
+            counts.stored > 0 || counts.permanent > 0 -> k.fault
+            counts.pending > 0 -> k.warn
+            else -> k.ok
         }
+        val value = plain(total.toString(), color, Mono)
+        val caption = listOfNotNull(
+            counts.stored.takeIf { it > 0 }?.let { "$it stored" },
+            counts.pending.takeIf { it > 0 }?.let { "$it pending" },
+            counts.permanent.takeIf { it > 0 }?.let { "$it permanent" },
+        ).joinToString(" · ").ifEmpty { "None found" }
         StripCell(
-            "CODES", value, "Stored · Pend · Perm",
+            "CODES", value, caption,
             "Codes: ${counts.stored} stored, ${counts.pending} pending, ${counts.permanent} permanent",
         )
     }

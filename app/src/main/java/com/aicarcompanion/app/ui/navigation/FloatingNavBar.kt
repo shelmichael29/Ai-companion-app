@@ -1,5 +1,9 @@
 package com.aicarcompanion.app.ui.navigation
 
+import androidx.compose.ui.semantics.semantics
+
+import androidx.compose.ui.semantics.contentDescription
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,37 +50,63 @@ internal fun Destination.icon(): ImageVector = when (this) {
  * least 48dp wide and tall.
  */
 @Composable
-internal fun FloatingNavBar(tabs: List<NavTab>, selectedRoute: String?, onSelect: (NavTab) -> Unit) {
+internal fun FloatingNavBar(
+    tabs: List<NavTab>,
+    selectedRoute: String?,
+    /** Advanced / Professional uses the plain black-and-grey style; the other levels the Penelope style. */
+    plain: Boolean = false,
+    onSelect: (NavTab) -> Unit,
+) {
     val t = Penelope.tokens
-    val shape = RoundedCornerShape(32.dp)
+    val k = com.aicarcompanion.app.ui.home.advancedTokens()
+    val shape = RoundedCornerShape(if (plain) 16.dp else 32.dp)
+    // At large font sizes only the selected tab shows its label, so no label is cut off; TalkBack reads all of them.
+    val compactLabels = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f
     Row(
         Modifier
             .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 12.dp)
             .fillMaxWidth()
-            .shadow(18.dp, shape, ambientColor = t.brandColors[2].copy(alpha = 0.25f), spotColor = t.brandColors[1].copy(alpha = 0.25f))
-            .clip(shape)
-            .background(t.glassStrong)
-            .border(1.dp, t.glassBorder, shape)
+            .then(
+                if (plain) {
+                    Modifier.clip(shape).background(k.panel).border(1.dp, k.hairline, shape)
+                } else {
+                    Modifier
+                        .shadow(18.dp, shape, ambientColor = t.brandColors[2].copy(alpha = 0.25f), spotColor = t.brandColors[1].copy(alpha = 0.25f))
+                        .clip(shape)
+                        .background(t.glassStrong)
+                        .border(1.dp, t.glassBorder, shape)
+                },
+            )
             .padding(4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         tabs.forEach { tab ->
             val isSelected = tab.route == selectedRoute
-            val tint by animateColorAsState(if (isSelected) Color.White else t.textSecondary, label = "tabTint")
+            val selectedTint = if (plain) k.primary else Color.White
+            val idleTint = if (plain) k.secondary else t.textSecondary
+            val tint by animateColorAsState(if (isSelected) selectedTint else idleTint, label = "tabTint")
+            val showLabel = !compactLabels || isSelected
             Column(
                 Modifier
-                    .weight(1f)
+                    .weight(if (compactLabels && isSelected) 2.8f else 1f)
                     .heightIn(min = 60.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .then(if (isSelected) Modifier.background(t.brandGradient) else Modifier)
+                    .clip(RoundedCornerShape(if (plain) 12.dp else 26.dp))
+                    .then(
+                        when {
+                            !isSelected -> Modifier
+                            plain -> Modifier.background(k.raised)
+                            else -> Modifier.background(t.brandGradient)
+                        },
+                    )
+                    .semantics { contentDescription = tab.label }
                     .selectable(isSelected, role = Role.Tab, onClick = { onSelect(tab) })
                     .padding(vertical = 8.dp, horizontal = 2.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(tab.destination.icon(), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-                Text(
+                if (showLabel) Text(
                     tab.label,
                     style = MaterialTheme.typography.labelSmall,
                     color = tint,

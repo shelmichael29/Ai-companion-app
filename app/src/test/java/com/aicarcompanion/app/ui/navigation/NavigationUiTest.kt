@@ -16,6 +16,7 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.unit.Density
@@ -45,7 +46,7 @@ class NavigationUiTest {
         compose.setContent {
             CarCompanionTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
-                    FloatingNavBar(LevelNavigation.tabs(level), selected, onSelect)
+                    FloatingNavBar(LevelNavigation.tabs(level), selected, onSelect = onSelect)
                 }
             }
         }
@@ -90,8 +91,12 @@ class NavigationUiTest {
             assertTrue("no overlap", b.left >= previousRight - 0.5f)
             previousRight = b.right
         }
-        // Labels stay single line: tab height doesn't grow with a wrapped label.
-        compose.onNodeWithText("Live Data").getBoundsInRoot().let { assertTrue(it.bottom - it.top < 120.dp) }
+        // At large text only the selected tab shows its label (single line); every tab keeps its name for TalkBack.
+        compose.onNodeWithText("Overview").getBoundsInRoot().let { assertTrue(it.bottom - it.top < 120.dp) }
+        assertEquals(0, compose.onAllNodesWithText("Live Data").fetchSemanticsNodes().size)
+        for (name in listOf("Overview", "Live Data", "Diagnostics", "Drive", "More")) {
+            compose.onNodeWithContentDescription(name).assertExists()
+        }
     }
 
     @Test fun `drive screen is honest and offers voice`() {

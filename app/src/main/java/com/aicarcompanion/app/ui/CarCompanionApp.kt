@@ -251,7 +251,7 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
             exit = if (t.reducedMotion) ExitTransition.None else fadeOut() + slideOutVertically { it },
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            FloatingNavBar(tabs, currentRoute) { navController.navigateTab(it.route) }
+            FloatingNavBar(tabs, currentRoute, plain = settings.explanationLevel == com.aicarcompanion.app.data.local.ExplanationLevel.ADVANCED) { navController.navigateTab(it.route) }
         }
     }
 }
