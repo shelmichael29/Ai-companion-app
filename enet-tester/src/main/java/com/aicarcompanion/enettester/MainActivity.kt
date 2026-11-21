@@ -62,6 +62,14 @@ import com.aicarcompanion.enet.ConnectionResult
 import com.aicarcompanion.enet.DiscoveryResult
 import com.aicarcompanion.enet.StepOutcome
 import com.aicarcompanion.enet.TargetPolicy
+import com.aicarcompanion.enet.EngineVinResult
+import com.aicarcompanion.enet.F10Modules
+import com.aicarcompanion.enet.ModuleScanEntry
+import com.aicarcompanion.enet.ModuleScanResult
+import com.aicarcompanion.enet.Nrc
+import com.aicarcompanion.enet.ScanEnd
+import com.aicarcompanion.enet.ScanOutcome
+import com.aicarcompanion.enet.VinMatch
 
 class MainActivity : ComponentActivity() {
     private val vm: TesterViewModel by viewModels()
@@ -102,9 +110,14 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
         item {
             Text("BMW ENET Connection Tester", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
             Text(
-                "Experimental. Discovery and connection checks only: it never codes, programs, clears codes or activates anything. " +
-                    "Nothing is sent until you tap a button.",
+                "Experimental. Discovery, connection checks and two read-only requests (the engine computer's VIN, and whether modules answer): " +
+                    "it never codes, programs, clears codes or activates anything. Nothing is sent until you tap a button.",
                 style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Build ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · revision ${BuildConfig.SOURCE_REVISION}",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.semantics { contentDescription = "Tester build ${BuildConfig.VERSION_NAME}, code ${BuildConfig.VERSION_CODE}, revision ${BuildConfig.SOURCE_REVISION}" },
             )
         }
 
@@ -248,6 +261,35 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
             }
         }
 
+        item {
+            Section("6. Engine computer VIN and module scan") {
+                Text(
+                    "Read-only. Both use the gateway address above and the connection to TCP port 6801, one at a time, and release the connection when they finish, are cancelled, or the cable is unplugged.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                val ready = !busy && localOk && vm.targetText.isNotBlank() && targetProblem == null
+                Button(
+                    onClick = vm::readEngineVin,
+                    enabled = ready,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "Read engine computer VIN. Asks the engine computer, not just the gateway." },
+                ) { Text("Read engine computer VIN") }
+                EngineVinView(vm.engineVin)
+                Button(
+                    onClick = vm::scanModules,
+                    enabled = ready,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "Scan modules. Checks ${F10Modules.SCANNED.size} modules one at a time." },
+                ) { Text("Scan modules") }
+                ScanView(vm.scanProgress, vm.scanResult, vm.running != null)
+                if (vm.canCancel) {
+                    OutlinedButton(
+                        onClick = { vm.stop() },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = "Cancel the running operation and release the connection" },
+                    ) { Text("Cancel") }
+                }
+                vm.stoppedNotice?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
+            }
+        }
+
         vm.running?.let { msg ->
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
@@ -296,6 +338,102 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun EngineVinView(result: EngineVinResult?) {
+    val error = MaterialTheme.colorScheme.error
+    Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+        when (result) {
+            null -> Unit
+            is EngineVinResult.Success -> {
+                Text("OK · VIN read from the engine computer", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                Text("Responding module: ${result.module.name} (${result.module.abbreviation}), address 0x%02X · ${result.latencyMillis} ms".format(result.module.address), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "VIN: ${result.vin}", fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.semantics { contentDescription = "VIN ${result.vin.toList().joinToString(" ")}" },
+                )
+                Text(
+                    when (result.match) {
+                        VinMatch.MATCHES_GATEWAY -> "Matches the VIN the gateway reported (${result.gatewayMaskedVin})."
+                        VinMatch.DIFFERS_FROM_GATEWAY -> "DOES NOT MATCH the VIN the gateway reported (${result.gatewayMaskedVin}). Check which car you are connected to."
+                        VinMatch.NO_GATEWAY_VIN -> "No gateway VIN to compare with. Run Discover gateway first to compare."
+                    },
+                    color = if (result.match == VinMatch.DIFFERS_FROM_GATEWAY) error else MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            is EngineVinResult.Rejected -> {
+                Text("Declined · no VIN read", style = MaterialTheme.typography.labelLarge)
+                Text(result.detail, style = MaterialTheme.typography.bodySmall)
+            }
+            is EngineVinResult.Unusable -> {
+                Text("Failed · reply was not a valid VIN", color = error, style = MaterialTheme.typography.labelLarge)
+                Text(result.detail, style = MaterialTheme.typography.bodySmall)
+            }
+            is EngineVinResult.NoAnswer -> {
+                Text("Failed · the engine computer did not answer", color = error, style = MaterialTheme.typography.labelLarge)
+                Text(result.detail, style = MaterialTheme.typography.bodySmall)
+            }
+            is EngineVinResult.ConnectionFailed -> {
+                Text("Failed · connection", color = error, style = MaterialTheme.typography.labelLarge)
+                Text(result.detail, style = MaterialTheme.typography.bodySmall)
+            }
+            is EngineVinResult.Refused -> Text(result.reason, color = error)
+        }
+    }
+}
+
+@Composable
+private fun ScanView(progress: com.aicarcompanion.enet.ScanProgress?, result: ModuleScanResult?, running: Boolean) {
+    val error = MaterialTheme.colorScheme.error
+    when (result) {
+        is ModuleScanResult.Refused -> { Text(result.reason, color = error); return }
+        is ModuleScanResult.ConnectionFailed -> { Text("Failed · connection: ${result.detail}", color = error, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }); return }
+        else -> Unit
+    }
+    val entries = (result as? ModuleScanResult.Finished)?.entries ?: progress?.entries.orEmpty()
+    if (progress == null && result == null) return
+    val total = (result as? ModuleScanResult.Finished)?.entries?.size ?: progress?.total ?: 0
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val status = when {
+            result is ModuleScanResult.Finished && result.end == ScanEnd.CONNECTION_LOST ->
+                "Scan stopped: ${result.endDetail}. ${result.answered} of $total modules answered before it stopped."
+            result is ModuleScanResult.Finished -> "Scan finished: ${result.answered} of $total modules answered."
+            running && progress?.current != null -> "Checking ${progress.current!!.name} (${progress.entries.size + 1} of ${progress.total})…"
+            else -> "Scan stopped: ${entries.size} of $total modules checked. Modules not listed were not checked."
+        }
+        Text(status, style = MaterialTheme.typography.titleSmall, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+        entries.forEach { ModuleRow(it) }
+        if (result is ModuleScanResult.Finished) {
+            Text(result.coverage.statement, style = MaterialTheme.typography.bodySmall)
+        } else {
+            Text(F10Modules.coverage().statement, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun ModuleRow(e: ModuleScanEntry) {
+    val color = when (e.outcome) {
+        ScanOutcome.POSITIVE -> MaterialTheme.colorScheme.primary
+        ScanOutcome.REJECTED -> MaterialTheme.colorScheme.tertiary
+        ScanOutcome.NO_RESPONSE -> MaterialTheme.colorScheme.onSurfaceVariant
+        ScanOutcome.NOT_CHECKED -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Column(
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = "${e.module.name}, ${e.module.abbreviation}: ${e.outcome.label}. ${e.detail}"
+        },
+    ) {
+        Text("${e.module.name} (${e.module.abbreviation}, 0x%02X)".format(e.module.address), style = MaterialTheme.typography.bodyMedium)
+        // The result is words, not only color.
+        Text(
+            "${e.outcome.label}${e.nrc?.let { " · NRC 0x%02X %s".format(it, Nrc.describe(it)) } ?: ""}${e.latencyMillis?.let { " · $it ms" } ?: ""}",
+            color = color, style = MaterialTheme.typography.labelLarge,
+        )
+        Text(e.detail, style = MaterialTheme.typography.bodySmall)
     }
 }
 

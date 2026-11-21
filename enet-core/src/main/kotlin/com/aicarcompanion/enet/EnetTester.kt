@@ -20,6 +20,8 @@ data class DiscoveredGateway(
     val maskedVin: String?,
     /** Masked; manufacturer prefix only. */
     val maskedMac: String?,
+    /** One-way fingerprint of the full VIN, kept only to compare it with another VIN. Never the VIN itself, never logged. */
+    val vinDigest: String? = null,
 )
 
 sealed interface DiscoveryResult {
@@ -67,6 +69,13 @@ data class DiscoveryOptions(
         val LISTEN_RANGE = 1_000L..15_000L
     }
 }
+
+data class EngineVinOptions(
+    /** The VIN the gateway announced during discovery, if any, to compare with the engine computer's. */
+    val gatewayVin: GatewayVinReference? = null,
+    val connectTimeoutMillis: Long = ConnectionOptions.DEFAULT_CONNECT_TIMEOUT_MILLIS,
+    val responseTimeoutMillis: Long = 3_000,
+)
 
 data class ConnectionOptions(
     val sendTesterPresent: Boolean = true,
@@ -167,10 +176,10 @@ class EnetTester(
                 }
                 val gw = when (d.fromPort) {
                     Hsfz.IDENT_PORT -> HsfzIdentParser.parse(d.data)?.let {
-                        DiscoveredGateway(d.from, GatewayProtocol.HSFZ, latency, it.diagAddress, it.vin?.let(Redaction::maskVin), it.mac?.let(Redaction::maskMac))
+                        DiscoveredGateway(d.from, GatewayProtocol.HSFZ, latency, it.diagAddress, it.vin?.let(Redaction::maskVin), it.mac?.let(Redaction::maskMac), it.vin?.let(Redaction::vinDigest))
                     }
                     Doip.PORT -> DoipParser.parseAnnouncement(d.data)?.let {
-                        DiscoveredGateway(d.from, GatewayProtocol.DOIP, latency, "0x%04X".format(it.logicalAddress), Redaction.maskVin(it.vin), Redaction.maskMac(it.eid))
+                        DiscoveredGateway(d.from, GatewayProtocol.DOIP, latency, "0x%04X".format(it.logicalAddress), Redaction.maskVin(it.vin), Redaction.maskMac(it.eid), Redaction.vinDigest(it.vin))
                     }
                     else -> null
                 }
@@ -264,6 +273,160 @@ class EnetTester(
             else StepResult(ConnectionResult.STEP_IGNITION, StepOutcome.SKIPPED, if (options.queryIgnition) "Skipped: no TCP connection." else "Not selected.")
             steps += if (options.checkDoipPort) doipPort(link, target, options) else StepResult(ConnectionResult.STEP_DOIP, StepOutcome.SKIPPED, "Not selected.")
             return ConnectionResult.Completed(target, steps)
+        } finally {
+            busy.unlock()
+        }
+    }
+
+    // ---- Read-only diagnostic requests to a module behind the gateway ------------------------------------------------
+
+    private suspend fun connectDiagnostic(link: EnetLink, target: Ipv4Address, timeoutMillis: Long): Pair<TcpChannel?, String?> {
+        val timeout = timeoutMillis.coerceIn(ConnectionOptions.CONNECT_TIMEOUT_RANGE)
+        val t0 = clock()
+        return try {
+            val tcp = transport.connectTcp(link.subnet.address, target, Hsfz.DIAG_PORT, timeout)
+            log.add("TCP ${tcp.info.endpoint} → $target:${Hsfz.DIAG_PORT} connected in ${clock() - t0} ms (${tcp.info.binding})")
+            tcp to null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: SocketTimeoutException) {
+            log.add("TCP $target:${Hsfz.DIAG_PORT}: no answer within $timeout ms")
+            null to "No answer from $target within $timeout ms. Check the cable, ignition and target address."
+        } catch (e: IOException) {
+            log.add("Network error: TCP $target:${Hsfz.DIAG_PORT}: ${e.describe()}")
+            null to "Connection failed: ${e.message ?: e.javaClass.simpleName}"
+        }
+    }
+
+    private fun silentDetail(r: ModuleReply.Silent, who: String, timeoutMillis: Long): String = when {
+        r.gatewayError != null -> "The gateway reported an error (0x%04X) instead of passing the request on to $who.".format(r.gatewayError)
+        r.otherSources.isNotEmpty() -> "Only another address answered (${r.otherSources.joinToString { "0x%02X".format(it) }}). That is not $who, so it doesn't count."
+        r.gatewayAcked -> "The gateway acknowledged the request, but $who did not reply within $timeoutMillis ms. A gateway acknowledgment is not an answer from the module."
+        else -> "No reply from $who within $timeoutMillis ms."
+    }
+
+    /**
+     * Asks the engine computer (DME) for its VIN through the gateway: ReadDataByIdentifier F190, read-only.
+     * Success needs a positive reply from the DME's own address with a well-formed 17-character VIN; a
+     * gateway acknowledgment, a rejection, silence or a reply from any other module is never a successful read.
+     */
+    suspend fun readEngineVin(link: EnetLink, target: Ipv4Address, options: EngineVinOptions = EngineVinOptions()): EngineVinResult {
+        (TargetPolicy.checkLocal(link.subnet) as? TargetPolicy.Verdict.Rejected)?.let { log.add("Engine VIN read refused: ${it.reason}"); return EngineVinResult.Refused(it.reason) }
+        (TargetPolicy.checkTarget(target, link.subnet) as? TargetPolicy.Verdict.Rejected)?.let { log.add("Engine VIN read refused: ${it.reason}"); return EngineVinResult.Refused(it.reason) }
+        if (!busy.tryLock()) return EngineVinResult.Refused("Another test is already running.")
+        try {
+            val module = F10Modules.DME
+            val timeout = options.responseTimeoutMillis.coerceIn(ScanOptions.MODULE_TIMEOUT_RANGE.first, MAX_VIN_TIMEOUT_MILLIS)
+            log.add("Engine VIN read via gateway $target from ${link.interfaceName} (${link.subnet.address}); asking module 0x%02X".format(module.address))
+            val (tcp, failure) = connectDiagnostic(link, target, options.connectTimeoutMillis)
+            if (tcp == null) return EngineVinResult.ConnectionFailed(failure ?: "Connection failed.")
+            return tcp.use {
+                when (val r = DiagnosticLink(it, log, clock).exchange(SafeRequest.READ_VIN, module.address, timeout)) {
+                    is ModuleReply.Positive -> interpretVin(module, r, options.gatewayVin)
+                    is ModuleReply.Rejected -> {
+                        log.add("Engine computer answered but declined to give its VIN (NRC 0x%02X).".format(r.nrc))
+                        EngineVinResult.Rejected(
+                            module, r.nrc,
+                            "The engine computer answered but declined to give its VIN (NRC 0x%02X: %s). It is there; no VIN was read.".format(r.nrc, Nrc.describe(r.nrc)),
+                        )
+                    }
+                    is ModuleReply.Silent -> {
+                        val detail = silentDetail(r, "the engine computer", timeout)
+                        log.add("Engine VIN read: no VIN. $detail")
+                        EngineVinResult.NoAnswer(detail)
+                    }
+                    is ModuleReply.Lost -> {
+                        log.add("Engine VIN read: connection lost: ${r.reason}")
+                        EngineVinResult.ConnectionFailed(r.reason)
+                    }
+                }
+            }
+        } catch (e: CancellationException) {
+            log.add("Engine VIN read cancelled; connection closed.")
+            throw e
+        } finally {
+            busy.unlock()
+        }
+    }
+
+    private fun interpretVin(module: EcuModule, r: ModuleReply.Positive, gateway: GatewayVinReference?): EngineVinResult {
+        val data = r.uds.copyOfRange(SafeRequest.READ_VIN.positiveResponse.size, r.uds.size)
+        if (data.size != VIN_LENGTH) {
+            log.add("Engine computer replied, but with ${data.size} data bytes; a VIN has $VIN_LENGTH characters. Not a VIN read.")
+            return EngineVinResult.Unusable(module, "The engine computer replied with ${data.size} characters; a VIN has $VIN_LENGTH. Nothing is shown as the VIN.")
+        }
+        val vin = String(data, Charsets.ISO_8859_1)
+        if (!VinFormat.isValid(vin)) {
+            log.add("Engine computer replied with $VIN_LENGTH characters that are not a valid VIN. Not a VIN read.")
+            return EngineVinResult.Unusable(module, "The engine computer's reply is not a valid VIN (it has characters a VIN can't contain). Nothing is shown as the VIN.")
+        }
+        val match = when {
+            gateway == null -> VinMatch.NO_GATEWAY_VIN
+            Redaction.vinDigest(vin) == gateway.digest -> VinMatch.MATCHES_GATEWAY
+            else -> VinMatch.DIFFERS_FROM_GATEWAY
+        }
+        log.add("Engine computer VIN read: ${Redaction.maskVin(vin)} from module 0x%02X in ${r.millis} ms; ${match.name}".format(r.source))
+        return EngineVinResult.Success(module, vin, match, gateway?.masked, r.millis)
+    }
+
+    /**
+     * Checks the modules in [ScanOptions.modules] one at a time over one connection, each with a
+     * bounded wait, reporting progress as it goes. Cancelling (or the cable coming out) closes the
+     * connection. A module that rejects the request still counts as having answered; silence is
+     * reported as "no response", never as "absent".
+     */
+    suspend fun scanModules(
+        link: EnetLink,
+        target: Ipv4Address,
+        options: ScanOptions = ScanOptions(),
+        onProgress: (ScanProgress) -> Unit = {},
+    ): ModuleScanResult {
+        (TargetPolicy.checkLocal(link.subnet) as? TargetPolicy.Verdict.Rejected)?.let { log.add("Module scan refused: ${it.reason}"); return ModuleScanResult.Refused(it.reason) }
+        (TargetPolicy.checkTarget(target, link.subnet) as? TargetPolicy.Verdict.Rejected)?.let { log.add("Module scan refused: ${it.reason}"); return ModuleScanResult.Refused(it.reason) }
+        if (!busy.tryLock()) return ModuleScanResult.Refused("Another test is already running.")
+        try {
+            val timeout = options.moduleTimeoutMillis.coerceIn(ScanOptions.MODULE_TIMEOUT_RANGE)
+            val modules = options.modules
+            log.add("Module scan via gateway $target: ${modules.size} modules, $timeout ms each, one at a time")
+            val (tcp, failure) = connectDiagnostic(link, target, options.connectTimeoutMillis)
+            if (tcp == null) return ModuleScanResult.ConnectionFailed(failure ?: "Connection failed.")
+            val entries = mutableListOf<ModuleScanEntry>()
+            var end = ScanEnd.COMPLETE
+            var endDetail: String? = null
+            tcp.use {
+                val diag = DiagnosticLink(it, log, clock)
+                for (module in modules) {
+                    onProgress(ScanProgress(entries.toList(), modules.size, module))
+                    val entry = when (val r = diag.exchange(SafeRequest.TESTER_PRESENT, module.address, timeout)) {
+                        is ModuleReply.Positive -> ModuleScanEntry(module, ScanOutcome.POSITIVE, "Replied to the request.", null, r.millis)
+                        is ModuleReply.Rejected -> ModuleScanEntry(
+                            module, ScanOutcome.REJECTED,
+                            "Declined the request (NRC 0x%02X: %s). A rejection still means the module answered.".format(r.nrc, Nrc.describe(r.nrc)),
+                            r.nrc, r.millis,
+                        )
+                        is ModuleReply.Silent -> ModuleScanEntry(
+                            module, ScanOutcome.NO_RESPONSE, silentDetail(r, module.abbreviation, timeout) + " " + F10Modules.SILENCE_NOTE, null, r.millis,
+                        )
+                        is ModuleReply.Lost -> {
+                            end = ScanEnd.CONNECTION_LOST; endDetail = r.reason
+                            log.add("Module scan stopped: ${r.reason}")
+                            null
+                        }
+                    }
+                    if (entry == null) break
+                    entries += entry
+                    log.add("${module.abbreviation} (0x%02X): ${entry.outcome.label}".format(module.address))
+                }
+                modules.drop(entries.size).forEach { m ->
+                    entries += ModuleScanEntry(m, ScanOutcome.NOT_CHECKED, "The scan stopped before this module (${endDetail ?: "no reason given"}).")
+                }
+                onProgress(ScanProgress(entries.toList(), modules.size, null))
+            }
+            log.add("Module scan finished: ${entries.count { e -> e.outcome.answered }} of ${modules.size} modules answered. ${F10Modules.SILENCE_NOTE}")
+            return ModuleScanResult.Finished(entries, end, endDetail, ScanCoverage(modules, F10Modules.NOT_CHECKED))
+        } catch (e: CancellationException) {
+            log.add("Module scan cancelled; connection closed.")
+            throw e
         } finally {
             busy.unlock()
         }
@@ -436,6 +599,9 @@ class EnetTester(
         }
     }
 }
+
+private const val VIN_LENGTH = 17
+private const val MAX_VIN_TIMEOUT_MILLIS = 6_000L
 
 private fun ByteArray.hex() = joinToString(" ") { "%02X".format(it.toInt() and 0xFF) }
 

@@ -59,9 +59,26 @@ object Hsfz {
  * The only diagnostic requests this tester can send. Fixed bytes, no user input, and none of
  * them changes anything in the car: no coding, programming, actuator tests or code clearing.
  */
-enum class SafeRequest(val label: String, val uds: ByteArray, val positiveResponse: ByteArray) {
+enum class SafeRequest(
+    val label: String,
+    val uds: ByteArray,
+    val positiveResponse: ByteArray,
+    /** True when a positive response is these bytes followed by data (e.g. the VIN), not exactly these bytes. */
+    val positiveIsPrefix: Boolean = false,
+) {
     /** UDS TesterPresent (0x3E, sub-function 0x00): "are you there?", requires a response. */
     TESTER_PRESENT("TesterPresent (3E 00)", byteArrayOf(0x3E, 0x00), byteArrayOf(0x7E, 0x00)),
+
+    /**
+     * UDS ReadDataByIdentifier 0x22, data identifier 0xF190 (the ISO 14229 vehicle identification number).
+     * Read-only. A positive response is `62 F1 90` followed by the 17 ASCII characters of the VIN.
+     */
+    READ_VIN(
+        "ReadDataByIdentifier VIN (22 F1 90)",
+        byteArrayOf(0x22, 0xF1.toByte(), 0x90.toByte()),
+        byteArrayOf(0x62, 0xF1.toByte(), 0x90.toByte()),
+        positiveIsPrefix = true,
+    ),
 }
 
 data class HsfzFrame(val control: Int, val payload: ByteArray) {
