@@ -44,6 +44,7 @@ import com.aicarcompanion.app.ui.navigation.MoreAction
 import com.aicarcompanion.app.ui.navigation.MoreScreen
 import com.aicarcompanion.app.ui.navigation.NavRoutes
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import com.aicarcompanion.app.ui.home.HomeScreen
 import com.aicarcompanion.app.ui.results.ResultsScreen
 import com.aicarcompanion.app.ui.settings.SettingsScreen
