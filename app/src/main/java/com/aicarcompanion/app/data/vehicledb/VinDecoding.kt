@@ -185,7 +185,12 @@ object VpicParser {
     }
 }
 
-class NhtsaVinDecoder(private val http: HttpClient) : VinDecoder {
+/**
+ * The VIN is sent in the request body (vPIC's batch decoder, one VIN), never in the URL. Verified
+ * 2026-11-21 against the live service: for valid, bad-check-digit and invalid VINs the single-VIN
+ * result is identical to `DecodeVinValues`, and the response doesn't echo the VIN.
+ */
+class NhtsaVinDecoder(private val poster: HttpFormPoster) : VinDecoder {
     override val sourceName = "NHTSA vPIC"
 
     override suspend fun decode(vin: String): VinDecodeResult {
@@ -194,7 +199,7 @@ class NhtsaVinDecoder(private val http: HttpClient) : VinDecoder {
             is VinValidator.Result.Valid -> v.vin
         }
         val response = try {
-            http.get("$BASE/DecodeVinValues/$valid?format=json", emptyMap())
+            poster.postForm("$BASE/DecodeVINValuesBatch/", mapOf("format" to "json", "data" to valid), mapOf("Accept" to "application/json"))
         } catch (e: java.io.IOException) {
             return VinDecodeResult.Failed(LookupError.OFFLINE)
         }

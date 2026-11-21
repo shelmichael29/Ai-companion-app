@@ -26,7 +26,7 @@ Code: `vin/VinScanning.kt` (platform-neutral), `vin/android/VinCameraView.kt`.
 Asked only when the scanner opens (the guide screen already explained why). If it's denied the screen says why and offers **Allow camera** (or **Open phone settings** when Android won't ask again) and **Type my VIN instead**. Returning from settings re-checks the permission. A camera that fails to start also falls back to typing. The `CAMERA` permission and the camera `uses-feature` entries are **not required**: phones without a camera can still install the app and type a VIN.
 
 ## 4. Decoding (NHTSA vPIC)
-`VinDecoder` / `NhtsaVinDecoder` (already in the app) → `DecodeVinValues`. Extracted: year, make, model, series, trim, engine (size, cylinders, layout, code), fuel type, aspiration, transmission, drivetrain, body class, **manufacturer name, plant city and country**. Anything NHTSA didn't report stays blank and is listed as "A VIN can't tell me…". Engine layout stays *Unknown* (shown "6-cyl", never "V6") until the user confirms it.
+`VinDecoder` / `NhtsaVinDecoder` (already in the app) → vPIC `DecodeVINValuesBatch` with one VIN in a POST form body (`HttpFormPoster`). Checked against the live service on 2026-11-21: results are identical to the single-VIN `DecodeVinValues` for valid, wrong-check-digit and invalid VINs. Extracted: year, make, model, series, trim, engine (size, cylinders, layout, code), fuel type, aspiration, transmission, drivetrain, body class, **manufacturer name, plant city and country**. Anything NHTSA didn't report stays blank and is listed as "A VIN can't tell me…". Engine layout stays *Unknown* (shown "6-cyl", never "V6") until the user confirms it.
 
 - The profile is filled in but never saved automatically; the review form stays editable.
 - **No duplicates:** if a saved car has the same VIN, the results say so and offer **Open my saved car**; saving a second copy is blocked (also from the normal form's Save).
@@ -46,14 +46,14 @@ Each campaign shows: campaign number, affected component (made readable), proble
 
 ### Where the user checks their VIN
 - Always: **nhtsa.gov/recalls** (works for every make with the VIN).
-- Plus the manufacturer's own page for Toyota/Lexus, Volkswagen and Mazda. Only addresses that were confirmed reachable on 2026-11-20 are listed; many other manufacturers' pages block automated checks or move often, so they are not linked rather than risk a dead link. The links are fixed addresses: **the VIN is never put in a URL.** A **Copy my VIN** button lets the user paste it there.
+- Plus the manufacturer's own page for Toyota/Lexus, Volkswagen and Mazda. Only addresses that were confirmed reachable on 2026-11-20 are listed; many other manufacturers' pages block automated checks or move often, so they are not linked rather than risk a dead link. **Owner decision (2026-11-21): keep this short verified list;** NHTSA's lookup covers every make. Add a manufacturer only after confirming its page in a browser. The links are fixed addresses: **the VIN is never put in a URL.** A **Copy my VIN** button lets the user paste it there.
 
 ### Offline
 If NHTSA can't be reached, the already-installed offline knowledge pack's recall snapshot (`docs/OFFLINE_KNOWLEDGE.md`) is shown, labeled "saved data from <date>, which may be out of date". An empty snapshot is **not** shown as "no recalls" (the model name may simply not match); the normal "couldn't check" message appears instead.
 
 ## 6. Privacy
 - **Camera:** frames are analyzed in memory and closed immediately. No picture or video is saved, cached or sent anywhere. The camera is on only while the scan screen is open and is unbound when it closes (which also turns the flashlight off).
-- **VIN:** sent only to NHTSA vPIC (to decode). **Never** sent to the recalls API (only year, make, model), **never** to Gemini, **never** logged (the connection log records the result category and the count), and **never spoken in full**: voice guidance says only "a VIN ending in 0 0 0 1". It isn't put in crash reports.
+- **VIN:** sent only to NHTSA vPIC (to decode), **in the request body (POST), never in the URL**, so it isn't in anyone's access logs as part of an address (the response doesn't echo it either). **Never** sent to the recalls API (only year, make, model), **never** to Gemini, **never** logged (the connection log records the result category and the count), and **never spoken in full**: voice guidance says only "a VIN ending in 0 0 0 1". It isn't put in crash reports.
 - VIN processing is entirely independent of Gemini; no AI call is made.
 
 ## 7. Voice and accessibility
