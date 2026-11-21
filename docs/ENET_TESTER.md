@@ -5,6 +5,8 @@ A separate Android app for checking whether a phone can reach a BMW F-series cen
 - **Separate app:** application ID `com.aicarcompanion.enettester` (shown as "ENET Tester (experimental)"), so it installs alongside Penelope.
 - **Penelope is unchanged:** the app, Firebase and Bluetooth OBD-II code aren't touched.
 
+For the current module catalog, individual/selected/all scan controls, timing, hardware evidence and change record, see [F10 module coverage](ENET_MODULE_COVERAGE.md).
+
 ## Modules
 | Module | What it is |
 |---|---|
@@ -43,11 +45,16 @@ These are community-documented, not official BMW specifications. They come from 
 4. **Optional connect-only check of DoIP port 13400.** No DoIP messages are sent.
 
 **Safety limits:**
-- **Requests:** `SafeRequest` is a fixed enum with one member, TesterPresent. No code path accepts user-supplied bytes, so there is no raw command entry. There is no coding, programming, actuator activation, routine control, security access or fault-code clearing.
+- **Requests:** `SafeRequest` is a fixed enum containing only TesterPresent (`3E 00`) and Read VIN (`22 F1 90`). No code path accepts user-supplied bytes, so there is no raw command entry. There is no coding, programming, actuator activation, routine control, security access or fault-code clearing.
 - **Targets:** `TargetPolicy` allows only unicast private or link-local addresses inside the selected interface's subnet. It also refuses an interface with a public address or a network larger than /16. It is checked before any socket opens.
 - **Interfaces:** only Ethernet-transport networks are listed. Wi-Fi, mobile data and VPN can't be selected, and sockets are bound with `Network.bindSocket`.
 - **User action:** no traffic until a button is pressed. One operation runs at a time, every wait has a timeout, and incoming frames are capped at 4 KB.
 - **Logs:** VINs (maker code and last 6 characters kept) and MAC addresses (manufacturer prefix kept) are masked in the log and in exports.
+
+## Engine VIN and module checks
+The DME VIN read requires a diagnostic reply from DME `0x12` addressed to tester `0xF4`, the expected `62 F1 90` identifier and a valid 17-character VIN. A gateway ACK does not count. A valid discovery identity is compared in full without logging the VIN.
+
+Build **0.3.0-experimental (3)** adds **Scan All**, **Scan Selected**, and a **Scan** button for each of the 47 candidate F10 module addresses. Requests run one at a time with bounded waits, cancellation and per-module/total timing. Optional equipment is labeled and silence never means confirmed absence. Details and sources: [F10 module coverage](ENET_MODULE_COVERAGE.md).
 
 ## Verification status
 | Area | Simulation (unit tests) | Needs the car |
