@@ -72,7 +72,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                Surface(Modifier.fillMaxSize()) { TesterScreen(vm, ::copyLog, ::shareLog) }
+                Surface(Modifier.fillMaxSize()) {
+                    var details by rememberSaveable { mutableStateOf(false) }
+                    if (details) {
+                        androidx.activity.compose.BackHandler { details = false }
+                        TesterScreen(vm, ::copyLog, ::shareLog)
+                    } else FreshHome(vm, { details = true }, ::shareLog)
+                }
             }
         }
     }

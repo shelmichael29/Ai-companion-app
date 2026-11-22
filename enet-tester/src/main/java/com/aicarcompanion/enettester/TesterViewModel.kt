@@ -119,6 +119,11 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
     fun selected(): EthernetInterface? = monitor.interfaces.value.values.firstOrNull { it.interfaceName == selectedName }
 
     /** Null when the typed target is usable; otherwise why not. */
+    fun freshGatewayReady(): Boolean = discoveryNetwork != null && discoveryNetwork == selected()?.network &&
+        (discovery as? DiscoveryResult.Completed)?.gateways.orEmpty().any {
+            it.protocol == com.aicarcompanion.enet.GatewayProtocol.HSFZ && it.address.toString() == targetText
+        }
+
     fun targetProblem(): String? {
         val link = selected()?.ipv4 ?: return "Select an Ethernet interface with an IPv4 address first."
         if (targetText.isBlank()) return null
@@ -147,7 +152,23 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun discover() {
+    fun discoverFresh() {
+        if (running != null) return
+        val candidates = monitor.interfaces.value.values.filter {
+            it.isEthernetTransport && it.ipv4?.let { ip -> TargetPolicy.checkLocal(ip) == TargetPolicy.Verdict.Allowed } == true
+        }
+        val iface = candidates.firstOrNull { it.interfaceName == selectedName } ?: candidates.singleOrNull() ?: return
+        selectedName = iface.interfaceName
+        targetText = ""
+        moduleStatus = ""
+        moduleRows = emptyList()
+        connection = null
+        discoverGateway(autoSelect = true)
+    }
+
+    fun discover() = discoverGateway(autoSelect = false)
+
+    private fun discoverGateway(autoSelect: Boolean) {
         if (running != null) return
         val link = link() ?: return
         val manual = targetText.takeIf { it.isNotBlank() }?.let(Ipv4Address::parse)
@@ -159,6 +180,14 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
             if (monitor.interfaces.value.containsKey(network)) {
                 discoveryNetwork = network
                 discovery = found
+                if (autoSelect && selected()?.network == network && found is DiscoveryResult.Completed) {
+                    val gateway = found.gateways.filter { it.protocol == com.aicarcompanion.enet.GatewayProtocol.HSFZ }.singleOrNull()
+                    if (gateway != null) {
+                        targetText = gateway.address.toString()
+                        targetSelectionNotice = "Selected discovered gateway: ${gateway.address}"
+                        log.add(targetSelectionNotice)
+                    }
+                }
             }
             running = null
         }
