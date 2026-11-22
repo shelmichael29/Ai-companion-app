@@ -33,8 +33,13 @@ object MessageNotificationParser {
         if (!isMessage) return null
 
         val (sender, text) = extract(style, notification) ?: return null
+        val group = style?.takeIf { it.isGroupConversation }?.conversationTitle?.toString()?.trim()?.ifEmpty { null }
         val reply = replyAction(notification)
-        return ParsedMessage(IncomingMessage(key, sender, text, appName, canReply = reply != null), reply)
+        val conversationId = "$packageName|${group ?: sender}"
+        return ParsedMessage(
+            IncomingMessage(key, sender, text, appName, canReply = reply != null, conversationId = conversationId, groupTitle = group),
+            reply,
+        )
     }
 
     private fun extract(style: NotificationCompat.MessagingStyle?, n: Notification): Pair<String, String>? {

@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 /** Whether the user has turned on notification access for Penelope (needed to read and answer messages, and to see what's playing). */
 interface NotificationAccessState {
     val granted: StateFlow<Boolean>
+    /** True while Android has Penelope's notification listener connected. Access can be on while it isn't. */
+    val connected: StateFlow<Boolean>
+    fun listenerConnected(connected: Boolean)
     /** Re-checks the system setting. Call when the app comes back to the foreground. */
     fun refresh()
 }
@@ -20,6 +23,12 @@ class AndroidNotificationAccess(context: Context) : NotificationAccessState {
     private val appContext = context.applicationContext
     private val _granted = MutableStateFlow(read())
     override val granted: StateFlow<Boolean> = _granted.asStateFlow()
+    private val _connected = MutableStateFlow(false)
+    override val connected: StateFlow<Boolean> = _connected.asStateFlow()
+
+    override fun listenerConnected(connected: Boolean) {
+        _connected.value = connected
+    }
 
     override fun refresh() {
         _granted.value = read()
@@ -28,6 +37,13 @@ class AndroidNotificationAccess(context: Context) : NotificationAccessState {
     private fun read(): Boolean = appContext.packageName in NotificationManagerCompat.getEnabledListenerPackages(appContext)
 
     companion object {
+        /** Asks Android to reconnect the listener when access is on but it isn't connected (API 24+). */
+        fun requestRebind(context: Context) {
+            android.service.notification.NotificationListenerService.requestRebind(
+                android.content.ComponentName(context, PenelopeNotificationListener::class.java),
+            )
+        }
+
         /** Opens Penelope's own notification-access page (Android 11+), else the general list. */
         fun settingsIntent(context: Context): Intent =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

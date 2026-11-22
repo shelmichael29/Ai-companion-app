@@ -32,6 +32,8 @@ class AndroidCallService(private val context: Context) : CallService {
             ActionResult.Requested
         } catch (_: ActivityNotFoundException) {
             ActionResult.Failed("This phone has no dialer app I can open.")
+        } catch (_: SecurityException) {
+            ActionResult.Failed(HandsFreeSafety.DIAL_FAILED_TEXT)
         }
     }
 

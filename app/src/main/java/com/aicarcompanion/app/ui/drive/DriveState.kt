@@ -22,6 +22,8 @@ data class MediaUiState(val source: MediaSource, val nowPlaying: NowPlaying?, va
 sealed interface MessagesUiState {
     /** Notification access is off: Penelope can't see or read messages. */
     data object NeedsAccess : MessagesUiState
+    /** Access is on, but Android hasn't connected Penelope's notification listener, so nothing can be seen. */
+    data object NotConnected : MessagesUiState
     data object None : MessagesUiState
     data class Unread(val count: Int, val latestSender: String?, val appName: String?) : MessagesUiState {
         override fun toString() = "Unread(count=$count)"
@@ -45,6 +47,8 @@ data class DriveUiState(
     val micLevel: Float,
     /** The honest result of the last button or voice action, e.g. "I asked your media app to pause." */
     val notice: String?,
+    /** True while a Send/Open dialer action is being carried out; the buttons are disabled. */
+    val confirming: Boolean = false,
 ) {
     companion object {
         val Empty = DriveUiState(
@@ -62,8 +66,15 @@ data class DriveUiState(
     }
 }
 
-fun messagesState(accessGranted: Boolean, count: Int, latestSender: String?, appName: String?): MessagesUiState = when {
+fun messagesState(
+    accessGranted: Boolean,
+    connected: Boolean,
+    count: Int,
+    latestSender: String?,
+    appName: String?,
+): MessagesUiState = when {
     !accessGranted -> MessagesUiState.NeedsAccess
+    !connected -> MessagesUiState.NotConnected
     count <= 0 -> MessagesUiState.None
     else -> MessagesUiState.Unread(count, latestSender, appName)
 }

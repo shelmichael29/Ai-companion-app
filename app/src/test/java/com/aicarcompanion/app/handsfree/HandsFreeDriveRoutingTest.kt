@@ -32,7 +32,7 @@ class HandsFreeDriveRoutingTest {
     private val routed = mutableListOf<Pair<String, String>>()
 
     private fun provider(access: Boolean = true) = HandsFreeReasoningProvider(
-        delegate, AndroidHandsFreeCapabilities { access }, media, messaging, dialog,
+        delegate, AndroidHandsFreeCapabilities(notificationAccess = { access }), media, messaging, dialog,
     ) { k, s -> routed += k to s }
 
     private suspend fun say(text: String, access: Boolean = true) = provider(access).respond(AssistantRequest(text, "Penelope"))
@@ -75,7 +75,7 @@ class HandsFreeDriveRoutingTest {
 
     @Test fun `diagnostics get only the command kind and status`() = runTest {
         val log = ConnectionLog(now = { Instant.EPOCH })
-        val p = HandsFreeReasoningProvider(delegate, AndroidHandsFreeCapabilities { true }, media, messaging, dialog) { kind, status ->
+        val p = HandsFreeReasoningProvider(delegate, AndroidHandsFreeCapabilities(notificationAccess = { true }), media, messaging, dialog) { kind, status ->
             log.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Hands-free command", mapOf("command" to kind, "status" to status))
         }
         p.respond(AssistantRequest("text Sarah saying meet me at the red folder place", "Penelope"))
@@ -94,7 +94,7 @@ class HandsFreeDriveRoutingTest {
         // The yes goes to the dialog, not to the router or the AI.
         val done = p.respond(AssistantRequest("yes", "Penelope"))
         assertEquals(1, messaging.sent.size)
-        assertTrue(done.text.startsWith("Okay, I sent your reply to Messages"))
+        assertTrue(done.text.startsWith("I passed your reply to Messages to send."))
         assertFalse(done.text.contains("delivered"))
         assertTrue(delegate.seen.isEmpty())
     }
@@ -157,5 +157,39 @@ class HandsFreeDriveRoutingTest {
         p.respond(AssistantRequest("call 5551234567", "Penelope"))
         p.resetContext()
         assertEquals(null, dialog.pending.value)
+    }
+}
+
+class HandsFreeListenerConnectionTest {
+    @Test fun `access on but listener not connected says it can't see notifications and never no new messages`() = kotlinx.coroutines.test.runTest {
+        val caps = AndroidHandsFreeCapabilities({ true }, { false })
+        val status = caps.status(HandsFreeCapability.READ_MESSAGES)
+        assertEquals(CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_LISTENER_CONNECTION)), status)
+        val provider = HandsFreeReasoningProvider(
+            object : ReasoningProvider {
+                override suspend fun respond(request: AssistantRequest) = AssistantReply("vehicle answer", ReplyBasis.GENERAL_KNOWLEDGE)
+            },
+            caps, FakeMedia(), FakeMessaging(), HandsFreeDialog(FakeMessaging(), FakeCalls()),
+        )
+        val reply = provider.respond(AssistantRequest("read my messages", "Penelope"))
+        assertEquals(HandsFreeSafety.NOT_CONNECTED_TEXT, reply.text)
+        assertFalse(reply.text.contains("no new messages", ignoreCase = true))
+    }
+
+    @Test fun `group chat readout names the group and replies are read back with it`() = kotlinx.coroutines.test.runTest {
+        val group = IncomingMessage("k", "Sarah", "Dinner?", "Chat", canReply = true, conversationId = "c|Family", groupTitle = "Family")
+        val messaging = FakeMessaging(listOf(group))
+        val dialog = HandsFreeDialog(messaging, FakeCalls())
+        val provider = HandsFreeReasoningProvider(
+            object : ReasoningProvider {
+                override suspend fun respond(request: AssistantRequest) = AssistantReply("x", ReplyBasis.GENERAL_KNOWLEDGE)
+            },
+            AndroidHandsFreeCapabilities({ true }), FakeMedia(), messaging, dialog,
+        )
+        val read = provider.respond(AssistantRequest("read my messages", "Penelope"))
+        assertEquals("I read 1 message from Sarah in Family aloud.", read.text)
+        assertTrue(read.spokenText.startsWith("Sarah in Family on Chat: Dinner?"))
+        val back = provider.respond(AssistantRequest("reply saying on my way", "Penelope"))
+        assertTrue(back.spokenText.startsWith("Reply in Family: on my way."))
     }
 }

@@ -22,20 +22,26 @@ class NotificationHub(
 ) : NotificationEvents {
 
     override fun onConnected(active: List<StatusBarNotification>) {
+        messaging.clear()
         access.refresh()
+        access.listenerConnected(true)
         active.forEach(::onPosted)
         media.refresh()
     }
 
     override fun onDisconnected() {
         messaging.clear()
+        access.listenerConnected(false)
         access.refresh()
         media.refresh()
     }
 
-    override fun onPosted(sbn: StatusBarNotification) {
-        MessageNotificationParser.parse(sbn.key, sbn.packageName, appLabel(sbn.packageName), sbn.notification, context.packageName)
-            ?.let(messaging::onPosted)
+    override fun onPosted(sbn: StatusBarNotification) = onPosted(sbn.key, sbn.packageName, sbn.notification)
+
+    /** An updated notification that is no longer a message (or has no text) drops the old message under its key. */
+    internal fun onPosted(key: String, packageName: String, notification: android.app.Notification) {
+        MessageNotificationParser.parse(key, packageName, appLabel(packageName), notification, context.packageName)
+            ?.let(messaging::onPosted) ?: messaging.onRemoved(key)
     }
 
     override fun onRemoved(sbn: StatusBarNotification) = messaging.onRemoved(sbn.key)

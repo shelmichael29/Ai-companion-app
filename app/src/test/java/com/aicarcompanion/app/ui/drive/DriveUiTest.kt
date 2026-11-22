@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -57,7 +58,7 @@ class DriveUiTest {
         listOf("Music and audio", "Messages", "Calls").forEach { compose.onNodeWithText(it).assertExists() }
         assertEquals(0, compose.onAllNodesWithText("Coming in a later update").fetchSemanticsNodes().size)
         compose.onNodeWithContentDescription("Talk to Penelope").assertExists()
-        listOf("Play", "Pause", "Previous track", "Next track", "Volume up", "Volume down").forEach {
+        listOf("Pause", "Previous track", "Next track", "Volume up", "Volume down").forEach {
             compose.onNodeWithContentDescription(it).assertExists()
         }
         compose.onNodeWithContentDescription("Call someone. Choose a contact").assertExists()
@@ -70,11 +71,51 @@ class DriveUiTest {
     @Test fun `everyday level has large media controls and one car controls row`() {
         show(DriveFixtures.playing, ExplanationLevel.EVERYDAY)
         listOf("Previous track", "Next track").forEach { compose.onNodeWithContentDescription(it).assertWidthIsAtLeast(72.dp).assertHeightIsAtLeast(72.dp) }
-        compose.onNodeWithContentDescription("Play").assertWidthIsAtLeast(96.dp).assertHeightIsAtLeast(96.dp)
-        compose.onNodeWithContentDescription("Pause").assertWidthIsAtLeast(80.dp).assertHeightIsAtLeast(80.dp)
+        // One toggle (96dp) while a session's state is known.
+        compose.onNodeWithContentDescription("Pause").assertWidthIsAtLeast(96.dp).assertHeightIsAtLeast(96.dp)
         compose.onNodeWithContentDescription("Call someone. Choose a contact").performScrollTo().assertHeightIsAtLeast(72.dp)
         compose.onNodeWithText("Car controls: not available for this car").performScrollTo().assertIsDisplayed()
         assertEquals(0, compose.onAllNodesWithText("Check codes").fetchSemanticsNodes().size)
+    }
+
+    @Test fun `a known playing session shows only Pause, a paused one only Play, keys-only shows both`() {
+        var pauses = 0
+        show(DriveFixtures.playing, ExplanationLevel.EVERYDAY, DriveActions(onPause = { pauses++ }))
+        assertEquals(0, compose.onAllNodesWithContentDescription("Play").fetchSemanticsNodes().size)
+        compose.onNodeWithContentDescription("Pause").performClick()
+        assertEquals(1, pauses)
+    }
+
+    @Test fun `a paused session shows only Play`() {
+        var plays = 0
+        show(DriveFixtures.paused, ExplanationLevel.DIY, DriveActions(onPlay = { plays++ }))
+        assertEquals(0, compose.onAllNodesWithContentDescription("Pause").fetchSemanticsNodes().size)
+        compose.onNodeWithContentDescription("Play").performClick()
+        assertEquals(1, plays)
+    }
+
+    @Test fun `keys only mode offers both Play and Pause because the state is unknown`() {
+        show(DriveFixtures.needsAccess, ExplanationLevel.EVERYDAY)
+        compose.onNodeWithContentDescription("Play").assertWidthIsAtLeast(96.dp)
+        compose.onNodeWithContentDescription("Pause").assertWidthIsAtLeast(80.dp)
+    }
+
+    @Test fun `the not-connected state says so instead of no new messages`() {
+        show(DriveFixtures.playing.copy(messages = MessagesUiState.NotConnected), ExplanationLevel.EVERYDAY)
+        compose.onNodeWithText("I can't see your notifications right now.", substring = true).performScrollTo().assertIsDisplayed()
+        assertEquals(0, compose.onAllNodesWithText("No new messages", substring = true).fetchSemanticsNodes().size)
+    }
+
+    @Test fun `the setup text says Android lets Penelope see all notifications and Penelope keeps only messages`() {
+        show(DriveFixtures.needsAccess, ExplanationLevel.EVERYDAY)
+        compose.onNodeWithText("see all your notifications", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun `buttons are disabled while a confirmation is being carried out`() {
+        var confirmed = 0
+        show(DriveFixtures.confirmReply.copy(confirming = true), ExplanationLevel.EVERYDAY, DriveActions(onConfirm = { confirmed++ }))
+        compose.onNodeWithContentDescription("Send reply to Sarah").performClick()
+        assertEquals(0, confirmed)
     }
 
     @Test fun `everyday messages show a count only`() {
@@ -98,7 +139,7 @@ class DriveUiTest {
 
     @Test fun `advanced level is compact with 48dp targets and lists every car control with its reason`() {
         show(DriveFixtures.playing, ExplanationLevel.ADVANCED)
-        listOf("Play", "Pause", "Previous track", "Next track", "Volume up", "Volume down").forEach {
+        listOf("Pause", "Previous track", "Next track", "Volume up", "Volume down").forEach {
             compose.onNodeWithContentDescription(it).assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
         }
         val rows = DriveFixtures.rows

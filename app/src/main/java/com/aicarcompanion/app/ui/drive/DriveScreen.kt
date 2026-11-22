@@ -112,7 +112,7 @@ fun DriveContent(ui: DriveUiState, level: ExplanationLevel, assistantName: Strin
             modifier = Modifier.semantics { heading() },
         )
         VoiceBar(style, ui.voice, ui.conversationActive, ui.micLevel, assistantName, actions)
-        ui.pending?.let { ConfirmationCard(style, it, actions) }
+        ui.pending?.let { ConfirmationCard(style, it, actions, ui.confirming) }
         MediaSection(style, ui.media, actions, ui.notice)
         MessagesSection(style, ui.messages, actions)
         CallsSection(style, ui.calls, actions)

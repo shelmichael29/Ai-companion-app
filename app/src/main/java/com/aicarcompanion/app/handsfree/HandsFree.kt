@@ -32,6 +32,8 @@ enum class PlatformRequirement(val description: String) {
     CALL_PERMISSION("Allow Penelope to make and manage phone calls"),
     CONTACTS_PERMISSION("Allow Penelope to look up your contacts"),
     DEFAULT_DIALER_ROLE("Make Penelope the default phone app (not planned)"),
+    /** Access is on, but Android hasn't connected Penelope's notification listener (yet). */
+    NOTIFICATION_LISTENER_CONNECTION("Reconnect Penelope's notification link: open the Drive screen, or switch notification access off and on in system settings"),
     USER_CONFIRMATION_PER_ACTION("The system asks you to confirm each action"),
 }
 
@@ -110,6 +112,10 @@ data class IncomingMessage(
     val appName: String?,
     /** True only while the message's notification still offers a reply action. */
     val canReply: Boolean = false,
+    /** Which conversation this belongs to (app plus group title or sender). A reply must go to the same one. */
+    val conversationId: String = id,
+    /** The group chat's name, or null for a one-to-one chat. */
+    val groupTitle: String? = null,
 ) {
     override fun toString() = "IncomingMessage(redacted)"
 }
@@ -117,6 +123,8 @@ data class IncomingMessage(
 interface MessagingService {
     /** How many messages are waiting (a count only, safe to show anywhere). */
     val unreadCount: StateFlow<Int>
+    /** Changes whenever a message arrives, is replaced or goes away (so the UI can refresh the latest sender). */
+    val changes: StateFlow<Long>
     /** Unread messages, newest last. */
     suspend fun unread(): List<IncomingMessage>
     /**

@@ -72,11 +72,13 @@ object VoiceCommandRouter {
             val up = m.groupValues.drop(1).first { it.isNotEmpty() }.equals("up", ignoreCase = true)
             HandsFreeCommand.Volume(if (up) VolumeDirection.UP else VolumeDirection.DOWN)
         },
+        r("^(?:send a (?:text|message)|reply)$") { HandsFreeCommand.SendMessage(null) },
         r("^reply (?:saying|that) (.+)$") { m -> HandsFreeCommand.SendMessage(null, m.groupValues[1].trim()) },
+        // "tell Sarah I'm late": the first word is the person (so "tell me ..." stays a question).
+        r("^tell (?!me\\b|us\\b)(\\S+) (?:that )?(.+)$") { m -> HandsFreeCommand.SendMessage(m.groupValues[1], m.groupValues[2].trim()) },
         r("^(?:send|text|message|reply to)(?: a)?(?: text| message)?(?: to)? (.+?)(?: (?:saying|that) (.+))?$") { m ->
             HandsFreeCommand.SendMessage(m.groupValues[1].trim().ifBlank { null }, m.groupValues[2].trim().ifBlank { null })
         },
-        r("^(?:send a (?:text|message)|reply)$") { HandsFreeCommand.SendMessage(null) },
         r("^(?:answer|pick up|accept)(?: the)?(?: phone| call)+$|^answer it$") { HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.ANSWER) },
         r("^(?:decline|reject|ignore)(?: the)?(?: phone| call)+$") { HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.DECLINE) },
         r("^(?:hang up|end the call|end call)$") { HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.HANG_UP) },

@@ -23,6 +23,7 @@ class FakeMedia : MediaControl {
 class FakeMessaging(messages: List<IncomingMessage> = emptyList()) : MessagingService {
     val messages = messages.toMutableList()
     override val unreadCount = MutableStateFlow(messages.size)
+    override val changes = MutableStateFlow(0L)
     data class Sent(val id: String, val text: String, val confirmed: Boolean)
     val sent = mutableListOf<Sent>()
     var result: ActionResult = ActionResult.Requested

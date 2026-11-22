@@ -91,6 +91,8 @@ class VehicleControlSafetyTest {
         val adapter = FakeElmAdapter()
         val access = object : NotificationAccessState {
             override val granted = MutableStateFlow(true)
+            override val connected = MutableStateFlow(true)
+            override fun listenerConnected(connected: Boolean) = Unit
             override fun refresh() = Unit
         }
         val messaging = FakeMessaging()

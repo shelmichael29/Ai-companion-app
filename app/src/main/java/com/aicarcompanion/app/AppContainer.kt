@@ -272,7 +272,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val notificationAccess: com.aicarcompanion.app.handsfree.android.NotificationAccessState =
         com.aicarcompanion.app.handsfree.android.AndroidNotificationAccess(appContext)
     override val handsFreeCapabilities: com.aicarcompanion.app.handsfree.CapabilityProvider =
-        com.aicarcompanion.app.handsfree.android.AndroidHandsFreeCapabilities { notificationAccess.granted.value }
+        com.aicarcompanion.app.handsfree.android.AndroidHandsFreeCapabilities({ notificationAccess.granted.value }, { notificationAccess.connected.value })
     override val handsFreeMedia: com.aicarcompanion.app.handsfree.MediaControl by lazy {
         com.aicarcompanion.app.handsfree.android.AndroidMediaControl(
             com.aicarcompanion.app.handsfree.android.AudioManagerKeySink(appContext),

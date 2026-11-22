@@ -69,6 +69,8 @@ class DriveViewModelTest {
 
     private class Access(initial: Boolean) : NotificationAccessState {
         override val granted = MutableStateFlow(initial)
+        override val connected = MutableStateFlow(true)
+        override fun listenerConnected(connected: Boolean) { this.connected.value = connected }
         var refreshes = 0
         override fun refresh() { refreshes++ }
     }
@@ -82,6 +84,7 @@ class DriveViewModelTest {
         val dialog = HandsFreeDialog(messaging, calls)
         val access = Access(access)
         val spoken = mutableListOf<String>()
+        var rebinds = 0
         val session = VoiceSession(
             scope, Input(), Output(),
             ConversationManager(object : ReasoningProvider {
@@ -89,7 +92,10 @@ class DriveViewModelTest {
             }, { "Penelope" }),
             NoAudioFocus(), { true },
         )
-        val vm = DriveViewModel(media, messaging, dialog, this.access, NoVehicleControlProvider, session, flowOf(null), flowOf(hasVehicle), speak = { spoken += it })
+        val vm = DriveViewModel(
+            media, messaging, dialog, this.access, NoVehicleControlProvider, session, flowOf(null), flowOf(hasVehicle),
+            speak = { spoken += it }, rebindListener = { this.rebinds++ },
+        )
     }
 
     private fun TestScope.rig(access: Boolean = true, messages: List<IncomingMessage> = listOf(message)) = Rig(this, access, messages)
@@ -105,6 +111,7 @@ class DriveViewModelTest {
         assertEquals(MediaSource.Session("Sample Music"), s.media.source)
         assertEquals("Song", s.media.nowPlaying?.title)
         assertEquals(MessagesUiState.Unread(1, "Sarah", "Messages"), s.messages)
+        assertFalse(s.confirming)
         assertEquals(CallsUiState.DIAL_HANDOFF, s.calls)
         assertTrue(s.vehicleControls.isNotEmpty())
         assertTrue(s.vehicleControls.all { it.reason == UnavailableReason.OBD_ADAPTER_READ_ONLY })
@@ -190,5 +197,34 @@ class DriveViewModelTest {
         backgroundScope.launch { r.vm.state.collect {} }
         advanceUntilIdle()
         assertTrue(r.vm.state.value.vehicleControls.all { it.reason == UnavailableReason.NO_VEHICLE })
+    }
+
+    @Test fun `access on but listener not connected asks Android to reconnect and never says no new messages`() = runTest(dispatcher) {
+        val r = rig(messages = emptyList())
+        r.access.connected.value = false
+        collect(r); advanceUntilIdle()
+        assertEquals(MessagesUiState.NotConnected, r.vm.state.value.messages)
+        r.vm.onResume()
+        assertEquals(1, r.rebinds)
+        r.access.connected.value = true
+        advanceUntilIdle()
+        assertEquals(MessagesUiState.None, r.vm.state.value.messages)
+        r.vm.onResume()
+        assertEquals("no rebind once connected", 1, r.rebinds)
+    }
+
+    @Test fun `the latest sender updates when a message is replaced and the count stays the same`() = runTest(dispatcher) {
+        val r = rig()
+        collect(r); advanceUntilIdle()
+        r.messaging.messages[0] = message.copy(senderDisplayName = "Alex")
+        r.messaging.changes.value++
+        advanceUntilIdle()
+        assertEquals(MessagesUiState.Unread(1, "Alex", "Messages"), r.vm.state.value.messages)
+    }
+
+    @Test fun `a group chat shows the group in the latest sender`() = runTest(dispatcher) {
+        val r = rig(messages = listOf(message.copy(groupTitle = "Family")))
+        collect(r); advanceUntilIdle()
+        assertEquals(MessagesUiState.Unread(1, "Sarah in Family", "Messages"), r.vm.state.value.messages)
     }
 }

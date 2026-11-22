@@ -81,6 +81,7 @@ object AppViewModelProvider {
                     ).isNotEmpty()
                 },
                 speak = c::speakGuidance,
+                rebindListener = { com.aicarcompanion.app.handsfree.android.AndroidNotificationAccess.requestRebind(app) },
             )
         }
     }

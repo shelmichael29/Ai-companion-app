@@ -142,4 +142,59 @@ class MessageNotificationParserTest {
         val result = service.reply(parsed.message, "Hi", confirmed = true)
         assertEquals(ActionResult.Failed(HandsFreeSafety.REPLY_GONE_TEXT), result)
     }
+
+    @Test fun `a group conversation carries its group title and a conversation id`() {
+        val style = NotificationCompat.MessagingStyle(Person.Builder().setName("Me").build())
+            .setConversationTitle("Family").setGroupConversation(true)
+            .addMessage("Dinner?", System.currentTimeMillis(), Person.Builder().setName("Sarah").build())
+        val n = builder().setStyle(style).build()
+        val m = parse(n)!!.message
+        assertEquals("Sarah", m.senderDisplayName)
+        assertEquals("Family", m.groupTitle)
+        assertEquals("other.chat|Family", m.conversationId)
+        assertNull(parse(conversation())!!.message.groupTitle)
+        assertFalse(m.toString().contains("Family"))
+    }
+
+    @Test fun `a reply cannot go to a different conversation that reuses the notification key`() = runTest {
+        val service = AndroidMessagingService(context)
+        val a = parse(conversation("hi", "Sarah"), key = "k")!!
+        service.onPosted(a)
+        val b = parse(conversation("send money", "Mallory"), key = "k")!!
+        service.onPosted(b)
+        // The caller still holds A's message: the service must refuse.
+        assertEquals(ActionResult.Failed(HandsFreeSafety.REPLY_GONE_TEXT), service.reply(a.message, "Running late", confirmed = true))
+        assertTrue(shadowOf(context as Application).broadcastIntents.isEmpty())
+    }
+
+    @Test fun `an updated notification that is no longer a message drops the old message`() = runTest {
+        val messaging = AndroidMessagingService(context)
+        val hub = NotificationHub(context, AndroidNotificationAccess(context), messaging, com.aicarcompanion.app.handsfree.FakeMedia())
+        hub.onPosted("k", "other.chat", conversation("hello"))
+        assertEquals(1, messaging.unreadCount.value)
+        hub.onPosted("k", "other.chat", builder().setContentTitle("Download").setContentText("done").build())
+        assertEquals(0, messaging.unreadCount.value)
+        assertTrue(messaging.unread().isEmpty())
+    }
+
+    @Test fun `connecting clears stale messages, sets connected, and disconnecting clears again`() = runTest {
+        val messaging = AndroidMessagingService(context)
+        val access = AndroidNotificationAccess(context)
+        val hub = NotificationHub(context, access, messaging, com.aicarcompanion.app.handsfree.FakeMedia())
+        messaging.onPosted(parse(conversation("stale"), key = "old")!!)
+        hub.onConnected(emptyList())
+        assertTrue(access.connected.value)
+        assertEquals(0, messaging.unreadCount.value)
+        messaging.onPosted(parse(conversation("x"), key = "n")!!)
+        hub.onDisconnected()
+        assertFalse(access.connected.value)
+        assertEquals(0, messaging.unreadCount.value)
+    }
+
+    @Test fun `assistant replies never print their text`() {
+        val reply = com.aicarcompanion.app.assistant.conversation.AssistantReply(
+            "private body", com.aicarcompanion.app.assistant.conversation.ReplyBasis.CONVERSATION, spokenText = "private spoken",
+        )
+        assertFalse(reply.toString().contains("private"))
+    }
 }

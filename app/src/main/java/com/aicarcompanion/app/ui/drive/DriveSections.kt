@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -155,6 +156,7 @@ internal fun DriveButton(
     icon: ImageVector? = null,
     description: String = label,
     emphasized: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val shape = RoundedCornerShape(if (style.isAdvanced) 8.dp else 20.dp)
     val k = style.advanced
@@ -166,7 +168,8 @@ internal fun DriveButton(
             .clip(shape)
             .background(fill)
             .border(BorderStroke(if (emphasized) 2.dp else 1.dp, if (emphasized) style.accent else border), shape)
-            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .alpha(if (enabled) 1f else 0.5f)
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = description, onClick = onClick)
             .semantics { contentDescription = description }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.Center,
@@ -222,8 +225,15 @@ fun MediaSection(style: DriveStyle, media: MediaUiState, actions: DriveActions, 
             itemVerticalAlignment = Alignment.CenterVertically,
         ) {
             DriveIconButton(style, DriveIcons.Previous, "Previous track", style.sideSize, actions.onPrevious)
-            DriveIconButton(style, PenelopeIcons.Play, "Play", style.playSize, actions.onPlay, emphasized = true)
-            DriveIconButton(style, PenelopeIcons.Pause, "Pause", minOf(style.playSize, 80.dp), actions.onPause)
+            // When the app's playback state is known, one button does the next sensible thing. Each still sends its own
+            // PLAY or PAUSE (never a toggle key). With keys only, the state is unknown, so both are offered.
+            val known = media.source is MediaSource.Session && playing != null
+            if (!known || !playing!!.isPlaying) {
+                DriveIconButton(style, PenelopeIcons.Play, "Play", style.playSize, actions.onPlay, emphasized = true)
+            }
+            if (!known || playing!!.isPlaying) {
+                DriveIconButton(style, PenelopeIcons.Pause, "Pause", if (known) style.playSize else minOf(style.playSize, 80.dp), actions.onPause, emphasized = known)
+            }
             DriveIconButton(style, DriveIcons.Next, "Next track", style.sideSize, actions.onNext)
         }
         VolumeRow(style, media, actions)
@@ -267,10 +277,14 @@ fun MessagesSection(style: DriveStyle, messages: MessagesUiState, actions: Drive
         DriveHeading(style, "Messages")
         when (messages) {
             MessagesUiState.NeedsAccess -> {
-                DriveBody(style, "To read and answer your messages by voice, Penelope needs notification access. It only sees message notifications, keeps them in memory, and reads them only when you ask.")
+                DriveBody(style, "To read and answer your messages by voice, Penelope needs notification access. Android then lets Penelope see all your notifications; Penelope keeps only message notifications, in memory, and reads them only when you ask.")
                 DriveButton(style, "Turn on notification access", actions.onOpenNotificationAccess, emphasized = true)
                 DriveBody(style, "If Android says \"Restricted setting\" (apps installed outside Google Play): open Penelope in Settings, Apps, tap the three dots, then Allow restricted settings.")
                 DriveButton(style, "Open Penelope's app settings", actions.onOpenAppSettings)
+            }
+            MessagesUiState.NotConnected -> {
+                DriveBody(style, "I can't see your notifications right now. Notification access is on, but Android hasn't connected Penelope. Open this screen again to reconnect, or switch notification access off and on.")
+                DriveButton(style, "Open notification access", actions.onOpenNotificationAccess, emphasized = true)
             }
             MessagesUiState.None -> DriveBody(style, "No new messages. Penelope reads messages only when you ask, and can reply only to ones still in your notifications.")
             is MessagesUiState.Unread -> {
@@ -306,22 +320,24 @@ fun CallsSection(style: DriveStyle, calls: CallsUiState, actions: DriveActions) 
 /** The on-screen half of the confirmation: the same state the voice flow uses. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ConfirmationCard(style: DriveStyle, pending: PendingAction, actions: DriveActions) {
+fun ConfirmationCard(style: DriveStyle, pending: PendingAction, actions: DriveActions, busy: Boolean = false) {
     DriveCard(style, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
         when (pending) {
             is PendingAction.Reply -> {
                 DriveHeading(style, "Say your reply")
-                DriveBody(style, "Reply to ${pending.recipient}${pending.appName?.let { " in $it" }.orEmpty()}. Tap the microphone and say what to write.", strong = true)
-                DriveButton(style, "Cancel", actions.onCancel)
+                val who = pending.groupTitle?.let { "the group $it" } ?: pending.recipient
+                DriveBody(style, "Reply to $who${pending.appName?.let { " in $it" }.orEmpty()}. Tap the microphone and say what to write.", strong = true)
+                DriveButton(style, "Cancel", actions.onCancel, enabled = !busy)
             }
             is PendingAction.ConfirmReply -> {
                 DriveHeading(style, "Send this reply?")
-                DriveBody(style, "To ${pending.recipient}${pending.appName?.let { " in $it" }.orEmpty()}", strong = true)
+                val who = pending.groupTitle?.let { "Group $it" } ?: "To ${pending.recipient}"
+                DriveBody(style, "$who${pending.appName?.let { " in $it" }.orEmpty()}", strong = true)
                 Text("“${pending.text}”", style = MaterialTheme.typography.titleMedium, color = style.primary)
                 DriveBody(style, "Penelope hands this to ${pending.appName ?: "the messaging app"}; it can't promise it arrives.")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DriveButton(style, "Send", actions.onConfirm, description = "Send reply to ${pending.recipient}", emphasized = true)
-                    DriveButton(style, "Cancel", actions.onCancel, description = "Cancel, don't send")
+                    DriveButton(style, "Send", actions.onConfirm, description = "Send reply to ${pending.groupTitle ?: pending.recipient}", emphasized = true, enabled = !busy)
+                    DriveButton(style, "Cancel", actions.onCancel, description = "Cancel, don't send", enabled = !busy)
                 }
             }
             is PendingAction.ConfirmDial -> {
@@ -330,8 +346,8 @@ fun ConfirmationCard(style: DriveStyle, pending: PendingAction, actions: DriveAc
                 DriveBody(style, who, strong = true)
                 DriveBody(style, "I'll open your phone's dialer. You tap call.")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DriveButton(style, "Open dialer", actions.onConfirm, description = "Open the dialer for this number", emphasized = true)
-                    DriveButton(style, "Cancel", actions.onCancel, description = "Cancel, don't call")
+                    DriveButton(style, "Open dialer", actions.onConfirm, description = "Open the dialer for this number", emphasized = true, enabled = !busy)
+                    DriveButton(style, "Cancel", actions.onCancel, description = "Cancel, don't call", enabled = !busy)
                 }
             }
         }
@@ -374,7 +390,7 @@ fun VehicleControlsSection(style: DriveStyle, rows: List<VehicleControlRow>) {
         }
         if (expanded) {
             rows.firstOrNull()?.let { DriveBody(style, it.reason.explanation) }
-            DriveBody(style, "Climate, heated seats and door locks: ${rows.joinToString { it.feature.label.lowercase() }}. None can be controlled yet.")
+            DriveBody(style, "Climate, heated seats and door locks: ${rows.joinToString { it.feature.label.lowercase() }}. None can be controlled from Penelope.")
         }
     }
 }

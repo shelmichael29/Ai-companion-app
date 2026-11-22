@@ -30,7 +30,10 @@ data class AssistantReply(
     /** Text sent to speech output; defaults to [text]. */
     val spokenText: String = text,
     val action: ConversationAction? = null,
-)
+) {
+    /** Replies can hold message text or names (hands-free), so they never print their content. */
+    override fun toString() = "AssistantReply(basis=$basis)"
+}
 
 /** One request to the reasoning provider. */
 data class AssistantRequest(

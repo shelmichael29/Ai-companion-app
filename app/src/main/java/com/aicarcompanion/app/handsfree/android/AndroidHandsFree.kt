@@ -25,12 +25,19 @@ import kotlinx.coroutines.flow.asStateFlow
  * - Calls: a handoff to the dialer; answering needs call permissions Penelope doesn't request.
  * - Car controls: not supported; a standard OBD-II adapter can't control the car.
  */
-class AndroidHandsFreeCapabilities(private val notificationAccess: () -> Boolean = { false }) : CapabilityProvider {
+class AndroidHandsFreeCapabilities(
+    private val notificationAccess: () -> Boolean = { false },
+    /** Whether Android has the notification listener connected (access can be on without it). */
+    private val listenerConnected: () -> Boolean = { true },
+) : CapabilityProvider {
     override fun status(capability: HandsFreeCapability): CapabilityStatus = when (capability) {
         HandsFreeCapability.MEDIA_CONTROL -> CapabilityStatus.Available
         HandsFreeCapability.READ_MESSAGES, HandsFreeCapability.SEND_MESSAGES ->
-            if (notificationAccess()) CapabilityStatus.Available
-            else CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_ACCESS))
+            when {
+                !notificationAccess() -> CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_ACCESS))
+                !listenerConnected() -> CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_LISTENER_CONNECTION))
+                else -> CapabilityStatus.Available
+            }
         HandsFreeCapability.PLACE_CALLS -> CapabilityStatus.Available
         HandsFreeCapability.ANSWER_CALLS, HandsFreeCapability.NAVIGATION -> CapabilityStatus.NotImplemented
         HandsFreeCapability.VEHICLE_CONTROLS -> CapabilityStatus.NotSupported

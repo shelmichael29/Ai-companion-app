@@ -54,8 +54,12 @@ class PlatformMediaSessionSource(
     private val component = ComponentName(context, PenelopeNotificationListener::class.java)
     private val handler = Handler(Looper.getMainLooper())
     private var onChange: (() -> Unit)? = null
-    private var registered = false
+    @Volatile private var registered = false
     private var watched: List<MediaController> = emptyList()
+    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+        track(controllers.orEmpty())
+        onChange?.invoke()
+    }
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onPlaybackStateChanged(state: PlaybackState?) { onChange?.invoke() }
@@ -72,28 +76,37 @@ class PlatformMediaSessionSource(
     private fun register() {
         if (registered || !access.granted.value) return
         try {
-            manager.addOnActiveSessionsChangedListener({ controllers -> track(controllers.orEmpty()); onChange?.invoke() }, component, handler)
+            manager.removeOnActiveSessionsChangedListener(sessionsListener)
+            manager.addOnActiveSessionsChangedListener(sessionsListener, component, handler)
             registered = true
         } catch (_: SecurityException) {
             registered = false
         }
     }
 
+    @Synchronized
     private fun track(controllers: List<MediaController>) {
         watched.forEach { it.unregisterCallback(controllerCallback) }
         watched = controllers
         controllers.forEach { it.registerCallback(controllerCallback, handler) }
     }
 
+    @Synchronized
+    private fun hasWatched() = watched.isNotEmpty()
+
     override fun snapshot(): SessionSnapshot {
-        if (!access.granted.value) return SessionSnapshot.NoAccess
+        if (!access.granted.value) {
+            // Access was turned off: the system dropped our listener, so register again if it comes back.
+            registered = false
+            return SessionSnapshot.NoAccess
+        }
         register()
         val controllers = try {
             manager.getActiveSessions(component)
         } catch (_: SecurityException) {
             return SessionSnapshot.NoAccess
         }
-        if (controllers.isNotEmpty() && watched.isEmpty()) track(controllers)
+        if (controllers.isNotEmpty() && !hasWatched()) track(controllers)
         val chosen = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: controllers.firstOrNull()
             ?: return SessionSnapshot.None
         val meta = chosen.metadata

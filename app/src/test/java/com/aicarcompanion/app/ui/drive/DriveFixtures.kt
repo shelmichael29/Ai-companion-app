@@ -19,6 +19,7 @@ object DriveFixtures {
     val playing = DriveUiState.Empty.copy(
         media = playingMedia, messages = MessagesUiState.None, vehicleControls = rows,
     )
+    val paused = playing.copy(media = playingMedia.copy(nowPlaying = playingMedia.nowPlaying?.copy(isPlaying = false)))
     val needsAccess = DriveUiState.Empty.copy(media = keysOnlyMedia, messages = MessagesUiState.NeedsAccess, vehicleControls = rows)
     val unread = playing.copy(messages = MessagesUiState.Unread(2, "Sarah", "Messages"))
     val confirmReply = unread.copy(pending = PendingAction.ConfirmReply("k1", "Sarah", "Running ten minutes late", "Messages"))

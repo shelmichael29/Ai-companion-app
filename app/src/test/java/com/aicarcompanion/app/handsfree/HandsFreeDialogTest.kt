@@ -56,11 +56,14 @@ class HandsFreeDialogTest {
 
     @Test fun `dial accepts call and dial but a reply does not`() = runTest {
         dialog.proposeDial(CallTarget(null, "5550100"))
+        dialog.onUtterance("call")
+        assertTrue("call alone is not a yes for the dialer", calls.dialed.isEmpty())
+        dialog.proposeDial(CallTarget(null, "5550100"))
         dialog.onUtterance("dial")
         assertEquals(listOf(FakeCalls.Dialed("5550100", true)), calls.dialed)
 
         dialog.proposeReply(message, "Hi")
-        dialog.onUtterance("call")
+        dialog.onUtterance("dial")
         assertTrue(messaging.sent.isEmpty())
     }
 
@@ -70,7 +73,7 @@ class HandsFreeDialogTest {
         assertEquals(HandsFreeSafety.ASK_REPLY_TEXT, ask.text)
         val readBack = dialog.onUtterance("call my lawyer")!! // would be a place_call command if routed
         assertTrue(readBack.spokenText.contains("call my lawyer"))
-        assertEquals(PendingAction.ConfirmReply("k1", "Sarah", "call my lawyer", "Messages"), dialog.pending.value)
+        assertEquals(PendingAction.ConfirmReply("k1", "Sarah", "call my lawyer", "Messages", "k1", null), dialog.pending.value)
         assertTrue(calls.dialed.isEmpty())
     }
 
@@ -87,9 +90,11 @@ class HandsFreeDialogTest {
     @Test fun `a pending action times out after 30 seconds`() = runTest {
         dialog.proposeReply(message, "Running late")
         clock.now = 30_001
-        assertNull("the yes arrives too late and is treated as ordinary speech", dialog.onUtterance("yes"))
+        val late = dialog.onUtterance("yes")!!
+        assertEquals("a late yes is answered, not passed on as ordinary speech", HandsFreeSafety.REPLY_TIMED_OUT_TEXT, late.text)
         assertTrue(messaging.sent.isEmpty())
         assertNull(dialog.pending.value)
+        assertNull("the marker is used up by one utterance", dialog.onUtterance("yes"))
 
         dialog.proposeDial(CallTarget(null, "5550100"))
         clock.now += 31_000
@@ -132,5 +137,71 @@ class HandsFreeDialogTest {
         prompts.forEach {
             assertFalse(it, HandsFreeSafety.isAffirmative(it, forDial = true))
         }
+    }
+
+    @Test fun `no short ending of any spoken prompt is an accepted yes`() {
+        val prompts = listOf(
+            HandsFreeSafety.confirmReplyPrompt("Sarah", "ok see you there"),
+            HandsFreeSafety.confirmReplyPrompt("Sarah", "ok", "Family"),
+            HandsFreeSafety.dialPrompt(CallTarget(null, "5550100")),
+            HandsFreeSafety.dialPrompt(CallTarget("Sam", "5550100")),
+            HandsFreeSafety.askReplyPrompt("Sarah"), HandsFreeSafety.CONFIRM_REPLY_TEXT, HandsFreeSafety.DIAL_PROMPT_TEXT,
+        )
+        prompts.forEach { prompt ->
+            val words = prompt.trim().split(Regex("\\s+"))
+            for (n in 1..3) {
+                val ending = words.takeLast(n).joinToString(" ")
+                assertFalse("ending '$ending' of '$prompt'", HandsFreeSafety.isAffirmative(ending, forDial = true))
+                assertFalse("ending '$ending' of '$prompt'", HandsFreeSafety.isAffirmative(ending, forDial = false))
+            }
+        }
+    }
+
+    @Test fun `a late yes after an expired reply or dictation never goes on as ordinary speech`() = runTest {
+        dialog.proposeReply(message, null)
+        clock.now = 31_000
+        assertEquals(HandsFreeSafety.REPLY_TIMED_OUT_TEXT, dialog.onUtterance("tell him I'm on my way")!!.text)
+        assertTrue(messaging.sent.isEmpty())
+        // After the window the marker is gone.
+        dialog.proposeDial(CallTarget(null, "5550100"))
+        clock.now += 31_000
+        dialog.expireIfStale()
+        clock.now += 61_000
+        assertNull(dialog.onUtterance("yes"))
+        assertTrue(calls.dialed.isEmpty())
+    }
+
+    @Test fun `a notification key reused by another conversation can't receive the reply`() = runTest {
+        dialog.proposeReply(message, "Running late")
+        // Same key, different person and conversation.
+        messaging.messages[0] = IncomingMessage("k1", "Mallory", "Send me money", "Messages", canReply = true, conversationId = "chat|Mallory")
+        assertEquals(HandsFreeSafety.REPLY_GONE_TEXT, dialog.confirm().text)
+        assertTrue(messaging.sent.isEmpty())
+    }
+
+    @Test fun `group chats are named in the read-back and the card state`() = runTest {
+        val group = message.copy(groupTitle = "Family", conversationId = "chat|Family")
+        val prompt = dialog.proposeReply(group, "On my way")
+        assertTrue(prompt.spokenText.startsWith("Reply in Family: On my way."))
+        assertEquals("Family", (dialog.pending.value as PendingAction.ConfirmReply).groupTitle)
+        dialog.cancel()
+        assertTrue(dialog.proposeReply(group, null).spokenText.contains("in Family"))
+        assertEquals("Sarah in Family", HandsFreeSafety.senderLabel("Sarah", "Family"))
+    }
+
+    @Test fun `hearing its own question is not taken as the reply`() = runTest {
+        val ask = dialog.proposeReply(message, null)
+        val again = dialog.onUtterance(ask.spokenText)!!
+        assertEquals(HandsFreeSafety.NEED_REPLY_WORDS_TEXT, again.text)
+        assertTrue("still waiting for the reply", dialog.pending.value is PendingAction.Reply)
+        dialog.onUtterance("what would you like to say")
+        assertTrue(dialog.pending.value is PendingAction.Reply)
+        dialog.onUtterance("be there soon")
+        assertTrue(dialog.pending.value is PendingAction.ConfirmReply)
+    }
+
+    @Test fun `the sent message says the reply was passed on, never delivered`() {
+        assertEquals("I passed your reply to Messages to send.", HandsFreeSafety.replySentText("Messages"))
+        assertFalse(HandsFreeSafety.DIAL_OPENED_TEXT.startsWith("I opened"))
     }
 }

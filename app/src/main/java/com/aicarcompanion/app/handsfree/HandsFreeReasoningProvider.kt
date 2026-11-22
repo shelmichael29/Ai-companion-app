@@ -76,18 +76,19 @@ class HandsFreeReasoningProvider(
     private suspend fun readLatest(service: MessagingService): AssistantReply {
         val latest = service.unread().lastOrNull() ?: return say(HandsFreeSafety.NO_MESSAGES_TEXT)
         val app = latest.appName?.let { " on $it" }.orEmpty()
+        val who = HandsFreeSafety.senderLabel(latest.senderDisplayName, latest.groupTitle)
         val body = latest.text.take(MAX_READ_CHARS)
         val tail = if (latest.canReply) " Say reply to answer." else ""
         return say(
-            text = "I read 1 message from ${latest.senderDisplayName} aloud.",
-            spoken = "${latest.senderDisplayName}$app: $body.$tail",
+            text = "I read 1 message from $who aloud.",
+            spoken = "$who$app: $body.$tail",
         )
     }
 
     private suspend fun startReply(command: HandsFreeCommand.SendMessage, service: MessagingService, dialog: HandsFreeDialog): AssistantReply {
         val candidates = service.unread().filter { it.canReply }
         val target = command.recipient
-            ?.let { name -> candidates.lastOrNull { it.senderDisplayName.equals(name, ignoreCase = true) } }
+            ?.let { name -> candidates.lastOrNull { it.senderDisplayName.equals(name, ignoreCase = true) || it.groupTitle.equals(name, ignoreCase = true) } }
             ?: if (command.recipient == null) candidates.lastOrNull() else null
         return if (target == null) say(HandsFreeSafety.NO_REPLYABLE_TEXT) else dialog.proposeReply(target, command.body)
     }

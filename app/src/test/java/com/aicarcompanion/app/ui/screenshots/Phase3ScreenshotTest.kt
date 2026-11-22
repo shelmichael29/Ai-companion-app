@@ -39,7 +39,7 @@ import java.io.File
  */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(application = Application::class, sdk = [35], qualifiers = "w412dp-h2000dp-xhdpi")
+@Config(application = Application::class, sdk = [35], qualifiers = "w412dp-h3600dp-xhdpi")
 class Phase3ScreenshotTest(private val shot: Shot) {
 
     data class Shot(val scenario: String, val level: ExplanationLevel, val theme: ThemeMode, val fontScale: Float) {

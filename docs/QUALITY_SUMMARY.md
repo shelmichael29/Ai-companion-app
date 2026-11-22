@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-22 | Drive (Phase 3): media, messages, calls, capability-only car controls | PASS (local, --release) | 949 run, 0 failed | 0 / 2 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-22 | Phase 2: Live Data workspace (gauges, layouts, All sensors, DB v2) | PASS (local, --release) | 799 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-22 | Clear codes (Mode 04 via VehicleWriteGate, DIY/Advanced) | PASS (local, --release) | 717 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-21 | Phase 1 UI redesign: three interfaces (release gate) | PASS (local) | 667 run, 0 failed | 0 / 1 | 0 | NOT RUN (rendered screenshots only; no emulator) | NEEDS MANUAL VERIFICATION |
@@ -45,4 +46,3 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.
-| 2026-11-22 | Drive (Phase 3), branch feature/drive-screen | compile, Detekt, Lint, 925 unit tests (0 failed, 0 skipped) green locally via gradlew; secret scan and quality-gate.sh not run; device/media/message/call checks NOT RUN (docs/DEVICE_TESTING.md) |

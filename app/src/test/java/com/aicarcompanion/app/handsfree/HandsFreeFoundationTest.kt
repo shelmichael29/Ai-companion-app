@@ -103,8 +103,8 @@ class HandsFreeFoundationTest {
 
     @Test fun `each capability reports its real status, with and without notification access`() {
         val setup = CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_ACCESS))
-        val off = AndroidHandsFreeCapabilities { false }
-        val on = AndroidHandsFreeCapabilities { true }
+        val off = AndroidHandsFreeCapabilities(notificationAccess = { false })
+        val on = AndroidHandsFreeCapabilities(notificationAccess = { true })
         val table = mapOf(
             HandsFreeCapability.MEDIA_CONTROL to (CapabilityStatus.Available to CapabilityStatus.Available),
             HandsFreeCapability.READ_MESSAGES to (setup to CapabilityStatus.Available),

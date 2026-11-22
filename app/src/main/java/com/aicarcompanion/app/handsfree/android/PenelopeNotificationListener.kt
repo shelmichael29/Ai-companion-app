@@ -5,15 +5,20 @@ import android.service.notification.StatusBarNotification
 import com.aicarcompanion.app.CarCompanionApplication
 
 /**
- * Android's notification-access hook. It does nothing until the user turns on notification access
- * for Penelope, and then only forwards message notifications and media sessions to the app's
- * in-memory hands-free services. It never stores, logs or uploads anything.
+ * Android's notification-access hook. It does nothing until the user turns on notification access.
+ * Android then lets Penelope see all notifications; Penelope keeps only message notifications
+ * (in memory) and media sessions, and never stores, logs or uploads anything.
  */
 class PenelopeNotificationListener : NotificationListenerService() {
     private val events: NotificationEvents? get() = (application as? CarCompanionApplication)?.container?.notificationEvents
 
     override fun onListenerConnected() {
-        events?.onConnected(activeNotifications?.toList().orEmpty())
+        val active = try {
+            activeNotifications?.toList().orEmpty()
+        } catch (_: SecurityException) {
+            emptyList()
+        }
+        events?.onConnected(active)
     }
 
     override fun onListenerDisconnected() {

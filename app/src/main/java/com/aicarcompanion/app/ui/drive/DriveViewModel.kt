@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.aicarcompanion.app.assistant.VoiceSession
 import com.aicarcompanion.app.handsfree.CallTarget
 import com.aicarcompanion.app.handsfree.HandsFreeDialog
+import com.aicarcompanion.app.handsfree.HandsFreeSafety
 import com.aicarcompanion.app.handsfree.MediaAction
 import com.aicarcompanion.app.handsfree.MediaControl
 import com.aicarcompanion.app.handsfree.MessagingService
@@ -39,25 +40,31 @@ class DriveViewModel(
     private val dialerAvailable: () -> Boolean = { true },
     /** Speaks a confirmation prompt when the on-screen flow started it (does nothing during a conversation). */
     private val speak: suspend (String) -> Unit = {},
+    /** Asks Android to reconnect the notification listener when access is on but it isn't connected. */
+    private val rebindListener: () -> Unit = {},
 ) : ViewModel() {
 
     private val notice = MutableStateFlow<String?>(null)
+    private val confirming = MutableStateFlow(false)
 
     private val mediaState = combine(media.source, media.nowPlaying, media.volume, ::MediaUiState)
 
-    private val messagesState = combine(access.granted, messaging.unreadCount) { granted, count -> granted to count }
-        .map { (granted, count) ->
-            val latest = if (granted && count > 0) messaging.unread().lastOrNull() else null
-            messagesState(granted, count, latest?.senderDisplayName, latest?.appName)
-        }
+    // `changes` makes the latest sender refresh when a message is replaced, not only when the count moves.
+    private val messagesState = combine(access.granted, access.connected, messaging.unreadCount, messaging.changes) { granted, connected, count, _ ->
+        Triple(granted, connected, count)
+    }.map { (granted, connected, count) ->
+        val latest = if (granted && connected && count > 0) messaging.unread().lastOrNull() else null
+        messagesState(granted, connected, count, latest?.let { HandsFreeSafety.senderLabel(it.senderDisplayName, it.groupTitle) }, latest?.appName)
+    }
 
     private val voiceState = combine(session.state, session.conversationActive, session.inputLevel) { s, a, l -> Triple(s, a, l) }
 
     private val healthAndVehicle = combine(health, hasVehicle) { h, v -> h to v }
 
     val state: StateFlow<DriveUiState> = combine(
-        mediaState, messagesState, dialog.pending, combine(healthAndVehicle, notice) { hv, n -> hv to n }, voiceState,
-    ) { m, msgs, pending, (hv, note), (voice, active, level) ->
+        mediaState, messagesState, dialog.pending,
+        combine(healthAndVehicle, notice, confirming) { hv, n, c -> Triple(hv, n, c) }, voiceState,
+    ) { m, msgs, pending, (hv, note, busy), (voice, active, level) ->
         DriveUiState(
             media = m,
             messages = msgs,
@@ -69,6 +76,7 @@ class DriveViewModel(
             conversationActive = active,
             micLevel = level,
             notice = note,
+            confirming = busy,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DriveUiState.Empty)
 
@@ -109,10 +117,18 @@ class DriveViewModel(
     }
 
     fun confirm() {
-        viewModelScope.launch { notice.value = dialog.confirm().text }
+        if (!confirming.compareAndSet(expect = false, update = true)) return
+        viewModelScope.launch {
+            try {
+                notice.value = dialog.confirm().text
+            } finally {
+                confirming.value = false
+            }
+        }
     }
 
     fun cancel() {
+        if (confirming.value) return
         notice.value = dialog.cancel().text
     }
 
@@ -121,6 +137,8 @@ class DriveViewModel(
 
     fun onResume() {
         access.refresh()
+        // Access on but Android hasn't (re)connected the listener (e.g. after an update): ask it to.
+        if (access.granted.value && !access.connected.value) rebindListener()
         media.refresh()
         dialog.expireIfStale()
     }

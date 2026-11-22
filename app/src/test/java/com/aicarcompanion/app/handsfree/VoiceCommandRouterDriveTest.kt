@@ -62,3 +62,17 @@ class VoiceCommandRouterDriveTest {
         assertTrue(HandsFreeCommand.Volume(VolumeDirection.UP).logName == "media_volume_up")
     }
 }
+
+class VoiceCommandRouterReviewFixesTest {
+    @Test fun `send a message has no recipient`() {
+        assertEquals(HandsFreeCommand.SendMessage(null), VoiceCommandRouter.route("send a message"))
+        assertEquals(HandsFreeCommand.SendMessage(null), VoiceCommandRouter.route("send a text"))
+    }
+
+    @Test fun `tell someone a message is a dictated message but tell me is a question`() {
+        assertEquals(HandsFreeCommand.SendMessage("Sarah", "I'm running late"), VoiceCommandRouter.route("tell Sarah I'm running late"))
+        assertEquals(HandsFreeCommand.SendMessage("Sarah", "I'm running late"), VoiceCommandRouter.route("tell Sarah that I'm running late"))
+        assertNull(VoiceCommandRouter.route("tell me what P0171 means"))
+        assertNull(VoiceCommandRouter.route("tell us about the brakes"))
+    }
+}
