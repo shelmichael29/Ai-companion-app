@@ -335,7 +335,11 @@ class GeminiReasoningProvider(
     private suspend fun generateSafely(system: String, message: String): AiResult {
         val limit = aiTimeoutMillis()
         return try {
-            withTimeoutOrNull(limit) { client.generate(system, history.toList(), message) }
+            // Only the network payload is redacted: local conversation and diagnostic history
+            // retain their original wording. Scrub BOTH the new turn and previous turns.
+            val cloudMessage = PersonalDetailScrubber.scrub(message)
+            val cloudHistory = history.map { it.copy(text = PersonalDetailScrubber.scrub(it.text)) }
+            withTimeoutOrNull(limit) { client.generate(system, cloudHistory, cloudMessage) }
                 ?: AiResult.Failure(AiFailure.TIMEOUT, "No AI answer within ${limit / 1000} s")
         } catch (e: TimeoutCancellationException) {
             AiResult.Failure(AiFailure.TIMEOUT, "AI client timed out")
