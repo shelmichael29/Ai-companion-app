@@ -192,6 +192,25 @@ class GeminiIntegrationTest {
         assertEquals(ObservationKind.SYMPTOM, saved.single().kind)
     }
 
+    @Test fun \`the current message and previous turns are redacted before leaving the device\`() = runTest {
+        val client = FakeClient().apply {
+            next = { AiResult.Reply("Call me at 555-234-5678 about that repair.", "test") }
+        }
+        val p = provider(client)
+        val privateQuestion = "How much is an alternator repair at 12 Oak St? Call 555-123-4567 or mail me@example.com; VIN WBAFR1C56BC000001."
+        p.ask(privateQuestion)
+        p.ask("What would you check first?")
+        assertEquals(2, client.calls.size)
+        for (call in client.calls) {
+            val sent = call.message + call.history.joinToString(" ") { it.text }
+            for (secret in listOf("12 Oak St", "555-123-4567", "555-234-5678", "me@example.com", "WBAFR1C56BC000001")) {
+                assertFalse("Sensitive detail reached Gemini: $secret", sent.contains(secret))
+            }
+        }
+        assertTrue("Automotive context must remain useful", client.calls.first().message.contains("alternator repair"))
+        assertTrue("History remains conversational", client.calls.last().history.any { it.role == AiTurn.Role.USER })
+    }
+
     // --- Guards -------------------------------------------------------------------------------
 
     @Test fun `invented codes or readings are replaced by verified answers`() = runTest {
@@ -210,6 +229,9 @@ class GeminiIntegrationTest {
         assertNull(ReplyGuard.check("Your P0171 means the engine is lean.", setOf("P0171")))
         assertEquals(ReplyGuard.Violation.INVENTED_CODE, ReplyGuard.check("That's code P0420.", setOf("P0171")))
         assertEquals(ReplyGuard.Violation.UNVERIFIED_READING, ReplyGuard.check("Your battery is at 11.8 volts.", emptySet()))
+        assertEquals(ReplyGuard.Violation.UNVERIFIED_READING, ReplyGuard.check("Coolant: 280°F", emptySet()))
+        assertEquals(ReplyGuard.Violation.UNVERIFIED_READING, ReplyGuard.check("Battery voltage = 15.8 V, which is normal.", emptySet()))
+        assertNull(ReplyGuard.check("Coolant: 90°C", emptySet(), "Your coolant is 90°C, read just now."))
         assertEquals(ReplyGuard.Violation.EMPTY, ReplyGuard.check(" ", emptySet()))
         assertTrue(ReplyGuard.clean("A. ".repeat(500)).length <= 700)
     }
