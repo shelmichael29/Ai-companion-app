@@ -11,6 +11,7 @@ import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DtcStatus
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -159,6 +160,21 @@ class ObdManagerTest {
         m.disconnect(); settle()
         assertEquals(ObdConnectionState.Disconnected, m.state.value)
         assertTrue(adapter.closed)
+    }
+
+    @Test fun `a failed refresh removes the previous sensor value`() = runTest {
+        val adapter = FakeElmAdapter()
+        val m = manager(adapter)
+        m.connect(panlong); settle()
+        val snapshots = mutableListOf<List<com.aicarcompanion.app.domain.model.SensorReading>>()
+        val collector = backgroundScope.launch { m.liveReadings.collect { snapshots += it } }
+        settle()
+        assertTrue(snapshots.any { snapshot -> snapshot.any { it.pid == "0105" } })
+        adapter.responses["0105"] = "NO DATA"
+        settle(1_500)
+        assertTrue("A failed coolant refresh must not display the previous reading",
+            snapshots.last().none { it.pid == "0105" })
+        collector.cancel()
     }
 
     @Test fun `live readings poll supported pids while collected`() = runTest {
