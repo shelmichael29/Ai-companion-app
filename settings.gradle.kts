@@ -20,8 +20,8 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AiCarCompanion"
-include(":app")
-// Experimental, isolated BMW ENET connection tester (separate app; does not affect Penelope).
+// Standalone ENET development workspace. The Penelope application source stays in the
+// repository, but this experimental branch does NOT import/build/run the :app module.
+rootProject.name = "BMW-ENET-Development"
 include(":enet-core")
 include(":enet-tester")
