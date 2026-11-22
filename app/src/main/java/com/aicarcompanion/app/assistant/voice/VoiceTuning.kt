@@ -5,6 +5,10 @@ import java.util.Locale
 
 /** Pure helpers for voice configuration (JVM-testable). */
 object VoiceTuning {
+    /** A callback for an older TTS request must not complete the current one. */
+    fun isCurrentUtterance(activeId: String, callbackId: String): Boolean =
+        callbackId.startsWith("$activeId-")
+
     fun rate(value: Float) = value.coerceIn(AppSettings.RATE_RANGE)
     fun pitch(value: Float) = value.coerceIn(AppSettings.PITCH_RANGE)
 
