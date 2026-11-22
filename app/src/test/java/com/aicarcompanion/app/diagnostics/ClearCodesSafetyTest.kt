@@ -18,6 +18,7 @@ import com.aicarcompanion.app.diagnostics.obd.ReadOnlyCommandPolicy
 import com.aicarcompanion.app.diagnostics.obd.VehicleWriteGate
 import com.aicarcompanion.app.domain.model.ObservationKind
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -90,6 +91,10 @@ class ClearCodesSafetyTest {
         val sources = root.walkTopDown().filter { it.extension == "kt" }.toList()
         fun users(needle: String) = sources.filter { needle in it.readText() }.map { it.name }.toSet()
         assertEquals(setOf("VehicleWriteGate.kt"), users("ClearCodesPermit("))
+        assertEquals(setOf("VehicleWriteGate.kt"), users("ClearCodesToken("))
+        // Tests too: nothing outside the gate builds a permit or token by hand.
+        val tests = File("src/test/java").walkTopDown().filter { it.extension == "kt" && it.name != "ClearCodesSafetyTest.kt" }
+        assertTrue(tests.none { "ClearCodesPermit(" in it.readText() || "ClearCodesToken(" in it.readText() })
         assertEquals(setOf("Elm327Session.kt", "ObdManager.kt"), users("sendClearCodes("))
         assertEquals(setOf("Elm327Session.kt"), users("\"04\\r\""))
     }
@@ -211,6 +216,52 @@ class ClearCodesSafetyTest {
         val m = connectedAndRead(adapter)
         assertEquals(ClearCodesResult.Refused(ClearCodesRefusal.ENGINE_STATE_UNKNOWN), m.clearCodes(vehicle, m.token()))
         assertFalse("04" in adapter.written)
+    }
+
+    @Test fun `rpm is always asked and an unsupported rpm is refused`() = runTest {
+        // The car lists only PID 0x20 as supported; 010C is not in the list and answers nothing.
+        val adapter = engineOff(mapOf("0100" to "41 00 00 00 00 01", "0120" to "NO DATA", "010C" to "NO DATA"))
+        val m = connectedAndRead(adapter)
+        assertFalse(0x0C in m.supportedPids.value)
+        assertEquals(ClearCodesResult.Refused(ClearCodesRefusal.ENGINE_STATE_UNKNOWN), m.clearCodes(vehicle, m.token()))
+        assertTrue("010C" in adapter.written)
+        assertFalse("04" in adapter.written)
+    }
+
+    @Test fun `level withdrawn while the engine is checked stops the clear`() = runTest {
+        val adapter = engineOff()
+        val m = connectedAndRead(adapter)
+        val t = m.token()
+        adapter.onCommand = { if (it == "010C") level = ExplanationLevel.EVERYDAY }
+        assertEquals(ClearCodesResult.Refused(ClearCodesRefusal.LEVEL_NOT_ALLOWED), m.clearCodes(vehicle, t))
+        assertFalse("04" in adapter.written)
+    }
+
+    @Test fun `reading codes is refused while a clear is running`() = runTest {
+        val adapter = engineOff()
+        val m = connectedAndRead(adapter)
+        val t = m.token()
+        var duringClear: CodeReadResult? = null
+        val eager = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler))
+        adapter.onCommand = { if (it == "04") eager.launch { duringClear = m.readTroubleCodes(vehicle) } }
+        clock = clock.plusSeconds(10)
+        assertTrue(m.clearCodes(vehicle, t) is ClearCodesResult.Cleared)
+        assertTrue(duringClear is CodeReadResult.NoResponse)
+    }
+
+    @Test fun `cancelling the caller after the 04 write still records the outcome`() = runTest {
+        val adapter = engineOff()
+        val m = connectedAndRead(adapter)
+        val t = m.token()
+        clock = clock.plusSeconds(10)
+        lateinit var job: kotlinx.coroutines.Job
+        adapter.onCommand = { if (it == "04") job.cancel() }
+        job = launch { m.clearCodes(vehicle, t) }
+        runCurrent()
+        assertEquals(1, adapter.written.count { it == "04" })
+        assertEquals(1, history.observations(vehicle).first().size) // the note was saved
+        assertEquals(vehicle, m.codeReadSession.value?.vehicleId) // re-read completed after the clear
+        assertTrue(history.latestTroubleCodeRead(vehicle).first()!!.readAt.isAfter(Instant.parse("2026-11-21T12:00:00Z")))
     }
 
     // ---- Token rules at the manager --------------------------------------------------------------

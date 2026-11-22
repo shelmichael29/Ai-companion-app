@@ -167,6 +167,37 @@ class ClearCodesViewModelTest {
         assertFalse(result.summary().startsWith("Codes cleared"))
     }
 
+    @Test fun `unticking before the token request resolves leaves nothing confirmed`() = runTest {
+        val adapter = FakeElmAdapter(mapOf("010C" to "41 0C 00 00", "04" to "44"))
+        val settings = InMemorySettingsStore(AppSettings(explanationLevel = ExplanationLevel.DIY))
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val inner = InMemoryVehicleRepository(listOf(car))
+        var lookups = 0
+        val slow = object : com.aicarcompanion.app.domain.repository.VehicleRepository by inner {
+            // The first lookup (the screen state) is instant; later ones wait for the gate.
+            override val activeVehicleId = kotlinx.coroutines.flow.flow {
+                if (++lookups > 1) gate.await()
+                emit("bmw")
+            }
+        }
+        val obd = ObdManager(
+            backgroundScope, { adapter }, InMemoryHistoryRepository(),
+            clearCodesAllowed = { true },
+        )
+        val vm = ClearCodesViewModel(obd, slow, settings, obd)
+        backgroundScope.launch { vm.state.collect {} }
+        obd.connect(device); runCurrent()
+        obd.readTroubleCodes("bmw")
+        vm.open()
+        vm.setUnderstood(true)   // token request now waiting on the gate
+        vm.setUnderstood(false)  // user changes their mind
+        gate.complete(Unit); runCurrent()
+        assertFalse(vm.state.value.dialog.understood)
+        vm.confirm()
+        assertFalse("04" in adapter.written)
+        assertNull(vm.state.value.dialog.result)
+    }
+
     @Test fun `summaries say cleared only for a positive answer`() {
         assertTrue(ClearCodesResult.Cleared(0).summary().startsWith("Codes cleared"))
         assertTrue(ClearCodesResult.Cleared(2).summary().contains("2 code(s) are still reported"))

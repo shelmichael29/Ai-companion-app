@@ -88,6 +88,8 @@ class ClearCodesViewModel(
 
     private val dialog = MutableStateFlow(ClearCodesDialogState())
     private var token: ClearCodesToken? = null
+    /** Bumped whenever a pending token request stops being wanted (untick, reopen, dismiss). */
+    private var issueGeneration = 0
 
     val state: StateFlow<ClearCodesUiState> = combine(
         settings.settings, clearing.codeReadSession, vehicles.activeVehicleId, obd.state, dialog,
@@ -99,6 +101,7 @@ class ClearCodesViewModel(
 
     fun open() {
         if (!state.value.availability.enabled) return
+        issueGeneration++
         discardToken()
         dialog.value = ClearCodesDialogState(open = true)
     }
@@ -108,13 +111,20 @@ class ClearCodesViewModel(
         val d = dialog.value
         if (!d.open || d.working || d.result != null) return
         if (!understood) {
+            issueGeneration++
             discardToken()
             dialog.value = d.copy(understood = false, problem = null)
             return
         }
+        val generation = ++issueGeneration
         viewModelScope.launch {
             val vehicleId = vehicles.activeVehicleId.first()
             val issued = if (vehicleId == null) null else clearing.issueClearCodesToken(vehicleId)
+            if (generation != issueGeneration || !dialog.value.open) {
+                // The user unticked, reopened or cancelled while this was pending: never keep the token.
+                if (issued is ClearCodesTokenResult.Issued) clearing.cancelClearCodes()
+                return@launch
+            }
             when (issued) {
                 is ClearCodesTokenResult.Issued -> {
                     token = issued.token
@@ -146,6 +156,7 @@ class ClearCodesViewModel(
     /** Cancel, or "Done" after a result. Ignored while a clear is running. */
     fun dismiss() {
         if (dialog.value.working) return
+        issueGeneration++
         discardToken()
         dialog.value = ClearCodesDialogState()
     }

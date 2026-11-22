@@ -13,6 +13,8 @@ import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -502,6 +504,12 @@ class ObdManager(
     }
 
     override suspend fun readTroubleCodes(vehicleId: String): CodeReadResult {
+        // A read during a clear could change the code read the user confirmed.
+        if (clearing.get()) return CodeReadResult.NoResponse("a clear is in progress. Try again in a moment.")
+        return readCodes(vehicleId)
+    }
+
+    private suspend fun readCodes(vehicleId: String): CodeReadResult {
         if (_state.value !is ObdConnectionState.Connected) return CodeReadResult.NotConnected
         if (!vehicleResponding()) return CodeReadResult.NoResponse("the vehicle isn't responding. Is the ignition on?")
         val isCan = probe?.isCan
@@ -541,8 +549,8 @@ class ObdManager(
             writeGate.revoke()
             return ClearCodesTokenResult.Refused(it)
         }
-        val read = _codeReadSession.value ?: return ClearCodesTokenResult.Refused(ClearCodesRefusal.CODES_NOT_READ)
-        return ClearCodesTokenResult.Issued(writeGate.issue(vehicleId, read.sessionId))
+        return _codeReadSession.value?.let { ClearCodesTokenResult.Issued(writeGate.issue(vehicleId, it.sessionId)) }
+            ?: ClearCodesTokenResult.Refused(ClearCodesRefusal.CODES_NOT_READ)
     }
 
     override fun cancelClearCodes() = writeGate.revoke()
@@ -575,29 +583,34 @@ class ObdManager(
                 },
             )
         }
-        // Engine must be off. RPM is read-only (01 0C); if the car can report it, it must say 0.
-        if (ObdPid.ENGINE_RPM.pid in _supported.value) {
-            val rpm = guarded { it.execute(ObdPid.ENGINE_RPM.command) }?.let { Elm327ResponseParser.decodePid(it, ObdPid.ENGINE_RPM) }
-            when {
-                rpm == null -> return refuse(ClearCodesRefusal.ENGINE_STATE_UNKNOWN)
-                rpm > 0.0 -> return refuse(ClearCodesRefusal.ENGINE_RUNNING)
+        // Engine must be off. RPM is read-only (01 0C), always asked, never assumed from the supported list.
+        val rpm = guarded { it.execute(ObdPid.ENGINE_RPM.command) }?.let { Elm327ResponseParser.decodePid(it, ObdPid.ENGINE_RPM) }
+        when {
+            rpm == null -> return refuse(ClearCodesRefusal.ENGINE_STATE_UNKNOWN)
+            rpm > 0.0 -> return refuse(ClearCodesRefusal.ENGINE_RUNNING)
+        }
+        // From the last check to the saved note nothing may be cancelled half way: a cancelled
+        // caller must not leave a sent clear unrecorded.
+        return withContext(NonCancellable) {
+            // Re-check right before sending: the world may have changed during the rpm read.
+            clearPreconditionFailure(vehicleId)?.let { return@withContext refuse(it) }
+            if (_codeReadSession.value?.sessionId != read.sessionId) return@withContext refuse(ClearCodesRefusal.CODES_CHANGED)
+            val before = history.latestTroubleCodeRead(vehicleId).first()?.takeIf { it.sessionId == read.sessionId }?.codes.orEmpty()
+            vlog("Clear codes sent", "codesBefore" to before.size)
+            val answer = guarded { it.sendClearCodes(permit) }
+            // Whatever the answer, what the car stores may have changed: the old read no longer counts.
+            _codeReadSession.value = null
+            val accepted = answer != null && Elm327ResponseParser.isClearCodesAccepted(answer)
+            val remaining = (readCodes(vehicleId) as? CodeReadResult.Read)?.read?.codes?.size
+            val result = when {
+                accepted -> ClearCodesResult.Cleared(remaining)
+                answer == null -> ClearCodesResult.NoAnswer(remaining)
+                else -> ClearCodesResult.NotAccepted(remaining)
             }
+            vlog("Clear codes result", "result" to result::class.java.simpleName, "codesAfter" to remaining)
+            recordClearNote(clearNote(vehicleId, before.map { it.code }, result))
+            result
         }
-        val before = history.latestTroubleCodeRead(vehicleId).first()?.takeIf { it.sessionId == read.sessionId }?.codes.orEmpty()
-        vlog("Clear codes sent", "codesBefore" to before.size)
-        val answer = guarded { it.sendClearCodes(permit) }
-        // Whatever the answer, what the car stores may have changed: the old read no longer counts.
-        _codeReadSession.value = null
-        val accepted = answer != null && Elm327ResponseParser.isClearCodesAccepted(answer)
-        val remaining = (readTroubleCodes(vehicleId) as? CodeReadResult.Read)?.read?.codes?.size
-        val result = when {
-            accepted -> ClearCodesResult.Cleared(remaining)
-            answer == null -> ClearCodesResult.NoAnswer(remaining)
-            else -> ClearCodesResult.NotAccepted(remaining)
-        }
-        vlog("Clear codes result", "result" to result::class.java.simpleName, "codesAfter" to remaining)
-        recordClearNote(clearNote(vehicleId, before.map { it.code }, result))
-        return result
     }
 
     private fun clearNote(vehicleId: String, before: List<String>, result: ClearCodesResult): DiagnosticObservation {

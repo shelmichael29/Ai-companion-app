@@ -84,8 +84,8 @@ class Elm327Session(
      * and only with a [ClearCodesPermit] from [VehicleWriteGate]. Never retried: a repeat after a
      * timeout could clear codes twice without the user knowing. Returns the cleaned response.
      */
-    suspend fun sendClearCodes(permit: ClearCodesPermit): String = mutex.withLock {
-        check(permit.vehicleId.isNotEmpty())
+    suspend fun sendClearCodes(permit: ClearCodesPermit): String? = mutex.withLock {
+        if (permit.vehicleId.isBlank()) return@withLock null // nothing is sent without a vehicle
         val started = System.nanoTime()
         try {
             link.write("04\r")
