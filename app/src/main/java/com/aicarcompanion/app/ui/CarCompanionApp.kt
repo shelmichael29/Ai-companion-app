@@ -36,7 +36,7 @@ import com.aicarcompanion.app.ui.assistant.AssistantScreen
 import com.aicarcompanion.app.ui.design.PenelopeBackground
 import com.aicarcompanion.app.ui.design.PenelopeTopBar
 import com.aicarcompanion.app.ui.history.HistoryScreen
-import com.aicarcompanion.app.ui.navigation.DriveScreen
+import com.aicarcompanion.app.ui.drive.DriveScreen
 import com.aicarcompanion.app.ui.navigation.FloatingNavBar
 import com.aicarcompanion.app.ui.navigation.LevelNavigation
 import com.aicarcompanion.app.ui.livedata.LiveDataWorkspaceScreen
@@ -143,7 +143,15 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                 )
             }
             composable(Routes.DRIVE) {
-                DriveScreen(settings.assistantName, tabPadding, onTalk = { navController.navigate(Routes.CHAT) })
+                DriveScreen(
+                    level = level,
+                    assistantName = settings.assistantName,
+                    contentPadding = tabPadding,
+                    onOpenDiagnostics = { navController.navigateOrTab(Routes.DIAGNOSTICS, LevelNavigation.isTab(level, Routes.DIAGNOSTICS)) },
+                    onOpenLiveData = if (LevelNavigation.liveDataAvailable(level)) {
+                        { navController.navigateOrTab(Routes.LIVE_DATA, LevelNavigation.isTab(level, Routes.LIVE_DATA)) }
+                    } else null,
+                )
             }
             composable(Routes.DIAGNOSTICS) {
                 ResultsScreen(

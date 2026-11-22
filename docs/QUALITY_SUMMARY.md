@@ -45,3 +45,4 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.
+| 2026-11-22 | Drive (Phase 3), branch feature/drive-screen | compile, Detekt, Lint, 925 unit tests (0 failed, 0 skipped) green locally via gradlew; secret scan and quality-gate.sh not run; device/media/message/call checks NOT RUN (docs/DEVICE_TESTING.md) |

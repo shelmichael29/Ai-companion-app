@@ -39,30 +39,6 @@ import kotlinx.coroutines.delay
 import java.time.Instant
 import kotlin.math.abs
 
-/** Honest placeholder: Drive features are not built yet, so nothing here pretends otherwise. */
-@Composable
-fun DriveScreen(assistantName: String, contentPadding: PaddingValues, onTalk: () -> Unit) {
-    val t = Penelope.tokens
-    Column(Modifier.fillMaxSize()) {
-        PenelopeTopBar("Drive", onBack = null)
-        Column(
-            Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            GlassPanel {
-                Icon(PenelopeIcons.Drive, contentDescription = null, tint = t.textSecondary, modifier = Modifier.size(32.dp))
-                Text("Coming in a later update", style = MaterialTheme.typography.titleLarge, color = t.textPrimary, modifier = Modifier.padding(top = 8.dp))
-                Text(
-                    "Drive (music, calls and messages, hands-free) isn't available yet.",
-                    style = MaterialTheme.typography.bodyLarge, color = t.textSecondary,
-                    modifier = Modifier.padding(top = 6.dp, bottom = 14.dp),
-                )
-                GradientButton("Talk to $assistantName", onTalk)
-            }
-        }
-    }
-}
-
 enum class MoreAction(val label: String, val subtitle: String, val icon: ImageVector) {
     CHAT("Chat with Penelope", "Ask a question or talk it through", PenelopeIcons.Chat),
     HISTORY("History", "Past checks, mileage and service records", PenelopeIcons.History),

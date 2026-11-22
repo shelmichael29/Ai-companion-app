@@ -99,14 +99,6 @@ class NavigationUiTest {
         }
     }
 
-    @Test fun `drive screen is honest and offers voice`() {
-        var talked = false
-        compose.setContent { CarCompanionTheme { DriveScreen("Penelope", PaddingValues(), onTalk = { talked = true }) } }
-        compose.onNodeWithText("Coming in a later update").assertIsDisplayed()
-        compose.onNodeWithText("Talk to Penelope").performClick()
-        assertTrue(talked)
-    }
-
     @Test fun `more screen shows level rows`() {
         var action: MoreAction? = null
         compose.setContent { CarCompanionTheme { MoreScreen(ExplanationLevel.ADVANCED, "Penelope", PaddingValues()) { action = it } } }

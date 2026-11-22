@@ -14,6 +14,7 @@ import com.aicarcompanion.app.ui.livedata.LiveDataViewModel
 import com.aicarcompanion.app.ui.settings.SettingsViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleListViewModel
+import kotlinx.coroutines.flow.map
 
 /** Creates ViewModels with dependencies from the application's [com.aicarcompanion.app.AppContainer]. */
 object AppViewModelProvider {
@@ -61,6 +62,26 @@ object AppViewModelProvider {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
             VehicleEditViewModel(createSavedStateHandle(), c.vehicleRepository, c.vehicleCatalog, c.vinDecoder, c.recallService, c::speakGuidance)
+        }
+        initializer {
+            val app = this[APPLICATION_KEY] as CarCompanionApplication
+            val c = app.container
+            com.aicarcompanion.app.ui.drive.DriveViewModel(
+                media = c.handsFreeMedia,
+                messaging = c.handsFreeMessaging,
+                dialog = c.handsFreeDialog,
+                access = c.notificationAccess,
+                vehicleControls = c.vehicleControls,
+                session = c.voiceSession,
+                health = com.aicarcompanion.app.ui.drive.driveHealthFlow(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection.state),
+                hasVehicle = c.vehicleRepository.activeVehicleId.map { it != null },
+                dialerAvailable = {
+                    app.packageManager.queryIntentActivities(
+                        android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:5550100")), 0,
+                    ).isNotEmpty()
+                },
+                speak = c::speakGuidance,
+            )
         }
     }
 }

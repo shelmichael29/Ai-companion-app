@@ -117,6 +117,17 @@ interface AppContainer {
     /** Which hands-free features this build and platform can offer. */
     val handsFreeCapabilities: com.aicarcompanion.app.handsfree.CapabilityProvider
 
+    /** Media, messages and calls for the Drive screen and voice commands (supported Android handoffs only). */
+    val handsFreeMedia: com.aicarcompanion.app.handsfree.MediaControl
+    val handsFreeMessaging: com.aicarcompanion.app.handsfree.MessagingService
+    val handsFreeCalls: com.aicarcompanion.app.handsfree.CallService
+    /** The one confirmation state machine shared by voice and the Drive screen's buttons. */
+    val handsFreeDialog: com.aicarcompanion.app.handsfree.HandsFreeDialog
+    val notificationAccess: com.aicarcompanion.app.handsfree.android.NotificationAccessState
+    val notificationEvents: com.aicarcompanion.app.handsfree.android.NotificationEvents
+    /** Capability-only: every car control is unavailable. There is no way to send a control command. */
+    val vehicleControls: com.aicarcompanion.app.vehiclecontrol.VehicleControlProvider
+
     /** Where Penelope's voice plays (car Bluetooth, phone speaker…), for diagnostics. */
     val carAudioRoute: com.aicarcompanion.app.handsfree.CarAudioRoute
 
@@ -257,9 +268,31 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val vehiclePhotos by lazy { com.aicarcompanion.app.data.photos.VehiclePhotoStore(appContext) }
     private val audioFocus by lazy { AndroidAudioFocus(appContext, connectionLog) }
 
-    /** Hands-free foundation (Phase H0): capabilities report "not yet"; see docs/HANDS_FREE.md. */
+    /** Hands-free (Phase H0 + Drive): see docs/HANDS_FREE.md for what works, what is a handoff and what is deferred. */
+    override val notificationAccess: com.aicarcompanion.app.handsfree.android.NotificationAccessState =
+        com.aicarcompanion.app.handsfree.android.AndroidNotificationAccess(appContext)
     override val handsFreeCapabilities: com.aicarcompanion.app.handsfree.CapabilityProvider =
-        com.aicarcompanion.app.handsfree.android.AndroidHandsFreeCapabilities()
+        com.aicarcompanion.app.handsfree.android.AndroidHandsFreeCapabilities { notificationAccess.granted.value }
+    override val handsFreeMedia: com.aicarcompanion.app.handsfree.MediaControl by lazy {
+        com.aicarcompanion.app.handsfree.android.AndroidMediaControl(
+            com.aicarcompanion.app.handsfree.android.AudioManagerKeySink(appContext),
+            com.aicarcompanion.app.handsfree.android.PlatformMediaSessionSource(appContext, notificationAccess),
+            com.aicarcompanion.app.handsfree.android.AudioManagerVolume(appContext),
+        )
+    }
+    private val androidMessaging by lazy { com.aicarcompanion.app.handsfree.android.AndroidMessagingService(appContext) }
+    override val handsFreeMessaging: com.aicarcompanion.app.handsfree.MessagingService get() = androidMessaging
+    override val handsFreeCalls: com.aicarcompanion.app.handsfree.CallService by lazy {
+        com.aicarcompanion.app.handsfree.android.AndroidCallService(appContext)
+    }
+    override val handsFreeDialog by lazy {
+        com.aicarcompanion.app.handsfree.HandsFreeDialog(handsFreeMessaging, handsFreeCalls)
+    }
+    override val notificationEvents: com.aicarcompanion.app.handsfree.android.NotificationEvents by lazy {
+        com.aicarcompanion.app.handsfree.android.NotificationHub(appContext, notificationAccess, androidMessaging, handsFreeMedia)
+    }
+    override val vehicleControls: com.aicarcompanion.app.vehiclecontrol.VehicleControlProvider =
+        com.aicarcompanion.app.vehiclecontrol.NoVehicleControlProvider
     override val carAudioRoute: com.aicarcompanion.app.handsfree.CarAudioRoute by lazy {
         com.aicarcompanion.app.handsfree.android.AndroidCarAudioRoute(appContext, connectionLog)
     }
@@ -285,6 +318,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
         val reasoning = com.aicarcompanion.app.handsfree.HandsFreeReasoningProvider(
             delegate = geminiProvider(parser, ruleBased, recorder),
             capabilities = handsFreeCapabilities,
+            media = handsFreeMedia,
+            messaging = handsFreeMessaging,
+            dialog = handsFreeDialog,
         ) { kind, status ->
             connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Hands-free command", mapOf("command" to kind, "status" to status))
             answerSources.record(com.aicarcompanion.app.ai.ResponseRecord(com.aicarcompanion.app.ai.ResponseSource.DEVICE_COMMAND, category = status))
@@ -339,10 +375,12 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override fun onAppBackgrounded() {
         connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "App in background")
         if (voiceSessionLazy.isInitialized()) voiceSession.onAppBackgrounded()
+        handsFreeDialog.reset() // nothing stays waiting for a yes while the app is away
     }
 
     override fun onAppForegrounded() {
         connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "App in foreground")
+        notificationAccess.refresh()
     }
 
     init {

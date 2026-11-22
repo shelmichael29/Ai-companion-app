@@ -41,7 +41,9 @@ import com.aicarcompanion.app.domain.model.Vehicle
 import com.aicarcompanion.app.ui.design.PenelopeBackground
 import com.aicarcompanion.app.ui.home.HomeContent
 import com.aicarcompanion.app.ui.home.HomeUiState
-import com.aicarcompanion.app.ui.navigation.DriveScreen
+import com.aicarcompanion.app.ui.drive.DriveActions
+import com.aicarcompanion.app.ui.drive.DriveContent
+import com.aicarcompanion.app.ui.drive.DriveUiState
 import com.aicarcompanion.app.ui.navigation.FloatingNavBar
 import com.aicarcompanion.app.ui.navigation.LevelNavigation
 import com.aicarcompanion.app.ui.navigation.LiveDataContent
@@ -169,7 +171,7 @@ class Phase1ScreenshotTest(private val shot: Shot) {
                     items = DashboardPlanner.itemsFor(s.level, DashboardSettings()), kind = DashboardKind.forLevel(s.level), now = NOW,
                 )
                 "more" -> MoreScreen(s.level, "Penelope", navSpace) {}
-                "drive" -> DriveScreen("Penelope", navSpace) {}
+                "drive" -> DriveContent(DriveUiState.Empty, s.level, "Penelope", DriveActions(), navSpace)
                 "livedata-live" -> LiveDataContent(LiveDataStatus.of(true, live, connected, NOW), live, NOW, true, navSpace)
                 "livedata-disconnected" -> LiveDataContent(LiveDataStatus.of(true, live, ObdConnectionState.Disconnected, NOW), live, NOW, true, navSpace)
                 "livedata-sample" -> LiveDataContent(LiveDataStatus.of(true, sample, ObdConnectionState.Disconnected, NOW), sample, NOW, false, navSpace)

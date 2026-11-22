@@ -28,6 +28,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 | Phase 1 UI redesign: distinct Everyday / DIY / Advanced (black-and-grey) dashboards, per-level navigation, Drive placeholder, Live Data, More | #53 | `docs/PHASE1_UI.md` |
 | Phase 2 Live Data workspace (DIY/Advanced): add, remove, reorder and resize gauges; analog, digital, numeric, line graph and status styles; units; named layouts per vehicle (max 8 sensors); All sensors list; demand-driven poller paused during Clear codes; Room v2 | branch `feature/live-data-workspace` (not merged) | `docs/PHASE2_LIVE_DATA.md` |
+| Drive (Phase 3): shared Drive screen on all levels. Media keys or session control and volume; read and reply to message notifications and call handoff (confirmed by voice or button); capability-only, all-unavailable car controls. No new permissions. Answering calls and calling by name deferred | branch `feature/drive-screen` (not merged) | `docs/HANDS_FREE.md`, `docs/IOS_DRIVE_NOTES.md` |
 
 ## In progress (🔵)
 | Item | Where |
@@ -36,7 +37,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)
-- **Hands-free:** media control (H1), read messages (H2), reply (H3), calls (H4), background voice and car microphone (H5), navigation.
+- **Hands-free:** answering calls, calling by name (needs the contacts permission), background voice and car microphone (H5), navigation. (Media, reading and replying to messages and the call handoff are built in Drive.)
 - **Dashboards:** DIY (A3) and Advanced (A4).
 - **Diagnostics:** freeze-frame, VIN via Mode 09, foreground service for long OBD sessions, mechanic handoff report, BMW/N52 knowledge pack, predictive maintenance.
 - **Adapters:** BLE, Wi-Fi and USB.

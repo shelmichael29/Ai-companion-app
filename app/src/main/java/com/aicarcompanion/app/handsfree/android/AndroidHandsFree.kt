@@ -13,18 +13,28 @@ import com.aicarcompanion.app.handsfree.CapabilityProvider
 import com.aicarcompanion.app.handsfree.CapabilityStatus
 import com.aicarcompanion.app.handsfree.CarAudioRoute
 import com.aicarcompanion.app.handsfree.HandsFreeCapability
+import com.aicarcompanion.app.handsfree.PlatformRequirement
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * What Penelope can do hands-free on Android in this build: nothing yet beyond voice and
- * diagnostics. Each later phase switches one capability on. What each will need (notification
- * access, call permissions, user confirmation) is in docs/HANDS_FREE.md. No permission is
- * requested until that feature exists.
+ * What Penelope can do hands-free on Android, per capability (see docs/HANDS_FREE.md):
+ * - Media: always available (media keys); what's playing needs notification access.
+ * - Reading and replying to messages: need notification access (no SMS permission, ever).
+ * - Calls: a handoff to the dialer; answering needs call permissions Penelope doesn't request.
+ * - Car controls: not supported; a standard OBD-II adapter can't control the car.
  */
-class AndroidHandsFreeCapabilities : CapabilityProvider {
-    override fun status(capability: HandsFreeCapability): CapabilityStatus = CapabilityStatus.NotImplemented
+class AndroidHandsFreeCapabilities(private val notificationAccess: () -> Boolean = { false }) : CapabilityProvider {
+    override fun status(capability: HandsFreeCapability): CapabilityStatus = when (capability) {
+        HandsFreeCapability.MEDIA_CONTROL -> CapabilityStatus.Available
+        HandsFreeCapability.READ_MESSAGES, HandsFreeCapability.SEND_MESSAGES ->
+            if (notificationAccess()) CapabilityStatus.Available
+            else CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_ACCESS))
+        HandsFreeCapability.PLACE_CALLS -> CapabilityStatus.Available
+        HandsFreeCapability.ANSWER_CALLS, HandsFreeCapability.NAVIGATION -> CapabilityStatus.NotImplemented
+        HandsFreeCapability.VEHICLE_CONTROLS -> CapabilityStatus.NotSupported
+    }
 }
 
 /**

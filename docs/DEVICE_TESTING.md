@@ -178,3 +178,15 @@ Change the level under **Settings → Detail level**.
    - Console: `04`, `ATSH7E0` and `ATZ` must all be refused.
 4. Switch back to **Everyday** with custom settings saved. The connection must return to
    automatic, and the Advanced screen should say the settings are saved but not active.
+
+## Drive (Phase 3): checks on the phone (NOT RUN in automated tests)
+1. **Media without notification access:** play music in any app, open Drive, tap Pause, Play, Next, Previous. The music app should respond; Drive says "I asked your media app…". Note which apps ignore the keys.
+2. **Media with access:** turn on notification access (Android 13+ sideloaded builds: App info, three dots, Allow restricted settings first). Drive shows the title, artist and app, and the buttons control that app. Turn access off: Drive returns to "Turn on notification access".
+3. **Volume:** Volume up/down changes the music volume and shows the system panel.
+4. **Read messages:** with access on, receive a message in a messaging app, tap Read it to me or say "read my messages". The text is spoken and does not appear in the chat transcript.
+5. **Reply:** say "reply saying I'll be late", check the read-back, say "yes" (or tap Send). The reply appears in the messaging app. Say anything else or tap Cancel: nothing is sent. Dismiss the notification first: Penelope says it can't be replied to any more.
+6. **Call someone:** tap Call someone, pick a contact, confirm. The dialer opens with the number; you tap call. Say "call 5 5 5 …" for a number. "Call Mom" explains it can't look up names.
+7. **Car controls:** every row says it isn't available, with the reason, on each level. Nothing is sent to the car.
+8. **TalkBack, large font, light and dark themes** on each level; two-way voice still works on Drive.
+9. **Over car Bluetooth:** Penelope's prompts are audible and the confirmation works by voice.
+

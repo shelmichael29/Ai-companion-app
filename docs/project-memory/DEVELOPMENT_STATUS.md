@@ -16,6 +16,7 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 | Model delegation agents (Haiku / Sonnet / Opus) | Config only; CI green |
 | Gemini primary routing (#37); offline knowledge pack (#40) | CI green at merge |
 | VIN scanner, decoder and recalls (#41) | 506 tests, 0 failed |
+| Drive (Phase 3), branch `feature/drive-screen`, not merged | See `docs/QUALITY_SUMMARY.md`; hardware checks pending |
 | Recall accuracy and reporting (v0.7.1, build 8) (#45) | 562 tests, 0 failed; ✅ verified on the phone |
 | VIN scanner and recalls, device check | ✅ Galaxy S26 Ultra, build 0.7.1 (8), 2026-11-21, by the owner |
 
