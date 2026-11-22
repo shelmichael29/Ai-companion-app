@@ -96,6 +96,10 @@ object Elm327ResponseParser {
         return (0 until hex.length / 2).map { hex.substring(it * 2, it * 2 + 2).toInt(16) }
     }
 
+    /** True if any ECU answered a Mode 04 request with the positive response (0x44). */
+    fun isClearCodesAccepted(raw: String): Boolean =
+        (messages(raw) as? Result.Messages)?.messages?.any { it.size == 1 && it[0] == 0x44 } == true
+
     /** Single-message view kept for simple callers: the first message, or the status. */
     fun parse(raw: String): ObdResponse = when (val r = messages(raw)) {
         is Result.Status -> r.response

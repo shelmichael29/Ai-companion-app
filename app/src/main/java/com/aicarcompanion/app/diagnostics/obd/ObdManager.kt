@@ -5,12 +5,16 @@ import com.aicarcompanion.app.assistant.conversation.DiagnosticCommandHandler
 import com.aicarcompanion.app.assistant.conversation.LiveValueResult
 import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.domain.model.DataOrigin
+import com.aicarcompanion.app.domain.model.DiagnosticObservation
+import com.aicarcompanion.app.domain.model.ObservationKind
 import com.aicarcompanion.app.domain.model.DtcStatus
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +28,8 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Connection controls used by the DIY and Advanced levels. */
 interface ObdAdvancedControls {
@@ -72,7 +78,12 @@ class ObdManager(
     private val log: com.aicarcompanion.app.connectivity.ConnectionLog? = null,
     /** Overrides [RecoveryPolicy.RECHECK_DELAYS_MILLIS] (tests). */
     private val recheckDelaysOverride: List<Long>? = null,
-) : ObdConnection, DiagnosticCommandHandler, ObdAdvancedControls {
+    /** True only at the DIY and Advanced knowledge levels. Off unless the container says otherwise. */
+    private val clearCodesAllowed: () -> Boolean = { false },
+    private val writeGate: VehicleWriteGate = VehicleWriteGate(now),
+    /** Saves the "cleared by you" note in the vehicle's history. */
+    private val recordClearNote: suspend (DiagnosticObservation) -> Unit = history::saveObservation,
+) : ObdConnection, DiagnosticCommandHandler, ObdAdvancedControls, VehicleCodeClearing {
 
     private val statsTracker = ConnectionStatsTracker()
     override val stats: StateFlow<ConnectionStats> = statsTracker.stats
@@ -311,6 +322,9 @@ class ObdManager(
         probe = null
         _supported.value = emptySet()
         _adapterInfo.value = null
+        // A new connection must read the codes again before they can be cleared.
+        _codeReadSession.value = null
+        writeGate.revoke()
     }
 
     // ---- Advanced controls -------------------------------------------------------------
@@ -490,19 +504,133 @@ class ObdManager(
     }
 
     override suspend fun readTroubleCodes(vehicleId: String): CodeReadResult {
+        // A read during a clear could change the code read the user confirmed.
+        if (clearing.get()) return CodeReadResult.NoResponse("a clear is in progress. Try again in a moment.")
+        return readCodes(vehicleId)
+    }
+
+    private suspend fun readCodes(vehicleId: String): CodeReadResult {
         if (_state.value !is ObdConnectionState.Connected) return CodeReadResult.NotConnected
         if (!vehicleResponding()) return CodeReadResult.NoResponse("the vehicle isn't responding. Is the ignition on?")
         val isCan = probe?.isCan
         val stored = guarded { it.execute("03", 5_000) }?.let { Elm327ResponseParser.decodeTroubleCodes(it, isCan) }
         recordVehicleAnswer(stored != null)
-        if (stored == null) return CodeReadResult.NoResponse("the vehicle didn't return its stored codes.")
+        if (stored == null) {
+            _codeReadSession.value = null // state unknown: Clear codes needs a fresh successful read
+            return CodeReadResult.NoResponse("the vehicle didn't return its stored codes.")
+        }
         val pending = guarded { it.execute("07", 5_000) }?.let { Elm327ResponseParser.decodeTroubleCodes(it, isCan) }.orEmpty()
         val codes = stored.map { it to DtcStatus.STORED } + (pending - stored.toSet()).map { it to DtcStatus.PENDING }
         val at = now()
         history.recordTroubleCodes(vehicleId, codes, DataOrigin.OBD_BLUETOOTH, at)
         val read = history.latestTroubleCodeRead(vehicleId).first()
             ?: return CodeReadResult.NoResponse("the read couldn't be saved.")
+        _codeReadSession.value = CodeReadSession(vehicleId, read.sessionId, read.readAt)
         return CodeReadResult.Read(read)
+    }
+
+    // ---- Clear codes (Mode 04): the only vehicle-modifying path; see VehicleWriteGate ----------
+
+    private val _codeReadSession = MutableStateFlow<CodeReadSession?>(null)
+    override val codeReadSession: StateFlow<CodeReadSession?> = _codeReadSession.asStateFlow()
+    private val clearing = AtomicBoolean(false)
+
+    /** Every rule that doesn't involve the token. Null means all hold. */
+    private fun clearPreconditionFailure(vehicleId: String): ClearCodesRefusal? = when {
+        !clearCodesAllowed() -> ClearCodesRefusal.LEVEL_NOT_ALLOWED
+        _state.value !is ObdConnectionState.Connected -> ClearCodesRefusal.NOT_CONNECTED
+        !vehicleResponding() -> ClearCodesRefusal.VEHICLE_NOT_RESPONDING
+        _codeReadSession.value?.vehicleId != vehicleId -> ClearCodesRefusal.CODES_NOT_READ
+        else -> null
+    }
+
+    override fun issueClearCodesToken(vehicleId: String): ClearCodesTokenResult {
+        clearPreconditionFailure(vehicleId)?.let {
+            writeGate.revoke()
+            return ClearCodesTokenResult.Refused(it)
+        }
+        return _codeReadSession.value?.let { ClearCodesTokenResult.Issued(writeGate.issue(vehicleId, it.sessionId)) }
+            ?: ClearCodesTokenResult.Refused(ClearCodesRefusal.CODES_NOT_READ)
+    }
+
+    override fun cancelClearCodes() = writeGate.revoke()
+
+    override suspend fun clearCodes(vehicleId: String, token: ClearCodesToken): ClearCodesResult {
+        if (!clearing.compareAndSet(false, true)) return ClearCodesResult.Refused(ClearCodesRefusal.BUSY)
+        try {
+            return clearCodesLocked(vehicleId, token)
+        } finally {
+            clearing.set(false)
+        }
+    }
+
+    private suspend fun clearCodesLocked(vehicleId: String, token: ClearCodesToken): ClearCodesResult {
+        fun refuse(reason: ClearCodesRefusal): ClearCodesResult {
+            writeGate.revoke()
+            vlog("Clear codes refused", "reason" to reason.name)
+            return ClearCodesResult.Refused(reason)
+        }
+        clearPreconditionFailure(vehicleId)?.let { return refuse(it) }
+        val read = _codeReadSession.value ?: return refuse(ClearCodesRefusal.CODES_NOT_READ)
+        val permit = when (val d = writeGate.redeem(token, vehicleId, read.sessionId)) {
+            is GateDecision.Granted -> d.permit
+            is GateDecision.Refused -> return refuse(
+                when (d.reason) {
+                    GateRefusal.NO_TOKEN -> ClearCodesRefusal.NOT_CONFIRMED
+                    GateRefusal.EXPIRED -> ClearCodesRefusal.CONFIRMATION_EXPIRED
+                    GateRefusal.WRONG_VEHICLE -> ClearCodesRefusal.WRONG_VEHICLE
+                    GateRefusal.WRONG_READ_SESSION -> ClearCodesRefusal.CODES_CHANGED
+                },
+            )
+        }
+        // Engine must be off. RPM is read-only (01 0C), always asked, never assumed from the supported list.
+        val rpm = guarded { it.execute(ObdPid.ENGINE_RPM.command) }?.let { Elm327ResponseParser.decodePid(it, ObdPid.ENGINE_RPM) }
+        when {
+            rpm == null -> return refuse(ClearCodesRefusal.ENGINE_STATE_UNKNOWN)
+            rpm > 0.0 -> return refuse(ClearCodesRefusal.ENGINE_RUNNING)
+        }
+        // From the last check to the saved note nothing may be cancelled half way: a cancelled
+        // caller must not leave a sent clear unrecorded.
+        return withContext(NonCancellable) {
+            // Re-check right before sending: the world may have changed during the rpm read.
+            clearPreconditionFailure(vehicleId)?.let { return@withContext refuse(it) }
+            if (_codeReadSession.value?.sessionId != read.sessionId) return@withContext refuse(ClearCodesRefusal.CODES_CHANGED)
+            val before = history.latestTroubleCodeRead(vehicleId).first()?.takeIf { it.sessionId == read.sessionId }?.codes.orEmpty()
+            vlog("Clear codes sent", "codesBefore" to before.size)
+            val answer = guarded { it.sendClearCodes(permit) }
+            // Whatever the answer, what the car stores may have changed: the old read no longer counts.
+            _codeReadSession.value = null
+            val accepted = answer != null && Elm327ResponseParser.isClearCodesAccepted(answer)
+            val remaining = (readCodes(vehicleId) as? CodeReadResult.Read)?.read?.codes?.size
+            val result = when {
+                accepted -> ClearCodesResult.Cleared(remaining)
+                answer == null -> ClearCodesResult.NoAnswer(remaining)
+                else -> ClearCodesResult.NotAccepted(remaining)
+            }
+            vlog("Clear codes result", "result" to result::class.java.simpleName, "codesAfter" to remaining)
+            recordClearNote(clearNote(vehicleId, before.map { it.code }, result))
+            result
+        }
+    }
+
+    private fun clearNote(vehicleId: String, before: List<String>, result: ClearCodesResult): DiagnosticObservation {
+        val what = when (result) {
+            is ClearCodesResult.Cleared -> "The car accepted the request."
+            is ClearCodesResult.NotAccepted -> "The car did not accept the request."
+            is ClearCodesResult.NoAnswer -> "The car did not answer, so it is unknown whether anything was cleared."
+            is ClearCodesResult.Refused -> ""
+        }
+        val after = when (result) {
+            is ClearCodesResult.Cleared -> result.remaining
+            is ClearCodesResult.NotAccepted -> result.remaining
+            is ClearCodesResult.NoAnswer -> result.remaining
+            is ClearCodesResult.Refused -> null
+        }
+        val text = "Trouble codes cleared by you with Penelope. $what Codes before: " +
+            (before.joinToString().ifEmpty { "none" }) + ". Codes reported afterwards: " +
+            (after?.toString() ?: "not re-read") + "." +
+            if (result is ClearCodesResult.Cleared) " Readiness monitors were reset." else ""
+        return DiagnosticObservation(UUID.randomUUID().toString(), vehicleId, now(), ObservationKind.NOTE, text, null, DataOrigin.OBD_BLUETOOTH)
     }
 
     override val liveReadings: Flow<List<SensorReading>> = channelFlow {

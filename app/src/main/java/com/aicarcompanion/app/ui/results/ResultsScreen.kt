@@ -68,6 +68,8 @@ fun ResultsScreen(
             if (ui.codes.isNotEmpty()) {
                 item { GradientButton("Ask about this", onAsk) }
             }
+            // DIY and Advanced only; the control hides itself at the Everyday level.
+            item { ClearCodesControl() }
         }
     }
 }

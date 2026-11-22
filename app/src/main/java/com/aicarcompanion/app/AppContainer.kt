@@ -77,6 +77,7 @@ interface AppContainer {
     suspend fun speakGuidance(text: String)
     val obdConnection: ObdConnection
     val diagnosticCommands: DiagnosticCommandHandler
+    val codeClearing: com.aicarcompanion.app.diagnostics.obd.VehicleCodeClearing
     val bluetooth: BluetoothGateway
     /** Beginner-friendly adapter search and connection with bounded retries. */
     val adapterSetup: com.aicarcompanion.app.connectivity.AdapterConnectionManager
@@ -194,8 +195,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
                 appContext.getSharedPreferences("obd_settings", Context.MODE_PRIVATE),
             ),
             log = connectionLog,
+            clearCodesAllowed = { settings.settings.value.explanationLevel != com.aicarcompanion.app.data.local.ExplanationLevel.EVERYDAY },
         )
     }
+    override val codeClearing: com.aicarcompanion.app.diagnostics.obd.VehicleCodeClearing get() = obdManager
     override val obdControls: ObdAdvancedControls get() = obdManager
     override val obdConnection: ObdConnection get() = obdManager
     override val diagnosticCommands: DiagnosticCommandHandler get() = obdManager

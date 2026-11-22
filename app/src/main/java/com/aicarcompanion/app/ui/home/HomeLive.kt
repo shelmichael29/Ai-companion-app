@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.ui.home
 
+import androidx.compose.runtime.Composable
 import com.aicarcompanion.app.dashboard.DashboardItem
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.domain.model.DataOrigin
@@ -124,6 +125,8 @@ data class ProDashboardActions(
     val onOpenConnectionSettings: () -> Unit,
     val onAddVehicle: () -> Unit,
     val onOpenAppSettings: () -> Unit,
+    /** "Clear codes…" button shown next to "Read codes" (DIY only); null in previews and tests. */
+    val clearCodes: (@Composable () -> Unit)? = null,
 )
 
 /** One shortcut from the home layout ([com.aicarcompanion.app.dashboard.DashboardPlanner.itemsFor]). */
