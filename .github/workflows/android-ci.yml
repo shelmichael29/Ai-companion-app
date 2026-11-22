@@ -92,7 +92,7 @@ jobs:
         env:
           COMMIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          version=$(grep -oP 'versionName = "\\K[^"]+' enet-tester/build.gradle.kts)
+          version=$(sed -nE 's/.*versionName = "([^"]+)".*/\1/p' enet-tester/build.gradle.kts)
           echo "name=BMW-ENET-tester-${version}-debug-${COMMIT_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Upload ENET tester APK
