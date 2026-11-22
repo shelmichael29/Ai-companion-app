@@ -521,12 +521,19 @@ class ObdManager(
                 val pids = LIVE_PIDS.filter { it.pid in _supported.value && it.visibleAt(liveDetail) }
                 for (pid in pids) {
                     val raw = guarded { it.execute(pid.command) }
-                    if (raw == null) { recordVehicleAnswer(false); continue }
+                    if (raw == null) {
+                        latest.remove(pid) // A failed refresh must not leave an old value looking live.
+                        recordVehicleAnswer(false)
+                        continue
+                    }
                     val value = Elm327ResponseParser.decodePid(raw, pid)
                     recordVehicleAnswer(value != null || !vehicleSilent(raw))
-                    value?.let { latest[pid] = reading(pid, it) }
+                    if (value != null) latest[pid] = reading(pid, value) else latest.remove(pid)
                     if (health != LinkHealth.OK) break
                 }
+                // An unread PID can otherwise linger when polling is slow or interrupted.
+                val oldestAllowed = now().minusSeconds(10)
+                latest.entries.removeAll { it.value.timestamp.isBefore(oldestAllowed) }
                 send(latest.values.toList())
                 delay(config().pollIntervalMillis.toLong())
             }
