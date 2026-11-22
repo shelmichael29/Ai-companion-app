@@ -93,19 +93,20 @@ class ModuleDiagnostics(private val transport: EnetTransport, private val clock:
             progress(module)
             // Gateway routing errors may omit the ECU address. A fresh stream prevents a late
             // error for a previous module from being attributed to the current one.
-            try {
+            val reply = try {
                 transport.connectTcp(link.subnet.address, target, Hsfz.DIAG_PORT,
                     connectTimeout.coerceIn(ConnectionOptions.CONNECT_TIMEOUT_RANGE)).use { tcp ->
                     tcp.write(Hsfz.diagnosticFrame(request, module.address))
-                    result(module, receive(tcp, HsfzFrameReader(), module, request))
+                    receive(tcp, HsfzFrameReader(), module, request)
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled // The user hit Cancel; never continue sending to another ECU.
             } catch (e: IOException) {
                 // A refused connection, cable hiccup, or broken stream is not evidence that the
                 // ECU is absent. Record this candidate and continue with the next one.
-                result(module, ModuleReply.TransportError(e.message?.take(120) ?: e.javaClass.simpleName))
+                ModuleReply.TransportError(e.message?.take(120) ?: e.javaClass.simpleName)
             }
+            result(module, reply)
         }
     }
 
