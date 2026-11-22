@@ -71,4 +71,14 @@ class LevelNavigationTest {
         store.update { it.copy(dashboard = DashboardSettings()) }
         assertEquals(ExplanationLevel.entries.last(), store.settings.value.explanationLevel)
     }
+
+    @Test fun `live data is for DIY and Advanced only`() {
+        assertTrue(!LevelNavigation.liveDataAvailable(ExplanationLevel.EVERYDAY))
+        assertTrue(LevelNavigation.liveDataAvailable(ExplanationLevel.DIY))
+        assertTrue(LevelNavigation.liveDataAvailable(ExplanationLevel.ADVANCED))
+        // Advanced has it as a tab; Everyday has no tab for it, so a shortcut can never land there.
+        assertTrue(LevelNavigation.isTab(ExplanationLevel.ADVANCED, NavRoutes.LIVE_DATA))
+        assertTrue(!LevelNavigation.isTab(ExplanationLevel.EVERYDAY, NavRoutes.LIVE_DATA))
+        assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.EVERYDAY, NavRoutes.LIVE_DATA))
+    }
 }

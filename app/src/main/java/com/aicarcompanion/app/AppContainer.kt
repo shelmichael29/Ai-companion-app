@@ -60,6 +60,7 @@ interface AppContainer {
     val historyRepository: VehicleHistoryRepository
     val maintenanceRepository: MaintenanceRepository
     val diagnosticsRepository: DiagnosticsRepository
+    val dashboardRepository: com.aicarcompanion.app.domain.repository.DashboardRepository
     val vehicleCatalog: VehicleCatalogProvider
     val vinDecoder: VinDecoder
 
@@ -226,8 +227,15 @@ class DefaultAppContainer(context: Context) : AppContainer {
         }
     }
 
+    override val dashboardRepository: com.aicarcompanion.app.domain.repository.DashboardRepository by lazy {
+        com.aicarcompanion.app.data.local.RoomDashboardRepository(database.dashboardDao())
+    }
+
     override val diagnosticsRepository: DiagnosticsRepository by lazy {
-        DefaultDiagnosticsRepository(historyRepository, settings, dtcKnowledge, obdManager.liveReadings)
+        DefaultDiagnosticsRepository(
+            historyRepository, settings, dtcKnowledge, obdManager.liveReadings,
+            livePids = obdManager::livePids, connection = obdManager.state,
+        )
     }
 
     private val vehicleContext = VehicleContextProvider {

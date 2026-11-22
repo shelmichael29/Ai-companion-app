@@ -131,3 +131,45 @@ data class CachedResponseEntity(
     val body: String,
     val fetchedAtMillis: Long,
 )
+
+// ---- Live Data dashboards (database version 2) ------------------------------------------------
+
+@Entity(
+    tableName = "dashboard_layouts",
+    foreignKeys = [ForeignKey(VehicleEntity::class, ["id"], [VEHICLE_FK], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(VEHICLE_FK)],
+)
+data class DashboardLayoutEntity(
+    @PrimaryKey val id: String,
+    val vehicleId: String,
+    val name: String,
+    val position: Int,
+    val createdAtMillis: Long,
+    val updatedAtMillis: Long,
+)
+
+/** One gauge. [slot] is 0..7 (at most 8 per layout) and is the gauge's place in the layout. */
+@Entity(
+    tableName = "dashboard_gauges",
+    primaryKeys = ["layoutId", "slot"],
+    foreignKeys = [ForeignKey(DashboardLayoutEntity::class, ["id"], ["layoutId"], onDelete = ForeignKey.CASCADE)],
+    indices = [Index(value = ["layoutId", "pid"], unique = true)],
+)
+data class DashboardGaugeEntity(
+    val layoutId: String,
+    val slot: Int,
+    val pid: Int,
+    val style: String,
+    val size: String,
+    val unit: String?,
+)
+
+/** Which layout a vehicle last used. */
+@Entity(
+    tableName = "dashboard_prefs",
+    foreignKeys = [ForeignKey(VehicleEntity::class, ["id"], ["vehicleId"], onDelete = ForeignKey.CASCADE)],
+)
+data class DashboardPrefsEntity(
+    @PrimaryKey val vehicleId: String,
+    val activeLayoutId: String?,
+)

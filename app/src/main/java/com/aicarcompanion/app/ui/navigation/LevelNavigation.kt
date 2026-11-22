@@ -53,6 +53,9 @@ object LevelNavigation {
         )
     }
 
+    /** Live Data is for DIY and Advanced only; Everyday never sees it. */
+    fun liveDataAvailable(level: ExplanationLevel): Boolean = level != ExplanationLevel.EVERYDAY
+
     fun routes(level: ExplanationLevel): List<String> = tabs(level).map { it.route }
 
     /** True if [route] is a tab in [level]. */

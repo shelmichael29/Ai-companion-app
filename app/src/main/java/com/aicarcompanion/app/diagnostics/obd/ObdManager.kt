@@ -4,6 +4,8 @@ import com.aicarcompanion.app.assistant.conversation.CodeReadResult
 import com.aicarcompanion.app.assistant.conversation.DiagnosticCommandHandler
 import com.aicarcompanion.app.assistant.conversation.LiveValueResult
 import com.aicarcompanion.app.data.local.ExplanationLevel
+import com.aicarcompanion.app.domain.livedata.LivePollSnapshot
+import com.aicarcompanion.app.domain.livedata.PidSample
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DiagnosticObservation
 import com.aicarcompanion.app.domain.model.ObservationKind
@@ -11,6 +13,7 @@ import com.aicarcompanion.app.domain.model.DtcStatus
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -21,15 +24,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 
 /** Connection controls used by the DIY and Advanced levels. */
 interface ObdAdvancedControls {
@@ -114,8 +116,8 @@ class ObdManager(
 
     private val transport = ObdTransport.BLUETOOTH_CLASSIC
 
-    @Volatile private var liveDetail = ExplanationLevel.EVERYDAY
-    override fun setLiveDetail(level: ExplanationLevel) { liveDetail = level }
+    private val liveDetail = MutableStateFlow(ExplanationLevel.EVERYDAY)
+    override fun setLiveDetail(level: ExplanationLevel) { liveDetail.value = level }
 
     override fun connect(device: AdapterDevice) {
         if (device.radio == AdapterRadio.LE_ONLY) {
@@ -477,6 +479,7 @@ class ObdManager(
 
     override suspend fun readLiveValue(pid: ObdPid): LiveValueResult {
         if (_state.value !is ObdConnectionState.Connected) return LiveValueResult.NotConnected
+        if (clearing.value) return LiveValueResult.NoResponse("a clear is in progress. Try again in a moment.")
         if (!vehicleResponding()) {
             guarded { s -> probe = s.probeVehicle(); _supported.value = probe?.supportedPids.orEmpty(); updateConnected() }
             if (!vehicleResponding()) return LiveValueResult.NoResponse("the vehicle isn't responding. Is the ignition on?")
@@ -505,7 +508,7 @@ class ObdManager(
 
     override suspend fun readTroubleCodes(vehicleId: String): CodeReadResult {
         // A read during a clear could change the code read the user confirmed.
-        if (clearing.get()) return CodeReadResult.NoResponse("a clear is in progress. Try again in a moment.")
+        if (clearing.value) return CodeReadResult.NoResponse("a clear is in progress. Try again in a moment.")
         return readCodes(vehicleId)
     }
 
@@ -533,7 +536,8 @@ class ObdManager(
 
     private val _codeReadSession = MutableStateFlow<CodeReadSession?>(null)
     override val codeReadSession: StateFlow<CodeReadSession?> = _codeReadSession.asStateFlow()
-    private val clearing = AtomicBoolean(false)
+    /** True from the start of a clear until it finishes. Live polling holds off while it is set. */
+    private val clearing = MutableStateFlow(false)
 
     /** Every rule that doesn't involve the token. Null means all hold. */
     private fun clearPreconditionFailure(vehicleId: String): ClearCodesRefusal? = when {
@@ -560,7 +564,7 @@ class ObdManager(
         try {
             return clearCodesLocked(vehicleId, token)
         } finally {
-            clearing.set(false)
+            clearing.value = false
         }
     }
 
@@ -633,30 +637,44 @@ class ObdManager(
         return DiagnosticObservation(UUID.randomUUID().toString(), vehicleId, now(), ObservationKind.NOTE, text, null, DataOrigin.OBD_BLUETOOTH)
     }
 
-    override val liveReadings: Flow<List<SensorReading>> = channelFlow {
-        state.collectLatest { s ->
-            if (s !is ObdConnectionState.Connected || s.vehicleProtocol == null) {
-                send(emptyList())
-                return@collectLatest
-            }
-            if (s.health != LinkHealth.OK) {
-                // Recovering: don't add traffic. Polling restarts when the state changes back.
-                send(emptyList())
-                return@collectLatest
-            }
-            val latest = linkedMapOf<ObdPid, SensorReading>()
-            while (true) {
-                val pids = LIVE_PIDS.filter { it.pid in _supported.value && it.visibleAt(liveDetail) }
-                for (pid in pids) {
-                    val raw = guarded { it.execute(pid.command) }
-                    if (raw == null) { recordVehicleAnswer(false); continue }
-                    val value = Elm327ResponseParser.decodePid(raw, pid)
-                    recordVehicleAnswer(value != null || !vehicleSilent(raw))
-                    value?.let { latest[pid] = reading(pid, it) }
-                    if (health != LinkHealth.OK) break
-                }
-                send(latest.values.toList())
-                delay(config().pollIntervalMillis.toLong())
+    private val poller = LivePidPoller(
+        scope = scope,
+        connection = state,
+        paused = clearing,
+        intervalMillis = { config().pollIntervalMillis.toLong() },
+        now = now,
+        read = ::pollRead,
+    )
+
+    override fun livePids(pids: Set<Int>): Flow<LivePollSnapshot> = poller.request(pids)
+
+    /** One read-only Mode 01 request for the poller. Never sends anything for an unsupported PID. */
+    private suspend fun pollRead(pid: ObdPid): PollRead {
+        if (clearing.value) return PollRead.Skipped
+        if (pid.pid !in _supported.value) return PollRead.Unsupported
+        val raw = try {
+            guarded { it.execute(pid.command, skipIf = { clearing.value }) }
+        } catch (e: CommandSkippedException) {
+            return PollRead.Skipped
+        }
+        if (raw == null) {
+            recordVehicleAnswer(false)
+            return PollRead.NoAnswer
+        }
+        val value = Elm327ResponseParser.decodePid(raw, pid)
+        recordVehicleAnswer(value != null || !vehicleSilent(raw))
+        return if (value == null) PollRead.NoAnswer else PollRead.Value(value)
+    }
+
+    /** The shared list the older screens use, built on the same single poller. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val liveReadings: Flow<List<SensorReading>> = liveDetail.flatMapLatest { detail ->
+        val wanted = LIVE_PIDS.filter { it.visibleAt(detail) }
+        combine(state, poller.request(wanted.map { it.pid }.toSet())) { s, snap ->
+            if (s !is ObdConnectionState.Connected || s.vehicleProtocol == null || s.health != LinkHealth.OK) {
+                emptyList()
+            } else {
+                wanted.mapNotNull { pid -> (snap.perPid[pid.pid] as? PidSample.Ok)?.let { SensorReading(pid.label, it.value, pid.unit, it.at, DataOrigin.OBD_BLUETOOTH, pid.command) } }
             }
         }
     }.shareIn(scope, SharingStarted.WhileSubscribed(3_000), replay = 1)

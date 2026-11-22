@@ -74,6 +74,12 @@ interface ObdConnection {
     /** Current readings, polled only while collected and while the vehicle is responding. */
     val liveReadings: Flow<List<SensorReading>>
 
+    /**
+     * Demand-driven polling of exactly [pids]. Reads only these sensors, only while collected,
+     * and nothing while disconnected, unhealthy, or while trouble codes are being cleared.
+     */
+    fun livePids(pids: Set<Int>): Flow<com.aicarcompanion.app.domain.livedata.LivePollSnapshot>
+
     /** PIDs the vehicle reported as supported, empty until it responds. */
     val supportedPids: StateFlow<Set<Int>>
 

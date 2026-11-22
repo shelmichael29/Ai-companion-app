@@ -32,6 +32,12 @@ interface VehicleRepository {
 interface DiagnosticsRepository {
     fun troubleCodes(vehicleId: String): Flow<List<DiagnosticTroubleCode>>
     fun sensorReadings(vehicleId: String): Flow<List<SensorReading>>
+
+    /**
+     * Per-sensor state for exactly [pids]. Only these sensors are requested from the vehicle, and
+     * only while the flow is collected. Demonstration mode yields labelled sample states only.
+     */
+    fun liveSensors(pids: Set<Int>): Flow<Map<Int, com.aicarcompanion.app.domain.livedata.SensorValueState>>
 }
 
 interface MaintenanceRepository {
