@@ -192,7 +192,7 @@ class GeminiIntegrationTest {
         assertEquals(ObservationKind.SYMPTOM, saved.single().kind)
     }
 
-    @Test fun \`the current message and previous turns are redacted before leaving the device\`() = runTest {
+    @Test fun `the current message and previous turns are redacted before leaving the device`() = runTest {
         val client = FakeClient().apply {
             next = { AiResult.Reply("Call me at 555-234-5678 about that repair.", "test") }
         }
