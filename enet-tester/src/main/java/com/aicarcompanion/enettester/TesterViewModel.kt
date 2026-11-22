@@ -231,11 +231,13 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
                             is ModuleReply.Positive -> "Answered"
                             is ModuleReply.Rejected -> "Answered, request declined (NRC %02X)".format(reply.code)
                             is ModuleReply.GatewayError -> "Gateway rejected routing (%04X)".format(reply.control)
+                            is ModuleReply.TransportError -> "Connection error: ${reply.reason}"
                             ModuleReply.NoResponse -> "No response within 3 seconds"
                             ModuleReply.InvalidVin -> "Answered with an invalid VIN"
                             ModuleReply.Pending -> "Answered, final reply timed out"
                         }
-                        if (reply !is ModuleReply.GatewayError && reply != ModuleReply.NoResponse) answered++
+                        if (reply !is ModuleReply.GatewayError && reply !is ModuleReply.TransportError &&
+                            reply != ModuleReply.NoResponse) answered++
                         val line = "${module.title} (${module.name}): $outcome · ${clock() - moduleStarted} ms including connect"
                         log.add(line)
                         val vin = (reply as? ModuleReply.Positive)?.vin
