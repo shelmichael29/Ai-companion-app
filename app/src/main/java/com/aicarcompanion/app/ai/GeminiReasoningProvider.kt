@@ -337,9 +337,10 @@ class GeminiReasoningProvider(
         return try {
             // Only the network payload is redacted: local conversation and diagnostic history
             // retain their original wording. Scrub BOTH the new turn and previous turns.
+            val cloudSystem = PersonalDetailScrubber.scrub(system)
             val cloudMessage = PersonalDetailScrubber.scrub(message)
             val cloudHistory = history.map { it.copy(text = PersonalDetailScrubber.scrub(it.text)) }
-            withTimeoutOrNull(limit) { client.generate(system, cloudHistory, cloudMessage) }
+            withTimeoutOrNull(limit) { client.generate(cloudSystem, cloudHistory, cloudMessage) }
                 ?: AiResult.Failure(AiFailure.TIMEOUT, "No AI answer within ${limit / 1000} s")
         } catch (e: TimeoutCancellationException) {
             AiResult.Failure(AiFailure.TIMEOUT, "AI client timed out")
