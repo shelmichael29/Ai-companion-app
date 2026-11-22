@@ -116,25 +116,6 @@ fun MoreScreen(level: ExplanationLevel, assistantName: String, contentPadding: P
 }
 
 @Composable
-fun LiveDataScreen(level: ExplanationLevel, contentPadding: PaddingValues, viewModel: LiveDataViewModel = viewModel(factory = AppViewModelProvider.Factory)) {
-    val ui by viewModel.state.collectAsStateWithLifecycle()
-    // Tick once a second so "updated N s ago" and the stale state stay honest.
-    val now by produceState(Instant.now()) {
-        while (true) {
-            delay(1_000)
-            value = Instant.now()
-        }
-    }
-    LiveDataContent(
-        status = LiveDataStatus.of(ui.hasVehicle, ui.readings, ui.obdState, now),
-        readings = ui.readings,
-        now = now,
-        showPid = level == ExplanationLevel.ADVANCED,
-        contentPadding = contentPadding,
-    )
-}
-
-@Composable
 fun LiveDataContent(status: LiveDataStatus, readings: List<SensorReading>, now: Instant, showPid: Boolean, contentPadding: PaddingValues) {
     val t = Penelope.tokens
     Column(Modifier.fillMaxSize()) {

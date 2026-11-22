@@ -27,6 +27,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides | #40 | `docs/OFFLINE_KNOWLEDGE.md` |
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 | Phase 1 UI redesign: distinct Everyday / DIY / Advanced (black-and-grey) dashboards, per-level navigation, Drive placeholder, Live Data, More | #53 | `docs/PHASE1_UI.md` |
+| Phase 2 Live Data workspace (DIY/Advanced): add, remove, reorder and resize gauges; analog, digital, numeric, line graph and status styles; units; named layouts per vehicle (max 8 sensors); All sensors list; demand-driven poller paused during Clear codes; Room v2 | branch `feature/live-data-workspace` (not merged) | `docs/PHASE2_LIVE_DATA.md` |
 
 ## In progress (🔵)
 | Item | Where |

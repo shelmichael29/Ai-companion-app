@@ -39,7 +39,7 @@ import com.aicarcompanion.app.ui.history.HistoryScreen
 import com.aicarcompanion.app.ui.navigation.DriveScreen
 import com.aicarcompanion.app.ui.navigation.FloatingNavBar
 import com.aicarcompanion.app.ui.navigation.LevelNavigation
-import com.aicarcompanion.app.ui.navigation.LiveDataScreen
+import com.aicarcompanion.app.ui.livedata.LiveDataWorkspaceScreen
 import com.aicarcompanion.app.ui.navigation.MoreAction
 import com.aicarcompanion.app.ui.navigation.MoreScreen
 import com.aicarcompanion.app.ui.navigation.NavRoutes
@@ -154,7 +154,15 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                 )
             }
             composable(Routes.LIVE_DATA) {
-                LiveDataScreen(level, tabPadding)
+                // Everyday has no Live Data; a stale link or shortcut goes Home instead.
+                if (LevelNavigation.liveDataAvailable(level)) {
+                    LiveDataWorkspaceScreen(
+                        level, tabPadding,
+                        onBack = if (LevelNavigation.isTab(level, Routes.LIVE_DATA)) null else ({ navController.popBackStack() }),
+                    )
+                } else {
+                    LaunchedEffect(Unit) { navController.navigateTab(Routes.HOME) }
+                }
             }
             composable(Routes.MORE) {
                 MoreScreen(level, settings.assistantName, tabPadding) { action ->

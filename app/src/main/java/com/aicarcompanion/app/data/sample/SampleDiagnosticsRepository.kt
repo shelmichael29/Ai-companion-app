@@ -1,5 +1,8 @@
 package com.aicarcompanion.app.data.sample
 
+import com.aicarcompanion.app.domain.livedata.LiveDataStateMapper
+import com.aicarcompanion.app.domain.livedata.LiveSensorCatalog
+import com.aicarcompanion.app.domain.livedata.SensorValueState
 import com.aicarcompanion.app.domain.model.DiagnosticTroubleCode
 import com.aicarcompanion.app.domain.model.MaintenanceRecord
 import com.aicarcompanion.app.domain.model.SensorReading
@@ -15,6 +18,14 @@ class SampleDiagnosticsRepository : DiagnosticsRepository {
 
     override fun sensorReadings(vehicleId: String): Flow<List<SensorReading>> =
         flowOf(SampleData.sensorReadings())
+
+    override fun liveSensors(pids: Set<Int>): Flow<Map<Int, SensorValueState>> {
+        val now = java.time.Instant.now()
+        return flowOf(pids.associateWith { pid ->
+            LiveSensorCatalog.find(pid)?.let { SensorValueState.Sample(LiveDataStateMapper.sampleValueFor(it), now) }
+                ?: SensorValueState.Unsupported
+        })
+    }
 }
 
 class SampleMaintenanceRepository : MaintenanceRepository {

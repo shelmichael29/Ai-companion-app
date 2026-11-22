@@ -15,8 +15,11 @@ import androidx.room.RoomDatabase
         ObservationEntity::class,
         MileageEntity::class,
         CachedResponseEntity::class,
+        DashboardLayoutEntity::class,
+        DashboardGaugeEntity::class,
+        DashboardPrefsEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,9 +27,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun serviceRecordDao(): ServiceRecordDao
     abstract fun diagnosticHistoryDao(): DiagnosticHistoryDao
     abstract fun responseCacheDao(): ResponseCacheDao
+    abstract fun dashboardDao(): DashboardDao
 
     companion object {
         fun create(context: Context): AppDatabase =
-            Room.databaseBuilder(context, AppDatabase::class.java, "car_companion.db").build()
+            Room.databaseBuilder(context, AppDatabase::class.java, "car_companion.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }

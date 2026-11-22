@@ -37,6 +37,9 @@ data class VehicleProbe(
  * Timeouts and retries come from [ObdConnectionConfig]; every exchange is reported to [observer]
  * (connection statistics and the optional redacted traffic log).
  */
+/** A command was not sent because the caller asked to skip it once its turn came. */
+class CommandSkippedException : Exception("Command skipped")
+
 class Elm327Session(
     private val link: ElmLink,
     private val observer: ElmTrafficObserver? = null,
@@ -53,8 +56,17 @@ class Elm327Session(
     var capabilities = AdapterCapabilities()
         private set
 
-    suspend fun execute(command: String, timeoutMillis: Long = this.timeoutMillis): String = mutex.withLock {
+    /**
+     * [skipIf] is checked after this command's turn on the adapter begins; if it is true nothing is
+     * sent and [CommandSkippedException] is thrown (used to hold live polling off during a clear).
+     */
+    suspend fun execute(
+        command: String,
+        timeoutMillis: Long = this.timeoutMillis,
+        skipIf: () -> Boolean = { false },
+    ): String = mutex.withLock {
         ReadOnlyCommandPolicy.requireAllowed(command)
+        if (skipIf()) throw CommandSkippedException()
         val normalized = ReadOnlyCommandPolicy.normalize(command)
         // Resets are never repeated automatically; everything else may retry after a timeout.
         val attempts = if (normalized == "ATZ" || normalized == "ATWS" || normalized == "ATD") 1 else 1 + retries.coerceAtLeast(0)
