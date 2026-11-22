@@ -41,4 +41,4 @@ data class AdvancedTokens(
 
 /** The Advanced tokens for the app's current light or dark theme. */
 @Composable
-internal fun advancedTokens(): AdvancedTokens = AdvancedTokens.of(Penelope.tokens.isDark)
+fun advancedTokens(): AdvancedTokens = AdvancedTokens.of(Penelope.tokens.isDark)

@@ -1,6 +1,34 @@
-# Hands-free foundation (Phase H0)
+# Hands-free foundation (Phase H0) and Drive (Phase 3)
 
-Penelope is becoming a voice-first driving assistant: music, messages, calls, vehicle diagnostics and, later, navigation. This phase builds the **foundation only**. Nothing here controls music, reads messages or places calls yet.
+Penelope is becoming a voice-first driving assistant: music, messages, calls, vehicle diagnostics and, later, navigation. Phase H0 built the **foundation** (contracts, routing, honest "not yet" replies, diagnostics). **Drive (Phase 3)**, described first below, switched on the parts Android supports. Sections 1 to 4 are the original H0 notes; where they say nothing controls music yet, Drive supersedes them.
+
+## Drive (Phase 3): what works, what is a handoff, what is deferred
+
+Drive is the Drive tab on all three levels (one shared implementation, three presentations, see `ui/drive/`). **No new `uses-permission`**: no SMS, call, contacts or phone-state permission and no foreground service (`ManifestPolicyTest` enforces this). The only new manifest entries are the notification listener service (inactive until the user turns on notification access) and `queries` for the dialer, contact picker and media apps.
+
+| Capability | Status | How (and what it is not) |
+|---|---|---|
+| Play / pause / next / previous | **Works as a request** | Without notification access: separate PLAY, PAUSE, NEXT and PREVIOUS media keys through `AudioManager` (never the PLAY_PAUSE toggle). With access: the active media session's transport controls. Penelope says "I asked your media app to pause", never that it did. Some apps ignore media keys |
+| Now playing (title, artist, app) | **Needs notification access** | Android only lets a notification listener read media sessions. Without access Drive says "Turn on notification access to see what's playing" |
+| Volume | **Works** | Music stream up/down with the system volume panel; hidden ("Volume is set by your car") when the volume is fixed |
+| Compatible media apps | Whatever app has a session | No list of "supported apps" is claimed; Drive never implies universal control |
+| Read messages aloud | **Needs notification access** | Message notifications only (conversation or message category), kept in memory (max 20), dropped when dismissed, read only when asked. No `READ_SMS`. The text is spoken but never shown in the transcript, logged or sent to Gemini |
+| Reply by voice | **Needs notification access** | Uses the notification's own reply action. Only messages still in the notification shade. Read back, then yes (voice) or Send (button), then "Okay, I sent your reply to <app>". Penelope can't know it was delivered and never says so. No `SEND_SMS` |
+| Call someone | **Handoff** | Choose a contact with the system picker (no contacts permission) or say a number. Penelope confirms, then opens the dialer (`ACTION_DIAL`); the user taps call. Never `ACTION_CALL` |
+| Call by name ("call Mom") | **Not available** | Needs the contacts permission, which Penelope doesn't request. She says so and points to Call someone |
+| Answer / decline / hang up | **Deferred** | Needs call permissions Penelope doesn't request. Honest "can't yet" reply |
+| Car controls (climate, seats, locks, windows, remote start) | **Not available, by design** | Capability-only (`vehiclecontrol/`): no command method exists. A standard OBD-II adapter reads data; it can't control the car. A future manufacturer integration needs its own review |
+| Wake word, background voice | Not built | Unchanged |
+
+**Confirmation.** One state machine (`HandsFreeDialog`) serves voice and the on-screen card. Only a clear "yes", "yeah", "yep", "send it", "yes send it" or "confirm" (and "call" or "dial" for a call) confirms; anything else cancels; it times out after 30 seconds; the service is called once. What Penelope says never consists of an accepted word alone, so she can't confirm herself by hearing her own prompt.
+
+**Privacy.** Names, numbers, message text and track titles are not logged, stored, or sent to Gemini. Their types print `redacted`. The routing log records only the command kind and capability status.
+
+**Notification access setup.** Settings, Notifications, Notification access (or the button on Drive). On Android 13 and later, apps installed outside Google Play may need App info, three dots, **Allow restricted settings** first. Turn it off any time; Penelope forgets the in-memory messages.
+
+**Still to verify on a phone (NOT RUN):** media keys and sessions with real apps (Spotify, YouTube Music, a podcast app); notification access granted and revoked; message readout and reply with real messaging apps (and their replies actually sending); the dialer handoff and contact picker; behavior over car Bluetooth; TalkBack; large font on the real device.
+
+iOS: see `docs/IOS_DRIVE_NOTES.md` (planning notes only).
 
 ## 1. Debugging audit
 
@@ -43,7 +71,7 @@ All events go to the existing in-memory `ConnectionLog`: 300 events, never writt
 - `HandsFreeSafety`: rules every implementation must follow.
 - `HandsFreeReasoningProvider`: routes commands before the AI, so Gemini never sees contact names or message text and never pretends to act.
 
-**Android** (`handsfree/android/`): `AndroidHandsFreeCapabilities` (all NotImplemented today) and `AndroidCarAudioRoute`.
+**Android** (`handsfree/android/`): `AndroidHandsFreeCapabilities` (per-capability status, see the Drive table), `AndroidMediaControl`, `AndroidMessagingService` with `PenelopeNotificationListener`, `AndroidCallService`, `AndroidNotificationAccess`, and `AndroidCarAudioRoute`.
 
 **Unchanged:** continuous conversation, half-duplex mic, OBD/diagnostics, Gemini, dashboards, onboarding. No new permissions.
 
@@ -76,7 +104,7 @@ These are planning notes, to be confirmed on real devices before each feature is
 1. **Settings → Connection status → technical log** shows Voice, Audio and App events during a conversation, with no spoken words.
 2. **Phone on car Bluetooth:** the log shows "Audio output changed: Bluetooth audio (A2DP)". Disconnect: "Phone speaker".
 3. **Receive a phone call while Penelope talks:** "Audio focus changed: loss_transient", and voice pauses.
-4. **Ask "play some music", "call Mom", "read my messages":** Penelope says she can't yet, nothing else happens, and she keeps listening.
+4. **Ask "answer the call":** Penelope says she can't yet, nothing else happens, and she keeps listening. (Music, messages and calls: see the Drive section.)
 5. **Ask "how do I play music through my car?":** a normal answer (not intercepted).
 6. **Background the app:** "App in background" is logged and voice pauses, as before.
 

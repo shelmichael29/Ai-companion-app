@@ -53,7 +53,7 @@ class HandsFreeFoundationTest {
             "previous song" to HandsFreeCommand.Media(MediaAction.PREVIOUS),
             "read my messages" to HandsFreeCommand.ReadMessages,
             "do I have any new texts?" to HandsFreeCommand.ReadMessages,
-            "text Sarah saying I'm running late" to HandsFreeCommand.SendMessage("Sarah"),
+            "text Sarah saying I'm running late" to HandsFreeCommand.SendMessage("Sarah", "I'm running late"),
             "send a message to Mom" to HandsFreeCommand.SendMessage("Mom"),
             "can you call Mom" to HandsFreeCommand.PlaceCall("Mom"),
             "answer the call" to HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.ANSWER),
@@ -88,11 +88,10 @@ class HandsFreeFoundationTest {
         val delegate = RecordingDelegate()
         val routed = mutableListOf<Pair<String, String>>()
         val p = HandsFreeReasoningProvider(delegate, AndroidHandsFreeCapabilities()) { k, s -> routed += k to s }
-        val reply = p.respond(AssistantRequest("call Jennifer Smith", "Penelope"))
+        val reply = p.respond(AssistantRequest("answer the call", "Penelope"))
         assertTrue(delegate.seen.isEmpty())
-        assertTrue(reply.text.startsWith("I can't make phone calls yet."))
-        assertFalse("the contact name is never echoed", reply.text.contains("Jennifer"))
-        assertEquals(listOf("place_call" to "NotImplemented"), routed)
+        assertTrue(reply.text.startsWith("I can't answer phone calls yet."))
+        assertEquals(listOf("call_answer" to "NotImplemented"), routed)
     }
 
     @Test fun `everything else goes to the vehicle assistant unchanged`() = runTest {
@@ -102,9 +101,23 @@ class HandsFreeFoundationTest {
         assertEquals(listOf("what does P0171 mean"), delegate.seen)
     }
 
-    @Test fun `every capability is not implemented yet on Android, so no permission is needed`() {
-        HandsFreeCapability.entries.forEach {
-            assertEquals(CapabilityStatus.NotImplemented, AndroidHandsFreeCapabilities().status(it))
+    @Test fun `each capability reports its real status, with and without notification access`() {
+        val setup = CapabilityStatus.NeedsSetup(listOf(PlatformRequirement.NOTIFICATION_ACCESS))
+        val off = AndroidHandsFreeCapabilities(notificationAccess = { false })
+        val on = AndroidHandsFreeCapabilities(notificationAccess = { true })
+        val table = mapOf(
+            HandsFreeCapability.MEDIA_CONTROL to (CapabilityStatus.Available to CapabilityStatus.Available),
+            HandsFreeCapability.READ_MESSAGES to (setup to CapabilityStatus.Available),
+            HandsFreeCapability.SEND_MESSAGES to (setup to CapabilityStatus.Available),
+            HandsFreeCapability.PLACE_CALLS to (CapabilityStatus.Available to CapabilityStatus.Available),
+            HandsFreeCapability.ANSWER_CALLS to (CapabilityStatus.NotImplemented to CapabilityStatus.NotImplemented),
+            HandsFreeCapability.NAVIGATION to (CapabilityStatus.NotImplemented to CapabilityStatus.NotImplemented),
+            HandsFreeCapability.VEHICLE_CONTROLS to (CapabilityStatus.NotSupported to CapabilityStatus.NotSupported),
+        )
+        assertEquals("every capability is in the table", HandsFreeCapability.entries.toSet(), table.keys)
+        table.forEach { (capability, expected) ->
+            assertEquals("$capability without access", expected.first, off.status(capability))
+            assertEquals("$capability with access", expected.second, on.status(capability))
         }
     }
 
@@ -129,9 +142,12 @@ class HandsFreeFoundationTest {
     // ---- Platform separation (future iOS) ----------------------------------------------------------
 
     @Test fun `the hands-free core has no Android dependencies`() {
-        val core = File("src/main/java/com/aicarcompanion/app/handsfree")
-        val files = core.listFiles { f -> f.isFile && f.extension == "kt" }.orEmpty()
-        assertTrue("core files found", files.size >= 4)
+        val root = "src/main/java/com/aicarcompanion/app"
+        val core = File("$root/handsfree").listFiles { f -> f.isFile && f.extension == "kt" }.orEmpty()
+        val vehicle = File("$root/vehiclecontrol").listFiles { f -> f.isFile && f.extension == "kt" }.orEmpty()
+        val files = core.toList() + vehicle.toList() + File("$root/ui/drive/DriveState.kt")
+        assertTrue("core files found", core.size >= 4)
+        assertTrue("vehicle-control files found", vehicle.isNotEmpty())
         files.forEach { f -> assertFalse("${f.name} imports Android", f.readText().contains(Regex("^import android\\.", RegexOption.MULTILINE))) }
     }
 
@@ -191,8 +207,8 @@ class HandsFreeFoundationTest {
         val provider = HandsFreeReasoningProvider(delegate, AndroidHandsFreeCapabilities())
         val s = VoiceSession(this, input, output, ConversationManager(provider, { "Penelope" }), NoAudioFocus(), { true })
         s.start(); advanceUntilIdle()
-        input.say("play some music"); advanceUntilIdle()
-        assertTrue(output.spoken.single().startsWith("I can't control your music yet."))
+        input.say("answer the call"); advanceUntilIdle()
+        assertTrue(output.spoken.single().startsWith("I can't answer phone calls yet."))
         assertTrue("continuous conversation continues", s.state.value is VoiceState.Listening)
         input.say("is my coolant ok"); advanceUntilIdle()
         assertEquals("vehicle answer", output.spoken.last())

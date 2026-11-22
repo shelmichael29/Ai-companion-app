@@ -1,5 +1,7 @@
 package com.aicarcompanion.app.handsfree
 
+import com.aicarcompanion.app.vehiclecontrol.VehicleControlFeature
+
 /** A recognized hands-free request. Contact names and message text stay in memory only. */
 sealed interface HandsFreeCommand {
     val capability: HandsFreeCapability
@@ -10,11 +12,21 @@ sealed interface HandsFreeCommand {
     data object ReadMessages : HandsFreeCommand {
         override val capability get() = HandsFreeCapability.READ_MESSAGES
     }
-    data class SendMessage(val recipient: String?) : HandsFreeCommand {
+    data class Volume(val direction: VolumeDirection) : HandsFreeCommand {
+        override val capability get() = HandsFreeCapability.MEDIA_CONTROL
+    }
+    /** [body] is what the user dictated in the same breath ("saying I'm late"); never logged. */
+    data class SendMessage(val recipient: String?, val body: String? = null) : HandsFreeCommand {
         override val capability get() = HandsFreeCapability.SEND_MESSAGES
+        override fun toString() = "SendMessage(redacted)"
     }
     data class PlaceCall(val contact: String?) : HandsFreeCommand {
         override val capability get() = HandsFreeCapability.PLACE_CALLS
+        override fun toString() = "PlaceCall(redacted)"
+    }
+    /** A request to change something in the car. Never carried out: see vehiclecontrol/. */
+    data class VehicleControl(val feature: VehicleControlFeature) : HandsFreeCommand {
+        override val capability get() = HandsFreeCapability.VEHICLE_CONTROLS
     }
     data class CallControl(val action: Action) : HandsFreeCommand {
         enum class Action { ANSWER, DECLINE, HANG_UP }
@@ -27,6 +39,8 @@ sealed interface HandsFreeCommand {
     /** A privacy-safe name for logs: the kind of command, never who or what. */
     val logName: String get() = when (this) {
         is Media -> "media_${action.name.lowercase()}"
+        is Volume -> "media_volume_${direction.name.lowercase()}"
+        is VehicleControl -> "vehicle_control"
         ReadMessages -> "read_messages"
         is SendMessage -> "send_message"
         is PlaceCall -> "place_call"
@@ -54,14 +68,31 @@ object VoiceCommandRouter {
         r("^(?:skip|next)(?: (?:this )?(?:song|track))?$|^(?:skip|next) (?:the )?(?:song|track)$|^play (?:the )?next (?:song|track)$") { HandsFreeCommand.Media(MediaAction.NEXT) },
         r("^(?:previous|last|go back(?: to the)?(?: previous)?) (?:song|track)$|^play (?:the )?(?:previous|last) (?:song|track)$") { HandsFreeCommand.Media(MediaAction.PREVIOUS) },
         r("^(?:read|check|do i have(?: any)?|any)(?: me)?(?: my)?(?: new| unread)? (?:messages|texts|text messages)\\b.*") { HandsFreeCommand.ReadMessages },
-        r("^(?:send|text|message|reply to)(?: a)?(?: text| message)?(?: to)? (.+?)(?: (?:saying|that) .*)?$") { m -> HandsFreeCommand.SendMessage(m.groupValues[1].trim().ifBlank { null }) },
+        r("^(?:turn |put )?(?:the )?(?:music|volume) (up|down)$|^turn (up|down) the (?:music|volume)$|^volume (up|down)$") { m ->
+            val up = m.groupValues.drop(1).first { it.isNotEmpty() }.equals("up", ignoreCase = true)
+            HandsFreeCommand.Volume(if (up) VolumeDirection.UP else VolumeDirection.DOWN)
+        },
         r("^(?:send a (?:text|message)|reply)$") { HandsFreeCommand.SendMessage(null) },
+        r("^reply (?:saying|that) (.+)$") { m -> HandsFreeCommand.SendMessage(null, m.groupValues[1].trim()) },
+        // "tell Sarah I'm late": the first word is the person (so "tell me ..." stays a question).
+        r("^tell (?!me\\b|us\\b)(\\S+) (?:that )?(.+)$") { m -> HandsFreeCommand.SendMessage(m.groupValues[1], m.groupValues[2].trim()) },
+        r("^(?:send|text|message|reply to)(?: a)?(?: text| message)?(?: to)? (.+?)(?: (?:saying|that) (.+))?$") { m ->
+            HandsFreeCommand.SendMessage(m.groupValues[1].trim().ifBlank { null }, m.groupValues[2].trim().ifBlank { null })
+        },
         r("^(?:answer|pick up|accept)(?: the)?(?: phone| call)+$|^answer it$") { HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.ANSWER) },
         r("^(?:decline|reject|ignore)(?: the)?(?: phone| call)+$") { HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.DECLINE) },
         r("^(?:hang up|end the call|end call)$") { HandsFreeCommand.CallControl(HandsFreeCommand.CallControl.Action.HANG_UP) },
         r("^(?:call|phone|dial|ring) (.+)$") { m -> HandsFreeCommand.PlaceCall(m.groupValues[1].trim()) },
+        r("^turn (?:on|off|up|down) the (heat|heater|ac|air conditioning|heated seats?|seat heaters?|defrost)$") { m ->
+            HandsFreeCommand.VehicleControl(featureFor(m.groupValues[1]))
+        },
+        r("^(?:lock|unlock) (?:the )?(?:car|doors)$") { HandsFreeCommand.VehicleControl(VehicleControlFeature.DOOR_LOCKS) },
+        r("^start the car$") { HandsFreeCommand.VehicleControl(VehicleControlFeature.REMOTE_START) },
         r("^(?:navigate|take me|get directions|give me directions|directions) (?:to|home)\\b.*") { HandsFreeCommand.Navigate },
     )
+
+    private fun featureFor(word: String) =
+        if (word.lowercase().contains("seat")) VehicleControlFeature.HEATED_SEATS else VehicleControlFeature.CLIMATE
 
     private fun r(pattern: String, make: (MatchResult) -> HandsFreeCommand) = Regex(pattern, RegexOption.IGNORE_CASE) to make
 
