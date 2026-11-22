@@ -66,11 +66,16 @@ class AndroidSpeechOutput(
         engine.setPitch(VoiceTuning.pitch(config.pitch))
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) { _state.value = SpeechOutputState.Speaking }
-            override fun onDone(utteranceId: String) { if (utteranceId.endsWith(LAST)) finish(SpeakResult.Completed) }
-            override fun onStop(utteranceId: String, interrupted: Boolean) = finish(SpeakResult.Interrupted)
+            override fun onDone(utteranceId: String) {
+                if (utteranceId.endsWith(LAST)) finish(SpeakResult.Completed, utteranceId)
+            }
+            override fun onStop(utteranceId: String, interrupted: Boolean) =
+                finish(SpeakResult.Interrupted, utteranceId)
             @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String) = finish(SpeakResult.Failed("Speech engine error"))
-            override fun onError(utteranceId: String, errorCode: Int) = finish(SpeakResult.Failed("Speech engine error $errorCode"))
+            override fun onError(utteranceId: String) =
+                finish(SpeakResult.Failed("Speech engine error"), utteranceId)
+            override fun onError(utteranceId: String, errorCode: Int) =
+                finish(SpeakResult.Failed("Speech engine error $errorCode"), utteranceId)
         })
         _state.value = SpeechOutputState.Ready
     }
@@ -83,8 +88,11 @@ class AndroidSpeechOutput(
         return ok(engine.setLanguage(Locale.getDefault())) || ok(engine.setLanguage(Locale.US))
     }
 
-    private fun finish(result: SpeakResult) {
+    private fun finish(result: SpeakResult, callbackUtteranceId: String? = null) {
         val c = current ?: return
+        // An interrupted TTS engine can deliver callbacks after the next utterance starts.
+        // Never complete or release audio focus for the wrong request.
+        if (callbackUtteranceId != null && !VoiceTuning.isCurrentUtterance(c.first, callbackUtteranceId)) return
         current = null
         c.second.complete(result)
         focus.release()
