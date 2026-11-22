@@ -2,7 +2,7 @@ package com.aicarcompanion.app.diagnostics.bluetooth
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 
 /**
@@ -14,7 +14,7 @@ internal suspend fun blockingConnectWithCancellation(
     timeoutMillis: Long,
     abort: () -> Unit,
     connect: () -> Unit,
-) = coroutineScope {
+) = supervisorScope {
     val worker = async(Dispatchers.IO) { connect() }
     try {
         withTimeout(timeoutMillis.coerceAtLeast(1)) { worker.await() }
