@@ -10,6 +10,7 @@ import com.aicarcompanion.app.diagnostics.obd.ObdManager
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.DtcStatus
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
