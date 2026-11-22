@@ -30,3 +30,9 @@ Clears stored and pending codes and turns off the check-engine light; resets rea
 6. Wait more than 60 seconds after ticking the box: confirm is refused as timed out.
 7. Disconnect and reconnect: the button is disabled again until codes are read.
 8. Advanced console: `04` is still blocked.
+
+## Review notes
+- **Partial multi-ECU answer:** if any module answers `44`, the result is `Cleared` and the re-read count says what remains; the UI wording reports remaining codes honestly.
+- **History note and AI:** the "cleared by you" NOTE observation must not go into AI prompts. Only SYMPTOM observations feed the assistant context (`AppContainer` vehicle context filters on `ObservationKind.SYMPTOM`); keep it that way.
+- **Race and cancellation rules:** a pending confirmation token request is discarded if the user unticks, reopens or cancels first. Once `04` is about to be sent, the rest (send, re-read, history note) runs non-cancellable. Code reads are refused while a clear runs. Engine speed (01 0C) is always asked; unsupported or unreadable counts as unknown and refuses.
+- **Fail closed:** `clearCodesAllowed` defaults to false, and the container's default level is Everyday until settings load. Disconnect and link loss both go through `closeLink`, which revokes the token and drops the code read.

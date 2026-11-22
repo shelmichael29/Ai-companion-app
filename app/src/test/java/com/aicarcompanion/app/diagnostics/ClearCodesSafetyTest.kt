@@ -90,11 +90,14 @@ class ClearCodesSafetyTest {
         assertTrue(root.isDirectory)
         val sources = root.walkTopDown().filter { it.extension == "kt" }.toList()
         fun users(needle: String) = sources.filter { needle in it.readText() }.map { it.name }.toSet()
-        assertEquals(setOf("VehicleWriteGate.kt"), users("ClearCodesPermit("))
-        assertEquals(setOf("VehicleWriteGate.kt"), users("ClearCodesToken("))
+        // Constructor calls only: not names such as issueClearCodesToken(.
+        fun builders(type: String) = Regex("(?<![A-Za-z])$type\\(").let { re -> sources.filter { re.containsMatchIn(it.readText()) }.map { it.name }.toSet() }
+        assertEquals(setOf("VehicleWriteGate.kt"), builders("ClearCodesPermit"))
+        assertEquals(setOf("VehicleWriteGate.kt"), builders("ClearCodesToken"))
         // Tests too: nothing outside the gate builds a permit or token by hand.
         val tests = File("src/test/java").walkTopDown().filter { it.extension == "kt" && it.name != "ClearCodesSafetyTest.kt" }
-        assertTrue(tests.none { "ClearCodesPermit(" in it.readText() || "ClearCodesToken(" in it.readText() })
+        val ctor = Regex("(?<![A-Za-z])(ClearCodesPermit|ClearCodesToken)\\(")
+        assertTrue(tests.none { ctor.containsMatchIn(it.readText()) })
         assertEquals(setOf("Elm327Session.kt", "ObdManager.kt"), users("sendClearCodes("))
         assertEquals(setOf("Elm327Session.kt"), users("\"04\\r\""))
     }
