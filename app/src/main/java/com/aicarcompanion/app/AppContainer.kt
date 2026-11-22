@@ -139,7 +139,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
     private val internetOnline by lazy {
         internet.state.map { it.online }.stateIn(appScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, internet.state.value.online)
     }
-    override val vehicleRepository: VehicleRepository by lazy { RoomVehicleRepository(database.vehicleDao(), settings) }
+    override val vehicleRepository: VehicleRepository by lazy {
+        RoomVehicleRepository(database.vehicleDao(), settings, onVehicleDeleted = vehiclePhotos::delete)
+    }
     override val historyRepository: VehicleHistoryRepository get() = roomHistory
     override val maintenanceRepository: MaintenanceRepository get() = roomHistory
     override val vehicleCatalog: VehicleCatalogProvider by lazy {
