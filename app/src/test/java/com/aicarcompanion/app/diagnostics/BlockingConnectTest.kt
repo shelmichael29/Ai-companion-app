@@ -1,6 +1,7 @@
 package com.aicarcompanion.app.diagnostics
 
 import com.aicarcompanion.app.diagnostics.bluetooth.blockingConnectWithCancellation
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -35,7 +36,7 @@ class BlockingConnectTest {
         val unblock = CountDownLatch(1)
         val entered = CountDownLatch(1)
         val closed = AtomicBoolean(false)
-        val job = launch {
+        val job = launch(Dispatchers.Default) {
             blockingConnectWithCancellation(5_000, {
                 closed.set(true)
                 unblock.countDown()
