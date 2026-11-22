@@ -37,7 +37,7 @@ class PersonalDetailScrubberTest {
     }
 
     @Test fun `street addresses are removed`() {
-        for (addr in listOf("12 Oak St", "1600 Pennsylvania Ave", "4500 E Main Street", "77 Sunset Blvd.", "9 Old Mill Road")) {
+        for (addr in listOf("12 Oak St", "1600 Pennsylvania Ave", "4500 E Main Street", "77 Sunset Blvd.", "9 Old Mill Road", "12 oak st", "4500 e main street")) {
             val out = scrub("Noise started after I drove to $addr yesterday")
             assertFalse("'$addr' must be removed: $out", out.contains(addr.trimEnd('.')))
             assertTrue(out, out.contains("yesterday"))
