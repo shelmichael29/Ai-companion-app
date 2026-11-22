@@ -28,6 +28,8 @@ class RoomVehicleRepository(
     private val dao: VehicleDao,
     private val settings: SettingsStore,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Remove files kept outside Room once the corresponding record has been deleted. */
+    private val onVehicleDeleted: (String) -> Unit = {},
 ) : VehicleRepository {
 
     override val vehicles: Flow<List<Vehicle>> = dao.observeAll().map { list -> list.map { it.toDomain() } }
@@ -47,6 +49,7 @@ class RoomVehicleRepository(
 
     override suspend fun delete(id: String) {
         dao.delete(id)
+        onVehicleDeleted(id)
         if (settings.settings.value.activeVehicleId == id) {
             val next = dao.firstId()
             settings.update { it.copy(activeVehicleId = next) }
