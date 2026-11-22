@@ -34,6 +34,7 @@ class AndroidSpeechOutput(
     override val state: StateFlow<SpeechOutputState> = _state.asStateFlow()
 
     private val speakMutex = Mutex()
+    private val finishLock = Any()
     @Volatile private var current: Pair<String, CompletableDeferred<SpeakResult>>? = null
     @Volatile private var config = VoiceConfig()
     private var tts: TextToSpeech = create(null)
@@ -89,11 +90,13 @@ class AndroidSpeechOutput(
     }
 
     private fun finish(result: SpeakResult, callbackUtteranceId: String? = null) {
-        val c = current ?: return
-        // An interrupted TTS engine can deliver callbacks after the next utterance starts.
-        // Never complete or release audio focus for the wrong request.
-        if (callbackUtteranceId != null && !VoiceTuning.isCurrentUtterance(c.first, callbackUtteranceId)) return
-        current = null
+        val c = synchronized(finishLock) {
+            val active = current ?: return
+            // An interrupted TTS engine can call back after a newer utterance starts.
+            if (callbackUtteranceId != null && !VoiceTuning.isCurrentUtterance(active.first, callbackUtteranceId)) return
+            current = null // Atomic with the identity check: only one callback may release focus.
+            active
+        }
         c.second.complete(result)
         focus.release()
         if (_state.value == SpeechOutputState.Speaking) _state.value = SpeechOutputState.Ready
