@@ -48,6 +48,30 @@ class ModuleDiagnosticsTest {
         assertEquals(ModuleReply.InvalidVin, read(fake))
     }
 
+    @Test fun `one failed module connection does not abort the next ECU`() = runTest {
+        val fake = connected()
+        fake.tcpResponder[6801] = { request ->
+            listOf(1L to Sim.diag(request[7].toInt() and 0xFF, 0xF4, 0x7E, 0))
+        }
+        var first = true
+        val flaky = object : EnetTransport by fake {
+            override suspend fun connectTcp(local: Ipv4Address, target: Ipv4Address, port: Int, timeoutMillis: Long): TcpChannel {
+                if (first) {
+                    first = false
+                    throw java.net.ConnectException("simulated refused connection")
+                }
+                return fake.connectTcp(local, target, port, timeoutMillis)
+            }
+        }
+        val results = mutableListOf<ModuleReply>()
+        ModuleDiagnostics(flaky) { currentTime }.run(Sim.LINK, Sim.CAR, 1000, false, {}, { _, reply ->
+            results += reply
+        }, selectedModules = listOf(F10Module.DME, F10Module.EGS))
+        assertEquals(ModuleReply.TransportError("simulated refused connection"), results[0])
+        assertEquals(ModuleReply.Positive(), results[1])
+        assertEquals(1, fake.tcpClosed)
+    }
+
     @Test fun scanSeparatesModuleRepliesFromTransportAndSilence() = runTest {
         val fake = connected()
         fake.tcpResponder[6801] = { request ->
