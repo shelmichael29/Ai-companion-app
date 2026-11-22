@@ -16,8 +16,10 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 | Model delegation agents (Haiku / Sonnet / Opus) | Config only; CI green |
 | Gemini primary routing (#37); offline knowledge pack (#40) | CI green at merge |
 | VIN scanner, decoder and recalls (#41) | 506 tests, 0 failed |
-| Drive (Phase 3), branch `feature/drive-screen`, not merged | See `docs/QUALITY_SUMMARY.md`; hardware checks pending |
 | Recall accuracy and reporting (v0.7.1, build 8) (#45) | 562 tests, 0 failed; ✅ verified on the phone |
+| Clear codes (#58) | 717 tests, 0 failed; safety review passed with fixes; real-car test pending |
+| Phase 2 Live Data workspace (#59) | 799 tests, 0 failed; device and adapter checks pending |
+| Drive, Phase 3 (#60, merged with owner approval) | 949 tests, 0 failed; privacy review passed with fixes; device checks pending |
 | VIN scanner and recalls, device check | ✅ Galaxy S26 Ultra, build 0.7.1 (8), 2026-11-21, by the owner |
 
 ## Active pull requests
@@ -27,7 +29,7 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 
 ## Outstanding tasks
 - **Owner:** done, as reported by the owner on 2026-11-21: the `DEBUG_KEYSTORE_BASE64` secret, the App Check debug token, and the "Fresh" tag.
-- **Gemini personal details:** decided on 2026-11-21: option 2, automatic scrubbing before anything is sent to Gemini. Being built in its own PR.
+- **Gemini personal details:** decided on 2026-11-21: option 2, automatic scrubbing before anything is sent to Gemini. Built and merged (#51, `PersonalDetailScrubber`).
 - **Device verification:** see below.
 
 ## Known issues
