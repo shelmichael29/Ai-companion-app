@@ -16,17 +16,19 @@ import androidx.core.content.ContextCompat
 import com.aicarcompanion.app.diagnostics.obd.AdapterDevice
 import com.aicarcompanion.app.diagnostics.obd.AdapterRadio
 import com.aicarcompanion.app.diagnostics.obd.ElmLink
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 
 enum class BluetoothAvailability { READY, NO_PERMISSION, DISABLED, NOT_SUPPORTED }
 
@@ -156,23 +158,27 @@ class BluetoothGateway(
             val socket = try { create(remote) } catch (e: IOException) {
                 last = AdapterConnectException(ConnectFailure.ADAPTER_UNAVAILABLE, e.message); continue
             }
-            val timedOut = AtomicBoolean(false)
-            val watchdog = launch {
-                delay(connectTimeoutMillis)
-                timedOut.set(true)
-                runCatching { socket.close() } // aborts a blocked connect()
-            }
+            var handedOff = false
             try {
-                socket.connect()
-                watchdog.cancel()
-                return@withContext StreamElmLink(socket.inputStream, socket.outputStream) { runCatching { socket.close() } }
+                blockingConnectWithCancellation(connectTimeoutMillis, { runCatching { socket.close() } }) {
+                    socket.connect()
+                }
+                // Cancellation between connect and handing the stream to the caller still
+                // closes the socket instead of leaving a hidden Bluetooth session.
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                val link = StreamElmLink(socket.inputStream, socket.outputStream) {
+                    runCatching { socket.close() }
+                }
+                handedOff = true
+                return@withContext link
+            } catch (e: TimeoutCancellationException) {
+                last = AdapterConnectException(ConnectFailure.TIMEOUT, "Bluetooth connection timed out")
+            } catch (e: CancellationException) {
+                throw e // Explicit cancel must never trigger the insecure fallback.
             } catch (e: IOException) {
-                watchdog.cancel()
-                runCatching { socket.close() }
-                last = AdapterConnectException(
-                    if (timedOut.get()) ConnectFailure.TIMEOUT else ConnectFailureClassifier.classify(e),
-                    e.message,
-                )
+                last = AdapterConnectException(ConnectFailureClassifier.classify(e), e.message)
+            } finally {
+                if (!handedOff) runCatching { socket.close() }
             }
         }
         throw last ?: AdapterConnectException(ConnectFailure.UNKNOWN)

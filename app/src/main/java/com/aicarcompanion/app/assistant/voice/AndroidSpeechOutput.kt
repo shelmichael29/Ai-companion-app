@@ -34,6 +34,7 @@ class AndroidSpeechOutput(
     override val state: StateFlow<SpeechOutputState> = _state.asStateFlow()
 
     private val speakMutex = Mutex()
+    private val finishLock = Any()
     @Volatile private var current: Pair<String, CompletableDeferred<SpeakResult>>? = null
     @Volatile private var config = VoiceConfig()
     private var tts: TextToSpeech = create(null)
@@ -65,12 +66,24 @@ class AndroidSpeechOutput(
         engine.setSpeechRate(VoiceTuning.rate(config.rate))
         engine.setPitch(VoiceTuning.pitch(config.pitch))
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String) { _state.value = SpeechOutputState.Speaking }
-            override fun onDone(utteranceId: String) { if (utteranceId.endsWith(LAST)) finish(SpeakResult.Completed) }
-            override fun onStop(utteranceId: String, interrupted: Boolean) = finish(SpeakResult.Interrupted)
+            override fun onStart(utteranceId: String) {
+                synchronized(finishLock) {
+                    val active = current ?: return
+                    if (VoiceTuning.isCurrentUtterance(active.first, utteranceId)) {
+                        _state.value = SpeechOutputState.Speaking
+                    }
+                }
+            }
+            override fun onDone(utteranceId: String) {
+                if (utteranceId.endsWith(LAST)) finish(SpeakResult.Completed, utteranceId)
+            }
+            override fun onStop(utteranceId: String, interrupted: Boolean) =
+                finish(SpeakResult.Interrupted, utteranceId)
             @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String) = finish(SpeakResult.Failed("Speech engine error"))
-            override fun onError(utteranceId: String, errorCode: Int) = finish(SpeakResult.Failed("Speech engine error $errorCode"))
+            override fun onError(utteranceId: String) =
+                finish(SpeakResult.Failed("Speech engine error"), utteranceId)
+            override fun onError(utteranceId: String, errorCode: Int) =
+                finish(SpeakResult.Failed("Speech engine error $errorCode"), utteranceId)
         })
         _state.value = SpeechOutputState.Ready
     }
@@ -83,12 +96,17 @@ class AndroidSpeechOutput(
         return ok(engine.setLanguage(Locale.getDefault())) || ok(engine.setLanguage(Locale.US))
     }
 
-    private fun finish(result: SpeakResult) {
-        val c = current ?: return
-        current = null
-        c.second.complete(result)
+    private fun finish(result: SpeakResult, callbackUtteranceId: String? = null) {
+        val c = synchronized(finishLock) {
+            val active = current ?: return
+            // An interrupted TTS engine can call back after a newer utterance starts.
+            if (callbackUtteranceId != null && !VoiceTuning.isCurrentUtterance(active.first, callbackUtteranceId)) return
+            current = null // Atomic with the identity check: only one callback may release focus.
+            active
+        }
         focus.release()
         if (_state.value == SpeechOutputState.Speaking) _state.value = SpeechOutputState.Ready
+        c.second.complete(result)
     }
 
     override suspend fun speak(text: String): SpeakResult = speakMutex.withLock {
