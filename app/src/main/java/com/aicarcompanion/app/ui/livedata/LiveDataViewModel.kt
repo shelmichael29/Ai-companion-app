@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -75,7 +76,12 @@ class LiveDataViewModel(
         }
     }.map { (id, all, activeId) -> Triple(id, all, all.firstOrNull { it.id == activeId } ?: all.firstOrNull()) }
 
-    private val requested = combine(layouts, tab) { (id, all, active), t ->
+    // Rendering and sensor selection share one set of Room observers while the UI is collected.
+    private val visibleLayouts = layouts.shareIn(
+        viewModelScope, SharingStarted.WhileSubscribed(replayExpirationMillis = 0), replay = 1,
+    )
+
+    private val requested = combine(visibleLayouts, tab) { (id, all, active), t ->
         when {
             id == null || all.isEmpty() -> emptySet()
             t == WorkspaceTab.ALL_SENSORS -> LiveSensorCatalog.all.map { it.pid }.toSet()
@@ -97,7 +103,7 @@ class LiveDataViewModel(
     }
 
     val state: StateFlow<LiveDataUiState> = combine(
-        layouts, tab, editing, states, combine(history, obd.state, notice) { h, o, n -> Triple(h, o, n) },
+        visibleLayouts, tab, editing, states, combine(history, obd.state, notice) { h, o, n -> Triple(h, o, n) },
     ) { (id, all, active), t, e, s, (h, o, n) ->
         LiveDataUiState(id != null, all, active, t, e && t == WorkspaceTab.DASHBOARD, s, h, o, n)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LiveDataUiState())
@@ -113,7 +119,7 @@ class LiveDataViewModel(
         when (val r = created.rename(name)) {
             is LayoutResult.Changed -> {
                 dashboards.save(r.layout)
-                dashboards.setActive(vid, r.layout.id)
+                dashboards.setActive(r.layout.vehicleId, r.layout.id)
                 editing.value = true
             }
             is LayoutResult.Rejected -> notice.value = message(r.error)
@@ -122,10 +128,10 @@ class LiveDataViewModel(
 
     fun renameLayout(name: String) = edit { it.rename(name) }
 
-    fun deleteLayout() = launchFor { vid ->
-        val current = layouts.first().third ?: return@launchFor
+    fun deleteLayout() = viewModelScope.launch {
+        val current = layouts.first().third ?: return@launch
         dashboards.delete(current.id)
-        dashboards.setActive(vid, null)
+        dashboards.setActive(current.vehicleId, null)
     }
 
     fun addGauge(pid: Int) {
@@ -139,12 +145,12 @@ class LiveDataViewModel(
     fun restyleGauge(pid: Int, style: GaugeStyle) = edit { it.restyle(pid, style) }
     fun setGaugeUnit(pid: Int, unit: UnitChoice) = edit { it.setUnit(pid, unit) }
 
-    private fun edit(change: (DashboardLayout) -> LayoutResult) = launchFor { vid ->
-        val current = layouts.first().third ?: return@launchFor
+    private fun edit(change: (DashboardLayout) -> LayoutResult) = viewModelScope.launch {
+        val current = layouts.first().third ?: return@launch
         when (val r = change(current)) {
             is LayoutResult.Changed -> {
                 dashboards.save(r.layout)
-                dashboards.setActive(vid, r.layout.id)
+                dashboards.setActive(r.layout.vehicleId, r.layout.id)
             }
             is LayoutResult.Rejected -> notice.value = message(r.error)
         }
