@@ -4,6 +4,7 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 
 | Date | Stage | Automated gate | Tests | Lint (err/warn) | Detekt | Device testing | Status |
 |---|---|---|---|---|---|---|---|
+| 2026-11-23 | Android audit, dependency and lifecycle fixes | GitHub debug gates passed separately ([audit](https://github.com/shelmichael29/Ai-companion-app/actions/runs/45228040564), [Gemini](https://github.com/shelmichael29/Ai-companion-app/actions/runs/45226564887), [lifecycle](https://github.com/shelmichael29/Ai-companion-app/actions/runs/45228505827)) | Per-run reports | See reports | PASS | Pending phone and adapter | NEEDS MANUAL VERIFICATION |
 | 2026-11-22 | Drive (Phase 3): media, messages, calls, capability-only car controls | PASS (local, --release) | 949 run, 0 failed | 0 / 2 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-22 | Phase 2: Live Data workspace (gauges, layouts, All sensors, DB v2) | PASS (local, --release) | 799 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |
 | 2026-11-22 | Clear codes (Mode 04 via VehicleWriteGate, DIY/Advanced) | PASS (local, --release) | 717 run, 0 failed | 0 / 1 | 0 | NOT RUN | NEEDS MANUAL VERIFICATION |

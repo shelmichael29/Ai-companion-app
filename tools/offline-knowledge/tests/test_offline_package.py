@@ -1,3 +1,5 @@
+from contextlib import closing
+
 import json
 import sqlite3
 import subprocess
@@ -24,7 +26,7 @@ class KnowledgePackageTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'knowledge.sqlite'
             subprocess.run([sys.executable,str(ROOT/'scripts'/'build_database.py'),'--db',str(path)],check=True,capture_output=True,text=True)
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 guides=db.execute('SELECT COUNT(*) FROM symptom_guide').fetchone()[0]
                 self.assertGreaterEqual(guides,20)
                 warnings=db.execute("SELECT warning FROM symptom_guide WHERE guide_id='engine_overheat'").fetchone()
@@ -45,7 +47,7 @@ class KnowledgePackageTest(unittest.TestCase):
             epazip=base/'vehicles.csv.zip'
             with zipfile.ZipFile(epazip,'w') as zf:
                 zf.writestr('vehicles.csv','id,year,make,model,displ,cylinders,trany,drive,fuelType,city08,highway08,comb08\n90001,2011,BMW,528i,3.0,6,Automatic,Rear-Wheel Drive,Premium,18,27,21\n')
-            with sqlite3.connect(':memory:') as db:
+            with closing(sqlite3.connect(':memory:')) as db:
                 db.executescript(m.SCHEMA)
                 self.assertEqual(m.import_dtc(db,generic),1)
                 self.assertEqual(m.import_pids(db,pid,'mode01'),1)
