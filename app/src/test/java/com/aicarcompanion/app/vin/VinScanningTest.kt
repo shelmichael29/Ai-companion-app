@@ -17,7 +17,7 @@ class VinScanningTest {
     /** A different VIN with a correct check digit. */
     private fun otherVin(): String {
         val body = "1HGCM82033A004352".toCharArray()
-        body[8] = VinValidator.checkDigit(String(body))!!
+        body[8] = VinValidator.checkDigit(String(body))
         return String(body)
     }
 

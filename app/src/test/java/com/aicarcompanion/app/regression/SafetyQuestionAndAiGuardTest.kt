@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.aicarcompanion.app.regression
 
 import com.aicarcompanion.app.ai.AiChatClient

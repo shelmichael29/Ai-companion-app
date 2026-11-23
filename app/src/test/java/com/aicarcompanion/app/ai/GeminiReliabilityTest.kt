@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.aicarcompanion.app.ai
 
 import com.aicarcompanion.app.assistant.conversation.AssistantRequest

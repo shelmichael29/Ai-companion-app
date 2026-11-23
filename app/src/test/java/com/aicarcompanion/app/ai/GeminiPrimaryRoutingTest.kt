@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.aicarcompanion.app.ai
 
 import com.aicarcompanion.app.assistant.VoiceSession
@@ -242,7 +244,7 @@ class GeminiPrimaryRoutingTest {
         assertEquals("the fallback saves it, the AI path doesn't too", 2, saved.size)
     }
 
-    @Test fun `asking for codes with "anyway" still reads them`() {
+    @Test fun `asking for codes with anyway still reads them`() {
         val parser = CommandParser { "Penelope" }
         val q = "What are my codes anyway?"
         assertEquals(AiRouting.Route.DATA_THEN_AI, AiRouting.route(parser.parse(q), parser.normalize(q)))

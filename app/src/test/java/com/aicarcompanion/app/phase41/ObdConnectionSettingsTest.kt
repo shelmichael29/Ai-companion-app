@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.aicarcompanion.app.phase41
 
 import com.aicarcompanion.app.data.local.ExplanationLevel

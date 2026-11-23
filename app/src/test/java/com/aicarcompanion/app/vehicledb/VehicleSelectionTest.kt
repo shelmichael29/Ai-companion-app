@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.aicarcompanion.app.vehicledb
 
 import com.aicarcompanion.app.data.vehicledb.FuelEconomyCatalogProvider
