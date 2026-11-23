@@ -68,7 +68,6 @@ android {
         abortOnError = true
         checkReleaseBuilds = true
         checkDependencies = true
-        sarifReport = true
         // Version-update notices are handled by Dependabot pull requests instead of lint warnings.
         disable += setOf("GradleDependency", "NewerVersionAvailable", "AndroidGradlePluginVersion")
     }
@@ -90,6 +89,12 @@ ksp {
 }
 
 dependencies {
+    constraints {
+        implementation("com.google.guava:guava:33.7.2-android") {
+            because("Earlier versions are affected by GHSA-xxph-c9ww-hj94")
+        }
+    }
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -113,7 +118,6 @@ dependencies {
     implementation(libs.mlkit.text.recognition)
 
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
     // Gemini through Firebase AI Logic (no API key in the app), protected by App Check.

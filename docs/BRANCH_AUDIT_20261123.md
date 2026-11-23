@@ -67,3 +67,10 @@ Deletion requires owner approval and a fresh check of tip, open PR heads and bas
 | `feature/enet-expanded-module-selection` | `2fd141ce` | ENET history: verify counterpart in Enet-Development | #52 → experiment/bmw-enet-tester |
 | `fix/audit-privacy-reliability-20261122` | `64a508df` | Tip not proven integrated into main | #56 → main |
 | `fix/enet-scan-continuation-20261122` | `eab1b6b1` | ENET history: verify counterpart in Enet-Development | #57 → experiment/bmw-enet-tester |
+
+
+## Cleanup outcome
+
+Deleted the 38 merged branches and five additional ENET branches from Penelope. Four ENET tips matched the separate repository exactly. The fifth, `ccr-287aa85e-dsi4kt`, added two documentation commits above its transferred tester history. The owner also approved deleting the legacy setup branch, whose tip tree matches its main parent, and the superseded AGP 9.5.1 branch. Neither had an open PR dependency.
+
+The remaining original heads are `main`, the unmerged privacy and reliability audit, and the two closed dependency proposals for Gradle 9.9.2 and AGP 9.5.2. The active audit PRs target main independently.
