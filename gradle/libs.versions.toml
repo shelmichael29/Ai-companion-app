@@ -16,7 +16,7 @@ orgJson = "20260814"
 firebaseBom = "35.2.0"
 googleServices = "4.6.0"
 crashlyticsPlugin = "3.0.8"
-robolectric = "4.18"
+robolectric = "4.18.1"
 detekt = "1.23.8"
 kover = "0.9.11"
 
