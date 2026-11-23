@@ -15,6 +15,8 @@ import com.aicarcompanion.app.domain.model.EngineSpec
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.domain.model.Vehicle
 import com.aicarcompanion.app.domain.repository.DiagnosticsRepository
+import com.aicarcompanion.app.domain.repository.DashboardRepository
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -86,6 +88,19 @@ class LiveDataViewModelTest {
         val active = vm.state.value.active!!
         assertEquals(DashboardLayout.DEFAULT_NAME, active.name)
         assertEquals(LiveSensorCatalog.defaultPids.toSet(), diagnostics.requests.last())
+    }
+
+    @Test fun `rendering and sensor selection share one dashboard subscription`() = runTest {
+        var subscriptions = 0
+        val repository = object : DashboardRepository by dashboards {
+            override fun layouts(vehicleId: String) = dashboards.layouts(vehicleId).onStart { subscriptions++ }
+        }
+        val vm = LiveDataViewModel(InMemoryVehicleRepository(listOf(car)), diagnostics, FakeObd(), repository)
+        watch(vm)
+        runCurrent()
+        assertNotNull(vm.state.value.active)
+        assertTrue(diagnostics.requests.isNotEmpty())
+        assertEquals(1, subscriptions)
     }
 
     @Test fun `adding removing and resizing are saved per vehicle and change what is requested`() = runTest {
