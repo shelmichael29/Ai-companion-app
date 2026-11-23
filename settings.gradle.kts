@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "AiCarCompanion"
 include(":app")
-// The experimental BMW ENET tester is kept out of main, on the experiment/* branches.
+// The experimental BMW ENET tester is not part of Penelope; it lives in the separate Enet-Development repository.

@@ -25,7 +25,7 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 ## Active pull requests
 | PR | What | State |
 |---|---|---|
-| #11 | ENET tester (experimental) | Kept open and separate on purpose |
+| — | None open. ENET work moved to the separate `Enet-Development` repository (2026-11-23) | — |
 
 ## Outstanding tasks
 - **Owner:** done, as reported by the owner on 2026-11-21: the `DEBUG_KEYSTORE_BASE64` secret, the App Check debug token, and the "Fresh" tag.
