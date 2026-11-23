@@ -142,7 +142,7 @@ class OfflineKnowledgeTest {
         return RuleBasedReasoningProvider(CommandParser { "Penelope" }, { ctx }, NoAdapterDiagnosticCommandHandler, GenericDtcCatalog, offline = offline)
     }
 
-    @Test fun `asking about recalls gives the model's campaigns and the VIN check, never a claim about this car`() = runTest {
+    @Test fun `recalls distinguish model campaigns from VIN status`() = runTest {
         val r = rules().respond(AssistantRequest("Are there any recalls on my car?", "Penelope"))
         assertEquals(ReplyBasis.OFFLINE_REFERENCE, r.basis)
         assertTrue(r.text.startsWith("NHTSA lists 4 recall campaigns for the 2011 BMW 528i"))
@@ -224,7 +224,7 @@ class OfflineKnowledgeTest {
         assertTrue(com.aicarcompanion.app.diagnostics.knowledge.VehicleRecords.ratingAnswer("2021 Ford Mustang", ratings).contains("between 4 and 5"))
     }
 
-    @Test fun `a described symptom gives Gemini the matching triage guide, and emergencies stay built-in`() = runTest {
+    @Test fun `symptoms use triage and emergencies stay local`() = runTest {
         val c = Recorder()
         val p = gemini(c)
         p.respond(AssistantRequest("My AC isn't blowing cold air", "Penelope"))
@@ -261,7 +261,7 @@ class OfflineKnowledgeTest {
         override suspend fun specs(configurationId: String) = LookupResult.Failure(LookupError.OFFLINE)
     }
 
-    @Test fun `the vehicle list uses the online service first and the offline copy when it can't be reached`() = runTest {
+    @Test fun `vehicle list falls back to the offline catalog`() = runTest {
         val fallback = FallbackVehicleCatalog(Failing(), OfflineEpaCatalog(kb))
         val models = fallback.models(2011, "BMW") as LookupResult.Success
         assertTrue(models.fromCache)
