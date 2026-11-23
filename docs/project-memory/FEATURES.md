@@ -45,7 +45,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 - **Platform:** iOS app; `targetSdk` 37.
 
 ## Deferred (⏸) or experimental
-- **BMW ENET tester:** experimental, only on `experiment/*` branches (PR #11). Not part of Penelope.
+- **BMW ENET tester:** experimental, lives in the separate `Enet-Development` repository. Not part of Penelope.
 - **Clear trouble codes:** only ever as a separate, explicit, confirmed feature. Never automatic.
 - **Vehicle simulation mode:** excluded from recent phases by the owner.
 - **Becoming the phone's default dialer:** not planned (`docs/HANDS_FREE.md`).
