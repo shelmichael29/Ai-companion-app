@@ -13,6 +13,11 @@ object ReplyGuard {
     private val CLAIMS_CURRENT = Regex("\\b(your|currently|right now|is reading|reads|reading)\\b", RegexOption.IGNORE_CASE)
     /** "Coolant is 130 degrees.": a bare present-tense value is a claim too. */
     private val STATES_VALUE = Regex("\\b(is|are|was|reads?|sits? at)\\s+(now\\s+)?(about|around|roughly|approximately|nearly|almost)?\\s*\\d", RegexOption.IGNORE_CASE)
+    /** Sensor labels followed by a numeric value also assert a reading, even without "is". */
+    private val LABELED_READING = Regex(
+        """\b(?:coolant|oil|battery|engine|vehicle|transmission|intake|boost|fuel|rpm|speed|voltage|temperature|pressure)\b[^.!?\n]{0,35}[:=]\s*(?:about|around|roughly|approximately)?\s*\d""",
+        RegexOption.IGNORE_CASE,
+    )
     /** General knowledge ("normally runs between…"). Hedges like "about" or "around" don't count. */
     private val NORMATIVE = Regex("\\b(normal|normally|typical|typically|usually|should|most cars|most engines|ideal|generally|healthy|fully charged|between|range|at rest|at idle|boils|freezes|recommended|rated)\\b", RegexOption.IGNORE_CASE)
     /** "Your coolant is at 130 degrees": a value stated for this car, however it's worded. */
@@ -69,8 +74,10 @@ object ReplyGuard {
         val invented = sentences.any { s ->
             val values = NUMBER_UNIT.findAll(s).toList()
             if (values.isEmpty()) return@any false
-            val claim = CLAIMS_CURRENT.containsMatchIn(s) || STATES_VALUE.containsMatchIn(s)
-            val generalKnowledge = NORMATIVE.containsMatchIn(s) && !CLAIMS_NOW.containsMatchIn(s) && !YOUR_VALUE.containsMatchIn(s)
+            val labeledReading = LABELED_READING.containsMatchIn(s)
+            val claim = CLAIMS_CURRENT.containsMatchIn(s) || STATES_VALUE.containsMatchIn(s) || labeledReading
+            val generalKnowledge = NORMATIVE.containsMatchIn(s) && !CLAIMS_NOW.containsMatchIn(s) &&
+                !YOUR_VALUE.containsMatchIn(s) && !labeledReading
             claim && !generalKnowledge && values.any { (normalize(it.groupValues[1]) to kind(it.groupValues[2])) !in verified }
         }
         return if (invented) Violation.UNVERIFIED_READING else null

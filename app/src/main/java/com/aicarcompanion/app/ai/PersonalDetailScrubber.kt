@@ -24,6 +24,7 @@ object PersonalDetailScrubber {
     /** "12 Oak St", "1600 Pennsylvania Ave", "4500 E Main Street": a house number, capitalized words, a street type. */
     private val ADDRESS = Regex(
         """\b\d{1,6}\s+(?:[A-Z][A-Za-z.'-]*\s+){1,4}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Circle|Cir|Parkway|Pkwy|Highway|Hwy|Terrace|Trail)\b\.?""",
+        RegexOption.IGNORE_CASE,
     )
 
     /** 17 VIN characters mixing letters and digits. */
