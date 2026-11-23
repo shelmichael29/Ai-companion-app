@@ -4,6 +4,7 @@
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(__file__))
 import secret_scan  # noqa: E402
@@ -28,6 +29,21 @@ class SecretScanTest(unittest.TestCase):
 
     def test_ordinary_code_is_clean(self):
         self.assertEqual(set(), self.kinds("a.kt", 'val model = "gemini-3.8-flash"; val id = "0123456789ABCDEF0"'))
+
+    def test_history_rechecks_changed_blobs_and_paths(self):
+        vin = "WBA" + "FR7C5" + "5BC" + "123456"
+        trees = {"one": [("app/test/A.kt", "a")],
+                 "two": [("app/test/A.kt", "a"), ("A.kt", "a")],
+                 "three": [("A.kt", "b")]}
+        def fake_git(command, *args):
+            if command == "ls-tree":
+                return "".join(f"100644 blob {oid}\t{path}\0" for path, oid in trees[args[-1]])
+            return vin if args[-1] == "a" else "clean"
+        seen = set()
+        with patch.object(secret_scan, "git", side_effect=fake_git) as reader:
+            results = [secret_scan.scan_tree(ref, seen) for ref in trees]
+        self.assertEqual(results, [[], [("two:A.kt", 1, "possible VIN")], []])
+        self.assertEqual(sum(call.args[0] == "cat-file" for call in reader.call_args_list), 3)
 
     def test_forbidden_files(self):
         for name in ["app/google-services.json", "release.jks", "local.properties", "phone.logcat"]:

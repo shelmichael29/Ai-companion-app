@@ -68,21 +68,35 @@ def scan_text(path: str, text: str) -> list[tuple[str, int, str]]:
     return found
 
 
-def scan_tree(ref: str | None = None) -> list[tuple[str, int, str]]:
-    files = git("ls-files").splitlines() if ref is None else git("ls-tree", "-r", "--name-only", ref).splitlines()
+def scan_tree(ref: str | None = None, scanned: set[tuple[str, str]] | None = None) -> list[tuple[str, int, str]]:
+    if ref is None:
+        entries = [(path, None) for path in git("ls-files", "-z").split("\0") if path]
+    else:
+        entries = []
+        for entry in git("ls-tree", "-rz", ref).split("\0"):
+            if not entry:
+                continue
+            metadata, path = entry.split("\t", 1)
+            _, kind, oid = metadata.split()
+            if kind == "blob":
+                entries.append((path, oid))
     findings: list[tuple[str, int, str]] = []
-    for path in files:
+    for path, oid in entries:
+        if oid is not None and scanned is not None:
+            if (path, oid) in scanned:
+                continue
+            scanned.add((path, oid))
         label = path if ref is None else f"{ref[:7]}:{path}"
         if any(p.search(path) for p in FORBIDDEN_FILES):
             findings.append((label, 0, "file that must never be committed"))
             continue
         try:
-            text = open(path, encoding="utf-8", errors="ignore").read() if ref is None else git("show", f"{ref}:{path}")
-        except (OSError, subprocess.CalledProcessError):
+            text = open(path, encoding="utf-8", errors="ignore").read() if ref is None else git("cat-file", "blob", oid)
+        except FileNotFoundError:
             continue
         if "\0" in text[:4096]:
             continue  # binary
-        findings.extend(scan_text(label, text))
+        findings.extend((label, line, kind) for _, line, kind in scan_text(path, text))
     return findings
 
 
@@ -90,8 +104,9 @@ def main() -> int:
     findings = scan_tree()
     if "--history" in sys.argv:
         seen = {(f[0], f[2]) for f in findings}
+        scanned: set[tuple[str, str]] = set()
         for commit in git("rev-list", "--all").split():
-            for f in scan_tree(commit):
+            for f in scan_tree(commit, scanned):
                 key = (f[0].split(":", 1)[1], f[2])
                 if key not in seen:
                     seen.add(key)
