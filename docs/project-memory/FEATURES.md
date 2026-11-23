@@ -27,13 +27,13 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | Offline knowledge pack: 9,533 generic + 6,368 make-specific codes, 35,869 EPA vehicles, 20,128 recall campaigns, 8,432 crash ratings, 24 symptom guides | #40 | `docs/OFFLINE_KNOWLEDGE.md` |
 | Claude Code model delegation agents (developer tooling, not an app feature) | #35 | `CLAUDE.md`, `.claude/agents/` |
 | Phase 1 UI redesign: distinct Everyday / DIY / Advanced (black-and-grey) dashboards, per-level navigation, Drive placeholder, Live Data, More | #53 | `docs/PHASE1_UI.md` |
-| Phase 2 Live Data workspace (DIY/Advanced): add, remove, reorder and resize gauges; analog, digital, numeric, line graph and status styles; units; named layouts per vehicle (max 8 sensors); All sensors list; demand-driven poller paused during Clear codes; Room v2 | branch `feature/live-data-workspace` (not merged) | `docs/PHASE2_LIVE_DATA.md` |
-| Drive (Phase 3): shared Drive screen on all levels. Media keys or session control and volume; read and reply to message notifications and call handoff (confirmed by voice or button); capability-only, all-unavailable car controls. No new permissions. Answering calls and calling by name deferred | branch `feature/drive-screen` (not merged) | `docs/HANDS_FREE.md`, `docs/IOS_DRIVE_NOTES.md` |
+| Phase 2 Live Data workspace (DIY/Advanced): add, remove, reorder and resize gauges; analog, digital, numeric, line graph and status styles; units; named layouts per vehicle (max 8 sensors); All sensors list; demand-driven poller paused during Clear codes; Room v2 | #59 | `docs/PHASE2_LIVE_DATA.md` |
+| Clear codes (Mode 04) for DIY and Advanced: confirmation gate, engine-off check, re-read and history note | #58 | `docs/CLEAR_CODES.md` |
+| Drive (Phase 3): shared Drive screen on all levels. Media keys or session control and volume; read and reply to message notifications and call handoff (confirmed by voice or button); capability-only, all-unavailable car controls. No new permissions. Answering calls and calling by name deferred | #60 | `docs/HANDS_FREE.md`, `docs/IOS_DRIVE_NOTES.md` |
 
 ## In progress (🔵)
 | Item | Where |
 |---|---|
-| Clear codes (Mode 04) for DIY and Advanced: confirmation gate, engine-off check, re-read and history note (`docs/CLEAR_CODES.md`) | branch `feature/clear-codes` (PR open; safety review and device test pending) |
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
 
 ## Proposed (📋)
