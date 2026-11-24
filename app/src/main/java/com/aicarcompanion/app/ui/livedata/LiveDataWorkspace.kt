@@ -27,7 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -173,7 +173,7 @@ private fun Notice(text: String, c: LiveColors, onDismiss: () -> Unit) {
 
 @Composable
 private fun Tabs(selected: WorkspaceTab, c: LiveColors, onTab: (WorkspaceTab) -> Unit) {
-    TabRow(
+    SecondaryTabRow(
         selectedTabIndex = selected.ordinal, containerColor = c.panel, contentColor = c.primary,
         modifier = Modifier.fillMaxWidth(),
     ) {

@@ -12,10 +12,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
+
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -82,7 +84,7 @@ fun ConnectionStatusSection(vm: ConnectionStatusViewModel, level: ExplanationLev
     val lastAnswer by vm.lastAnswer.collectAsStateWithLifecycle()
     val technical = level != ExplanationLevel.EVERYDAY
     val summary = connectionSummary(obd, internet, ai, technical)
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         StatusLine("Your car", summary.vehicle, summary.vehicleDetail)
         StatusLine("Internet", summary.internet, null)
@@ -102,7 +104,7 @@ fun ConnectionStatusSection(vm: ConnectionStatusViewModel, level: ExplanationLev
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-                    OutlinedButton(onClick = { clipboard.setText(AnnotatedString(vm.log.export())) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Copy log") }
+                    OutlinedButton(onClick = { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Connection log", vm.log.export())) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Copy log") }
                     OutlinedButton(onClick = vm.log::clear, modifier = Modifier.heightIn(min = 48.dp)) { Text("Clear") }
                 }
             }

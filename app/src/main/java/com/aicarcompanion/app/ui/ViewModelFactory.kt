@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.ui
 
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.initializer
@@ -77,7 +78,7 @@ object AppViewModelProvider {
                 hasVehicle = c.vehicleRepository.activeVehicleId.map { it != null },
                 dialerAvailable = {
                     app.packageManager.queryIntentActivities(
-                        android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:5550100")), 0,
+                        android.content.Intent(android.content.Intent.ACTION_DIAL, "tel:5550100".toUri()), 0,
                     ).isNotEmpty()
                 },
                 speak = c::speakGuidance,
