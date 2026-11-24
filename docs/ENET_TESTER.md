@@ -5,6 +5,8 @@ A separate Android app for checking whether a phone can reach a BMW F-series cen
 - **Separate app:** application ID `com.aicarcompanion.enettester` (shown as "ENET Tester (experimental)"), so it installs alongside Penelope.
 - **Penelope is unchanged:** the app, Firebase and Bluetooth OBD-II code aren't touched.
 
+For BMW fault-code reading and the guarded clear (0.4.0), see [BMW fault codes](ENET_DTC.md). For versions, see the [changelog](ENET_CHANGELOG.md).
+
 For the current module catalog, individual/selected/all scan controls, timing, hardware evidence and change record, see [F10 module coverage](ENET_MODULE_COVERAGE.md).
 
 ## Modules
@@ -45,7 +47,7 @@ These are community-documented, not official BMW specifications. They come from 
 4. **Optional connect-only check of DoIP port 13400.** No DoIP messages are sent.
 
 **Safety limits:**
-- **Requests:** `SafeRequest` is a fixed enum containing only TesterPresent (`3E 00`) and Read VIN (`22 F1 90`). No code path accepts user-supplied bytes, so there is no raw command entry. There is no coding, programming, actuator activation, routine control, security access or fault-code clearing.
+- **Requests:** `SafeRequest` is a fixed enum containing only TesterPresent (`3E 00`) and Read VIN (`22 F1 90`). Fault reading uses `ReadRequest`, which only allows services `0x19` and `0x3E`. The one exception is fault-memory clearing (`14 FF FF FF`), which can only be sent with a single-use `ClearGate` authorization after the report is saved and every warning is confirmed ([details](ENET_DTC.md)). No code path accepts user-supplied bytes, so there is no raw command entry. There is no coding, programming, actuator activation, routine control or security access.
 - **Targets:** `TargetPolicy` allows only unicast private or link-local addresses inside the selected interface's subnet. It also refuses an interface with a public address or a network larger than /16. It is checked before any socket opens.
 - **Interfaces:** only Ethernet-transport networks are listed. Wi-Fi, mobile data and VPN can't be selected, and sockets are bound with `Network.bindSocket`.
 - **User action:** no traffic until a button is pressed. One operation runs at a time, every wait has a timeout, and incoming frames are capped at 4 KB.

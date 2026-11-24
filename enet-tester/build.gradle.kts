@@ -6,6 +6,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// Build identifier shown in the app: the short commit it was built from, set automatically.
+val buildId: String = providers.exec {
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.getOrElse("").ifBlank { "local" }
+
 android {
     namespace = "com.aicarcompanion.enettester"
     compileSdk = 35
@@ -14,8 +20,9 @@ android {
         applicationId = "com.aicarcompanion.enettester"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0-experimental"
+        versionCode = 4
+        versionName = "0.4.0-experimental"
+        buildConfigField("String", "BUILD_ID", "\"$buildId\"")
     }
 
     buildTypes {

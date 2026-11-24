@@ -103,8 +103,8 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
         item {
             Text("BMW ENET Connection Tester", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 12.dp).semantics { heading() })
             Text(
-                "Experimental build ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}). Read-only diagnostics. " +
-                    "Nothing is sent until you tap a button.",
+                "Experimental build ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · build ${BuildConfig.BUILD_ID}. " +
+                    "Read-only diagnostics, except the confirmed Clear fault memory action. Nothing is sent until you tap a button.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -309,7 +309,17 @@ private fun TesterScreen(vm: TesterViewModel, onCopy: (String) -> Unit, onShare:
             }
         }
 
-        vm.running?.takeUnless { vm.moduleActive }?.let { msg ->
+        item {
+            Section("7. BMW Diagnostics (fault codes)") {
+                BmwDiagnosticsSection(
+                    vm.faults,
+                    enabled = !busy && localOk && vm.targetText.isNotBlank() && targetProblem == null,
+                    onShare = onShare,
+                )
+            }
+        }
+
+        vm.running?.takeUnless { vm.moduleActive || vm.faults.active }?.let { msg ->
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
                     CircularProgressIndicator(Modifier.padding(end = 12.dp))

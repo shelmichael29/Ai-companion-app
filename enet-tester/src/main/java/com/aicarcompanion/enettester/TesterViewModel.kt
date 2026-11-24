@@ -34,7 +34,7 @@ import java.net.Socket
  * Nothing here touches the network on its own: discovery and connection tests run only from the
  * two buttons. Sockets are bound to the Ethernet network the user selected.
  */
-class TesterViewModel(app: Application) : AndroidViewModel(app) {
+class TesterViewModel(app: Application) : AndroidViewModel(app), DiagnosticsHost {
     private val clock = { SystemClock.elapsedRealtime() }
     val log = EnetLog(clock)
     private var selectedNetwork: android.net.Network? = null
@@ -66,7 +66,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     /** Advanced: TCP connect timeout for the port check and connection test (default 5 s). */
-    var connectTimeoutMillis by mutableLongStateOf(
+    override var connectTimeoutMillis by mutableLongStateOf(
         prefs.getLong(KEY_CONNECT, ConnectionOptions.DEFAULT_CONNECT_TIMEOUT_MILLIS).coerceIn(ConnectionOptions.CONNECT_TIMEOUT_RANGE),
     )
         private set
@@ -108,12 +108,37 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
             monitor.interfaces.collect { interfaces ->
                 val binding = moduleBinding
                 if (binding != null && interfaces[binding.network]?.ipv4 != binding.subnet) cancelModules("Ethernet disconnected")
+                faultNetwork?.let { n -> if (interfaces[n.first]?.ipv4 != n.second) faults.onNetworkLost() }
                 if (discoveryNetwork !in interfaces.keys) {
                     discoveryNetwork = null
                     discovery = null
                 }
             }
         }
+    }
+
+    /** BMW fault reading and guarded clearing (section 7). */
+    val faults = FaultController(app, viewModelScope, this, clock, log)
+    private var faultNetwork: Pair<android.net.Network, com.aicarcompanion.enet.Ipv4Subnet>? = null
+
+    override fun diagnosticTarget(): Triple<EthernetInterface, EnetLink, Ipv4Address>? {
+        val iface = selected() ?: return null
+        val subnet = iface.ipv4 ?: return null
+        if (targetProblem() != null) return null
+        val target = Ipv4Address.parse(targetText) ?: return null
+        faultNetwork = iface.network to subnet
+        return Triple(iface, EnetLink(iface.interfaceName, subnet), target)
+    }
+
+    override fun beginOperation(label: String): Boolean {
+        if (running != null) return false
+        running = label
+        return true
+    }
+
+    override fun endOperation() {
+        running = null
+        faultNetwork = null
     }
 
     fun selected(): EthernetInterface? = monitor.interfaces.value.values.firstOrNull { it.interfaceName == selectedName }
@@ -284,7 +309,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
         log.add("User selected discovered gateway: $previous -> $address")
     }
 
-    override fun onCleared() { moduleBinding?.close(); monitor.stop() }
+    override fun onCleared() { moduleBinding?.close(); if (faults.active) faults.cancel(); monitor.stop() }
 
     private companion object {
         const val KEY_LISTEN = "discovery_listen_ms"
@@ -293,7 +318,7 @@ class TesterViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 /** Owns the diagnostic socket even during connect, before the transport returns a channel. */
-private class ModuleBinding(val network: android.net.Network, val subnet: com.aicarcompanion.enet.Ipv4Subnet) : SocketBinder {
+internal class ModuleBinding(val network: android.net.Network, val subnet: com.aicarcompanion.enet.Ipv4Subnet) : SocketBinder {
     private var active: Socket? = null
     private var closed = false
 
