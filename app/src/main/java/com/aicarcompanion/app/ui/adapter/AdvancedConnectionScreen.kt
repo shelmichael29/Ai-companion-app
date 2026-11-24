@@ -32,9 +32,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.AnnotatedString
+
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -69,7 +71,7 @@ fun AdvancedConnectionScreen(
     val log by viewModel.controls.trafficLog.entries.collectAsStateWithLifecycle()
     val caps = info?.capabilities
     var confirmRestore by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
 
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = contentPadding.calculateBottomPadding() + 16.dp),
@@ -240,7 +242,7 @@ fun AdvancedConnectionScreen(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = { clipboard.setText(AnnotatedString(viewModel.controls.trafficLog.export())) },
+                            onClick = { context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Traffic log", viewModel.controls.trafficLog.export())) },
                             enabled = log.isNotEmpty(), modifier = Modifier.heightIn(min = 48.dp),
                         ) { Text("Copy log") }
                         TextButton(onClick = viewModel.controls.trafficLog::clear, modifier = Modifier.heightIn(min = 48.dp)) { Text("Clear") }

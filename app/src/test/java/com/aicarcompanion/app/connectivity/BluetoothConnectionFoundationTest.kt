@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.aicarcompanion.app.connectivity
 
 import com.aicarcompanion.app.assistant.VoiceSession

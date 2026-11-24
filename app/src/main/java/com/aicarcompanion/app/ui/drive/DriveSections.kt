@@ -228,10 +228,10 @@ fun MediaSection(style: DriveStyle, media: MediaUiState, actions: DriveActions, 
             // When the app's playback state is known, one button does the next sensible thing. Each still sends its own
             // PLAY or PAUSE (never a toggle key). With keys only, the state is unknown, so both are offered.
             val known = media.source is MediaSource.Session && playing != null
-            if (!known || !playing!!.isPlaying) {
+            if (!known || !playing.isPlaying) {
                 DriveIconButton(style, PenelopeIcons.Play, "Play", style.playSize, actions.onPlay, emphasized = true)
             }
-            if (!known || playing!!.isPlaying) {
+            if (!known || playing.isPlaying) {
                 DriveIconButton(style, PenelopeIcons.Pause, "Pause", if (known) style.playSize else minOf(style.playSize, 80.dp), actions.onPause, emphasized = known)
             }
             DriveIconButton(style, DriveIcons.Next, "Next track", style.sideSize, actions.onNext)
