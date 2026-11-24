@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -32,9 +33,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -103,21 +107,25 @@ private fun choiceFromKey(key: String?): VoiceChoice = when {
     else -> VoiceChoice.Installed(key.removePrefix(KEY_INSTALLED))
 }
 
-/** The voice description for the current choice, or null when the phone can't say. */
-private fun currentVoiceLabel(state: PersonalizationState): String? {
+/** What the selected personality will really speak with (the same choice the conversation and its preview use). */
+private fun effectiveResolution(state: PersonalizationState): VoiceResolution? {
     val s = state.settings
     return when (val c = s.voiceChoice) {
-        VoiceChoice.MatchPersonality -> state.resolutions[s.assistantProfileId]?.label
-        is VoiceChoice.Profile -> state.resolutions[c.id]?.label
-        is VoiceChoice.Installed -> state.voices.firstOrNull { it.id == c.voiceName }?.label
-            ?: state.resolutions[s.assistantProfileId]?.label
+        VoiceChoice.MatchPersonality, is VoiceChoice.Installed -> state.resolutions[s.assistantProfileId]
+        is VoiceChoice.Profile -> state.resolutions[c.id]
     }
+}
+
+/** The voice description for the current choice, or null when the phone can't say. */
+private fun currentVoiceLabel(state: PersonalizationState): String? {
+    val c = state.settings.voiceChoice
+    if (c is VoiceChoice.Installed) state.voices.firstOrNull { it.id == c.voiceName }?.let { return it.label }
+    return effectiveResolution(state)?.label
 }
 
 private fun missingVoiceNotice(state: PersonalizationState): String? {
     val missing = VoiceGender.entries.firstOrNull { g ->
-        val r = state.resolutions[AssistantProfiles.all.first { it.voiceGender == g }.id]
-        r is VoiceResolution.FallbackDefault && r.reason.startsWith("No ")
+        (state.resolutions[AssistantProfiles.all.first { it.voiceGender == g }.id] as? VoiceResolution.FallbackDefault)?.missingGender == g
     } ?: return null
     return when (missing) {
         VoiceGender.MALE -> "No male voice is installed on this phone. Male profiles use your phone's default voice. Install voices in text-to-speech settings."
@@ -165,9 +173,14 @@ private fun ProfileGrid(state: PersonalizationState, actions: PersonalizationAct
         rows.forEach { row ->
             Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { profile ->
+                    val selected = profile.id == state.settings.assistantProfileId
                     ProfileTile(
-                        profile, state.settings, state.resolutions[profile.id],
-                        selected = profile.id == state.settings.assistantProfileId,
+                        profile,
+                        // The selected tile shows the voice that will really be used, matching its preview.
+                        voiceLabel = if (selected) currentVoiceLabel(state) else state.resolutions[profile.id]?.label,
+                        resolution = if (selected) effectiveResolution(state) else state.resolutions[profile.id],
+                        loaded = state.resolutions.containsKey(profile.id),
+                        selected = selected,
                         actions = actions, modifier = Modifier.weight(1f).fillMaxHeight(),
                     )
                 }
@@ -180,8 +193,9 @@ private fun ProfileGrid(state: PersonalizationState, actions: PersonalizationAct
 @Composable
 private fun ProfileTile(
     profile: AssistantProfile,
-    settings: AppSettings,
+    voiceLabel: String?,
     resolution: VoiceResolution?,
+    loaded: Boolean,
     selected: Boolean,
     actions: PersonalizationActions,
     modifier: Modifier = Modifier,
@@ -189,18 +203,20 @@ private fun ProfileTile(
     val t = Penelope.tokens
     val shape = RoundedCornerShape(20.dp)
     val border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, t.glassBorder)
-    val displayName = if (selected) settings.assistantName else profile.name
+    // Tiles always show the profile's own name so the chosen personality is visible; a custom name lives in the summary and name field.
+    val displayName = profile.name
     Box(modifier.clip(shape).background(if (selected) t.glassStrong else t.glassFill, shape).border(border, shape)) {
         Column(
             Modifier
                 .fillMaxWidth()
+                .fillMaxSize()
                 .selectable(selected, role = Role.RadioButton) { actions.onSelectProfile(profile.id) }
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(
-                    Modifier.size(40.dp).background(ProfileTileStyle.brush(profile.id, t.isDark), CircleShape),
+                    Modifier.size(40.dp).background(ProfileTileStyle.brush(profile.id, t.isDark), CircleShape).clearAndSetSemantics {},
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(profile.name.take(1), style = MaterialTheme.typography.titleMedium, color = Color.White)
@@ -212,7 +228,7 @@ private fun ProfileTile(
             Text(displayName, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold), color = t.textPrimary)
             Text(profile.summary, style = MaterialTheme.typography.bodySmall, color = t.textSecondary)
             Text(
-                resolution?.label ?: "Checking voice…",
+                voiceLabel ?: if (loaded) "Voice unavailable" else "Checking voice…",
                 style = MaterialTheme.typography.labelSmall, color = t.textSecondary,
             )
             tileWarning(resolution)?.let {
@@ -277,6 +293,13 @@ private fun NameField(state: PersonalizationState, actions: PersonalizationActio
     val s = state.settings
     var draft by rememberSaveable(s.customName) { mutableStateOf(s.customName.orEmpty()) }
     var focused by remember { mutableStateOf(false) }
+    // Leaving the screen (back, tab change) with an edited name still saves it.
+    val latestDraft by rememberUpdatedState(draft)
+    val latestRename by rememberUpdatedState(actions.onRename)
+    // Focus loss, Done and leaving the screen can all fire for one edit; each distinct text is sent once.
+    val lastSent = remember(s.customName) { arrayOf(s.customName.orEmpty()) }
+    val commit = { text: String -> if (text != lastSent[0]) { lastSent[0] = text; latestRename(text) } }
+    DisposableEffect(Unit) { onDispose { commit(latestDraft) } }
     OutlinedTextField(
         value = draft,
         onValueChange = { draft = it.take(NAME_INPUT_LIMIT) },
@@ -286,9 +309,9 @@ private fun NameField(state: PersonalizationState, actions: PersonalizationActio
         isError = state.nameError != null,
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { actions.onRename(draft) }),
+        keyboardActions = KeyboardActions(onDone = { commit(draft) }),
         modifier = Modifier.fillMaxWidth().onFocusChanged {
-            if (focused && !it.isFocused) actions.onRename(draft)
+            if (focused && !it.isFocused) commit(draft)
             focused = it.isFocused
         },
     )

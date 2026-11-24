@@ -36,7 +36,7 @@ sealed interface VoiceResolution {
     ) : VoiceResolution
 
     /** No suitable voice: the engine's default voice is used and the reason is shown. */
-    data class FallbackDefault(val reason: String) : VoiceResolution {
+    data class FallbackDefault(val reason: String, val missingGender: VoiceGender? = null) : VoiceResolution {
         override val label: String get() = "Phone default voice"
     }
 }
@@ -67,7 +67,8 @@ object VoiceSelector {
         return null
     }
 
-    private fun candidates(voices: List<VoiceTuning.RawVoice>, locale: Locale): List<VoiceTuning.RawVoice> =
+    /** Installed voices for the language in one fixed, order-independent order. */
+    fun candidates(voices: List<VoiceTuning.RawVoice>, locale: Locale): List<VoiceTuning.RawVoice> =
         voices.filter { it.locale.language == locale.language && "notInstalled" !in it.features }
             .sortedWith(
                 compareBy<VoiceTuning.RawVoice> { it.locale.country != locale.country }
@@ -75,6 +76,12 @@ object VoiceSelector {
                     .thenByDescending { it.quality }
                     .thenBy { it.name },
             )
+
+    /** Which "Female voice N" / "Male voice N" / "Unlabeled voice N" this is: its place among same-gender voices in [sorted]. */
+    fun ordinalOf(voice: VoiceTuning.RawVoice, sorted: List<VoiceTuning.RawVoice>): Int {
+        val g = genderOf(voice)
+        return sorted.takeWhile { it.name != voice.name }.count { genderOf(it) == g } + 1
+    }
 
     private fun profilesOf(gender: VoiceGender) = AssistantProfiles.all.count { it.voiceGender == gender }
 
@@ -95,7 +102,7 @@ object VoiceSelector {
                 if (index >= 0) {
                     val v = sorted[index]
                     val g = genderOf(v)
-                    val n = sorted.take(index + 1).count { genderOf(it) == g }
+                    val n = ordinalOf(v, sorted)
                     VoiceResolution.Voice(v.name, "${genderWord(g)} voice $n · ${tag(v)}", g, shared = false, requiresNetwork = v.requiresNetwork)
                 } else {
                     gendered(request.fallback, sorted, "Your chosen voice isn't installed anymore")
@@ -111,13 +118,13 @@ object VoiceSelector {
         val pool = offline.ifEmpty { ofGender }
         if (pool.isEmpty()) {
             val word = if (request.gender == VoiceGender.MALE) "male" else "female"
-            return VoiceResolution.FallbackDefault(notice?.let { "$it. " }.orEmpty() + "No $word voice is installed on this phone")
+            return VoiceResolution.FallbackDefault(notice?.let { "$it. " }.orEmpty() + "No $word voice is installed on this phone", request.gender)
         }
         val index = request.slot % pool.size
         val v = pool[index]
         return VoiceResolution.Voice(
             voiceName = v.name,
-            label = "${genderWord(request.gender)} voice ${index + 1} · ${tag(v)}",
+            label = "${genderWord(request.gender)} voice ${ordinalOf(v, sorted)} · ${tag(v)}",
             gender = request.gender,
             shared = pool.size < profilesOf(request.gender),
             requiresNetwork = v.requiresNetwork,

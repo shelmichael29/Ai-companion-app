@@ -97,6 +97,8 @@ class SettingsViewModel(
     private val _voiceResolutions = MutableStateFlow<Map<String, VoiceResolution?>>(emptyMap())
     val voiceResolutions = _voiceResolutions.asStateFlow()
 
+    private var previewJob: kotlinx.coroutines.Job? = null
+
     private val _nameError = MutableStateFlow<String?>(null)
     val nameError = _nameError.asStateFlow()
 
@@ -161,12 +163,14 @@ class SettingsViewModel(
      * Pauses any conversation so voices don't overlap.
      */
     fun preview(profileId: String? = null) {
+        previewJob?.cancel()
+        speech.stop() // Tapping another preview replaces the one that is playing.
         if (session.state.value !is VoiceState.Idle) session.pause("Paused while you previewed the voice.")
         val current = settings.value
         val id = profileId ?: current.assistantProfileId
         val config = if (id == current.assistantProfileId) VoiceConfigFactory.from(current) else VoiceConfigFactory.from(current, VoiceChoice.Profile(id))
         val name = if (id == current.assistantProfileId) current.assistantName else AssistantProfiles.byId(id).name
-        viewModelScope.launch {
+        previewJob = viewModelScope.launch {
             speech.preview("Hi, I'm $name. You don't need to understand cars. I understand them for you.", config)
         }
     }

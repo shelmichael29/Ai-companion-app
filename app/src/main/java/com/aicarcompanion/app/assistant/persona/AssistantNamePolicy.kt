@@ -32,8 +32,9 @@ object AssistantNamePolicy {
         val collapsed = String(filtered.toIntArray(), 0, filtered.size).replace(Regex("""\s+"""), " ").trim()
         val points = collapsed.codePoints().toArray()
         val capped = String(points, 0, minOf(points.size, MAX_CODE_POINTS)).trim()
-        if (capped.none { it.isLetter() }) return null
-        if (capped.lowercase() in reserved) return null
+        if (capped.codePoints().noneMatch { Character.isLetter(it) }) return null
+        // "Stop." or "help-" are still the command word.
+        if (capped.lowercase().trim { it in ".'- " } in reserved) return null
         return capped
     }
 }

@@ -98,6 +98,12 @@ class PromptPersonaTest {
         assertTrue(prompt(AssistantProfiles.byId("luna"), name = "\n​").contains("You are \"Luna\""))
     }
 
+    @Test fun `the never-joke-about-safety line is present for every profile`() {
+        AssistantProfiles.all.forEach {
+            assertTrue(it.id, prompt(it).contains("- Never joke about warnings, safety, breakdowns, costs or anything the user is worried about. Personality never changes the detail level, the rules, the facts or safety advice below."))
+        }
+    }
+
     @Test fun `safety wording is untouched by humor`() {
         val playful = prompt(AssistantProfiles.byId("max"))
         assertTrue(playful.contains("Never joke about warnings, safety, breakdowns, costs"))

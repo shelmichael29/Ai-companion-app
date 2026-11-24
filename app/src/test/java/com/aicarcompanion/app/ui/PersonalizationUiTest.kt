@@ -24,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
 import com.aicarcompanion.app.assistant.persona.AssistantProfiles
 import com.aicarcompanion.app.assistant.persona.VoiceGender
 import com.aicarcompanion.app.assistant.voice.VoiceResolution
@@ -51,7 +52,7 @@ class PersonalizationUiTest {
 
     private val allAvailable = AssistantProfiles.all.associate { it.id to available(it.id) as VoiceResolution? }
     private val noMale = AssistantProfiles.all.associate {
-        it.id to (if (it.voiceGender == VoiceGender.MALE) VoiceResolution.FallbackDefault("No male voice is installed on this phone") else available(it.id)) as VoiceResolution?
+        it.id to (if (it.voiceGender == VoiceGender.MALE) VoiceResolution.FallbackDefault("No male voice is installed on this phone", VoiceGender.MALE) else available(it.id)) as VoiceResolution?
     }
 
     private fun show(
@@ -106,9 +107,28 @@ class PersonalizationUiTest {
         assertEquals(listOf("atlas"), previewed)
     }
 
-    @Test fun theSelectedTileShowsTheCustomNameInItsPreviewLabel() {
+    @Test fun tilesAlwaysShowTheProfileNameNeverTheCustomName() {
         show(AppSettings(assistantProfileId = "atlas", customName = "Jarvis"))
-        compose.onNodeWithContentDescription("Preview Jarvis's voice").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Preview Atlas's voice").performScrollTo().assertIsDisplayed()
+        compose.onNode(isRadio and hasText("Atlas", substring = true)).assertIsSelected()
+        assertEquals(0, compose.onAllNodes(isRadio and hasText("Jarvis", substring = true)).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodesWithContentDescription("Preview Jarvis's voice").fetchSemanticsNodes().size)
+        // The custom name is shown in the summary line.
+        compose.onNodeWithText("Jarvis · Confident, professional", substring = true, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun theSelectedTileShowsTheVoiceThatWillReallyBeUsed() {
+        val res = allAvailable + ("luna" to VoiceResolution.Voice("v-luna", "Female voice 4 · works offline", VoiceGender.FEMALE, false, false))
+        show(AppSettings(assistantProfileId = "atlas", voiceChoice = com.aicarcompanion.app.assistant.persona.VoiceChoice.Profile("luna")), resolutions = res)
+        val tile = compose.onNode(isRadio and hasText("Atlas", substring = true)).fetchSemanticsNode()
+        val texts = tile.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
+        assertTrue(texts, texts.contains("Female voice 4"))
+    }
+
+    @Test fun aProfileWhoseVoiceCouldNotBeResolvedSaysSo() {
+        show(resolutions = allAvailable + ("max" to null))
+        val tile = compose.onNode(isRadio and hasText("Max", substring = true)).fetchSemanticsNode()
+        assertTrue(tile.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }.contains("Voice unavailable"))
     }
 
     @Test fun slidersExposeTheirValueToTalkBack() {
@@ -137,6 +157,29 @@ class PersonalizationUiTest {
     @Test fun noWarningWhenEveryVoiceIsAvailable() {
         show()
         assertEquals(0, compose.onAllNodes(hasText("No male voice", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun anEditedNameIsSavedWhenTheScreenIsLeft() {
+        val saved = mutableListOf<String>()
+        var visible by mutableStateOf(true)
+        compose.setContent {
+            CarCompanionTheme(ThemeMode.DARK, reduceMotion = true) {
+                if (visible) {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        PersonalizationContent(
+                            PersonalizationState(AppSettings(), emptyList(), emptyList(), allAvailable, null),
+                            PersonalizationActions(onRename = { saved += it }),
+                        )
+                    }
+                }
+            }
+        }
+        compose.onNode(androidx.compose.ui.test.hasSetTextAction()).performScrollTo().performTextInput("Zed")
+        compose.waitForIdle()
+        assertEquals(emptyList<String>(), saved)
+        visible = false
+        compose.waitForIdle()
+        assertEquals(listOf("Zed"), saved)
     }
 
     @Test fun nameFieldShowsTheProfileNameAsTheDefault() {

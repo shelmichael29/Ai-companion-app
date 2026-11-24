@@ -51,5 +51,6 @@ class AssistantNamePolicyTest {
             assertNull(it, s(it))
         }
         assertEquals("Stop Sign", s("Stop Sign"))
+        listOf("Stop.", "help-", "'Call'", "yes .").forEach { assertNull(it, s(it)) }
     }
 }

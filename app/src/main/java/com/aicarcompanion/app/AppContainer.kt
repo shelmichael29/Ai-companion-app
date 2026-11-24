@@ -297,7 +297,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val speechOutput: SpeechOutput by lazy {
-        AndroidSpeechOutput(appContext, audioFocus, audioFocus.attributes, connectionLog).also { output ->
+        AndroidSpeechOutput(appContext, audioFocus, audioFocus.attributes, connectionLog) { internetOnline.value }.also { output ->
             com.aicarcompanion.app.assistant.voice.VoiceSettingsBinder(appScope, settings, output).start()
         }
     }

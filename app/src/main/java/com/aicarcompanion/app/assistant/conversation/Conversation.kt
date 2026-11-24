@@ -45,7 +45,10 @@ data class AssistantRequest(
     val level: ExplanationLevel = ExplanationLevel.EVERYDAY,
     /** Personality for Gemini replies (tone only). Independent of [level]. */
     val profile: AssistantProfile = AssistantProfiles.default,
-)
+) {
+    /** A request holds what the user said and the assistant name, so it never prints them. */
+    override fun toString() = "AssistantRequest(level=$level)"
+}
 
 enum class Speaker { USER, ASSISTANT }
 

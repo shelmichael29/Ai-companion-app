@@ -64,6 +64,9 @@ data class AppSettings(
     /** Home-screen layout per knowledge level (Easy or Customizable). Independent of [explanationLevel]. */
     val dashboard: DashboardSettings = DashboardSettings(),
 ) {
+    /** Settings hold the assistant name and the adapter address, so they never print themselves. */
+    override fun toString() = "AppSettings(profile=$assistantProfileId, level=$explanationLevel)"
+
     /** The selected personality (unknown ids resolve to Penelope). */
     val profile: AssistantProfile get() = AssistantProfiles.byId(assistantProfileId)
 
@@ -150,7 +153,7 @@ object SettingsCodec {
     private fun keyItems(level: ExplanationLevel) = "home_items_${level.name.lowercase()}"
 
     /** True when the stored values predate the personality settings and should be rewritten. */
-    fun needsMigration(store: KeyValueStore): Boolean = store.getString(KEY_SCHEMA) != SCHEMA
+    fun needsMigration(store: KeyValueStore): Boolean = store.getString(KEY_SCHEMA) == null
 
     private fun encodeVoice(choice: VoiceChoice): String = when (choice) {
         VoiceChoice.MatchPersonality -> "match"
@@ -174,7 +177,8 @@ object SettingsCodec {
      * an installed-voice choice. Migration is one-way: older app versions ignore the new keys.
      */
     private fun readPersonalization(store: KeyValueStore): Triple<String, String?, VoiceChoice> {
-        if (store.getString(KEY_SCHEMA) == SCHEMA) {
+        // Only a missing marker means legacy; any stored version (even a newer one) already uses the new keys.
+        if (store.getString(KEY_SCHEMA) != null) {
             val profile = AssistantProfiles.byId(store.getString(KEY_PROFILE)).id
             return Triple(profile, AssistantNamePolicy.sanitize(store.getString(KEY_CUSTOM_NAME)), decodeVoice(store.getString(KEY_VOICE_CHOICE)))
         }

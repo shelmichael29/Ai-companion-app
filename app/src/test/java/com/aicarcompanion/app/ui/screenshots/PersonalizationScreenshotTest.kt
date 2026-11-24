@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.aicarcompanion.app.assistant.persona.AssistantProfiles
 import com.aicarcompanion.app.assistant.persona.VoiceChoice
 import com.aicarcompanion.app.assistant.persona.VoiceGender
+import com.aicarcompanion.app.assistant.voice.VoiceOption
 import com.aicarcompanion.app.assistant.voice.VoiceResolution
 import com.aicarcompanion.app.data.local.AppSettings
 import com.aicarcompanion.app.data.local.ThemeMode
@@ -67,19 +68,23 @@ class PersonalizationScreenshotTest(private val shot: Shot) {
             p.id to VoiceResolution.Voice("fixture-${p.id}", "$word voice $n · works offline", p.voiceGender, shared = p.voiceGender == VoiceGender.MALE && p.voiceSlot >= 3, requiresNetwork = false)
         }
         private val noMaleResolutions: Map<String, VoiceResolution?> = fixtureResolutions.mapValues { (id, r) ->
-            if (AssistantProfiles.byId(id).voiceGender == VoiceGender.MALE) VoiceResolution.FallbackDefault("No male voice is installed on this phone") else r
+            if (AssistantProfiles.byId(id).voiceGender == VoiceGender.MALE) VoiceResolution.FallbackDefault("No male voice is installed on this phone", VoiceGender.MALE) else r
         }
     }
+
+    private fun installedVoices(male: Boolean): List<VoiceOption> =
+        (1..6).map { VoiceOption("f$it", "English (United States) · Female voice $it · works offline", false, it > 4) } +
+            if (male) (1..3).map { VoiceOption("m$it", "English (United States) · Male voice $it · works offline", false, false) } else emptyList()
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private fun stateFor(s: Shot): PersonalizationState = when (s.scenario) {
         "atlas-custom-name" -> PersonalizationState(
             AppSettings(assistantProfileId = "atlas", customName = "Jarvis", voiceChoice = VoiceChoice.Profile("luna"), speechRate = 1.2f, speechPitch = 0.9f),
-            emptyList(), emptyList(), fixtureResolutions, nameError = null,
+            installedVoices(male = true), emptyList(), fixtureResolutions, nameError = null,
         )
-        "no-male-voice" -> PersonalizationState(AppSettings(assistantProfileId = "oliver"), emptyList(), emptyList(), noMaleResolutions, nameError = null)
-        else -> PersonalizationState(AppSettings(), emptyList(), emptyList(), fixtureResolutions, nameError = null)
+        "no-male-voice" -> PersonalizationState(AppSettings(assistantProfileId = "oliver"), installedVoices(male = false), emptyList(), noMaleResolutions, nameError = null)
+        else -> PersonalizationState(AppSettings(), installedVoices(male = true), emptyList(), fixtureResolutions, nameError = null)
     }
 
     @Test fun render() {

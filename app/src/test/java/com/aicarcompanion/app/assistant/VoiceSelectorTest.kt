@@ -125,6 +125,28 @@ class VoiceSelectorTest {
         assertTrue(m.label.startsWith("Male voice 1"))
     }
 
+    @Test fun `a voice has one number in tiles Named labels and the installed list`() {
+        val voices = listOf(
+            v("en-gb-x-gba-local", Locale.UK, features = setOf("female")),
+            v("en-us-x-sfg-local"),
+            v("en-us-x-tpf-local"),
+        )
+        val sorted = VoiceSelector.candidates(voices, us)
+        val options = com.aicarcompanion.app.assistant.voice.VoiceTuning.voiceOptions(voices, us)
+        // Tile for slot 2 and the installed list name the same voice the same way.
+        val tile = gendered(VoiceGender.FEMALE, 2, voices) as VoiceResolution.Voice
+        val listed = options.first { it.id == tile.voiceName }
+        assertTrue("${listed.label} should end with ${tile.label}", listed.label.contains(tile.label))
+        val named = VoiceSelector.resolve(VoiceRequest.Named(tile.voiceName, VoiceRequest.Gendered(VoiceGender.FEMALE, 0)), voices, us) as VoiceResolution.Voice
+        assertEquals(tile.label, named.label)
+        assertEquals(3, VoiceSelector.ordinalOf(sorted.first { it.name == tile.voiceName }, sorted))
+    }
+
+    @Test fun `a missing gender is typed on the fallback`() {
+        assertEquals(VoiceGender.MALE, (gendered(VoiceGender.MALE, 0, emptyList()) as VoiceResolution.FallbackDefault).missingGender)
+        assertNull((VoiceSelector.resolve(VoiceRequest.EngineDefault, google, us) as VoiceResolution.FallbackDefault).missingGender)
+    }
+
     @Test fun `engine default never claims a gender`() {
         val r = VoiceSelector.resolve(VoiceRequest.EngineDefault, google, us)
         assertTrue(r is VoiceResolution.FallbackDefault)

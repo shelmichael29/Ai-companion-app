@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Builds Gemini's system instruction: Penelope's persona and rules plus a block of facts the
+ * Builds Gemini's system instruction: the assistant's personality and rules plus a block of facts the
  * app has verified. Deliberately excluded: VIN, nickname, photos, receipts, costs, shop names,
  * service notes, location and any account details. The owner-entered text that is included (service
  * titles, problem descriptions) is passed through [PersonalDetailScrubber] first.

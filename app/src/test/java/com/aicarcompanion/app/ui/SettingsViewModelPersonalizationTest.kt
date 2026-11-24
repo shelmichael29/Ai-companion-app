@@ -49,11 +49,12 @@ class SettingsViewModelPersonalizationTest {
     private class FakeOutput : SpeechOutput {
         override val state = MutableStateFlow<SpeechOutputState>(SpeechOutputState.Ready)
         val previews = mutableListOf<Pair<String, VoiceConfig>>()
+        var stops = 0
         override suspend fun speak(text: String) = SpeakResult.Completed
-        override fun stop() = Unit
+        override fun stop() { stops++ }
         override fun configure(config: VoiceConfig) = Unit
         override suspend fun resolve(request: VoiceRequest): VoiceResolution? = when {
-            request is VoiceRequest.Gendered && request.gender == VoiceGender.MALE -> VoiceResolution.FallbackDefault("No male voice is installed on this phone")
+            request is VoiceRequest.Gendered && request.gender == VoiceGender.MALE -> VoiceResolution.FallbackDefault("No male voice is installed on this phone", VoiceGender.MALE)
             else -> VoiceResolution.Voice("v", "Female voice 1 · works offline", VoiceGender.FEMALE, false, false)
         }
         override suspend fun preview(text: String, config: VoiceConfig): SpeakResult { previews += text to config; return SpeakResult.Completed }
@@ -158,6 +159,14 @@ class SettingsViewModelPersonalizationTest {
         val out = FakeOutput()
         viewModel(store, out).preview(null); dispatcher.scheduler.advanceUntilIdle()
         assertTrue(out.previews.single().second.voice is VoiceRequest.Named)
+    }
+
+    @Test fun `a new preview stops the one that is playing`() {
+        val out = FakeOutput()
+        val vm = viewModel(InMemorySettingsStore(), out)
+        vm.preview("ace"); vm.preview("nova"); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(2, out.stops)
+        assertEquals(listOf("Hi, I'm Nova."), out.previews.map { it.first.substringBefore(" You") })
     }
 
     @Test fun `resolutions are loaded for all ten profiles`() {

@@ -83,6 +83,22 @@ class SettingsMigrationTest {
         }
     }
 
+    @Test fun `a newer schema is never treated as legacy and is not wiped`() {
+        val kv = legacy("settings_schema" to "3", "assistant_profile" to "ace", "custom_assistant_name" to "Zed", "voice_choice" to "profile:luna")
+        assertFalse(SettingsCodec.needsMigration(kv))
+        val s = PersistentSettingsStore(kv).settings.value
+        assertEquals("ace", s.assistantProfileId); assertEquals("Zed", s.customName)
+        assertEquals(VoiceChoice.Profile("luna"), s.voiceChoice)
+        assertEquals("Zed", kv.map["custom_assistant_name"])
+    }
+
+    @Test fun `settings and requests never print names or utterances`() {
+        val s = AppSettings(customName = "Zed", lastAdapterAddress = "00:11:22:33:44:55", activeVehicleId = "car1")
+        assertFalse(s.toString().contains("Zed")); assertFalse(s.toString().contains("00:11")); assertFalse(s.toString().contains("car1"))
+        val r = com.aicarcompanion.app.assistant.conversation.AssistantRequest("call Mom about my VIN", "Zed")
+        assertFalse(r.toString().contains("Mom")); assertFalse(r.toString().contains("Zed"))
+    }
+
     @Test fun `knowledge level is untouched by personality changes`() {
         val kv = MapKeyValueStore()
         val store = PersistentSettingsStore(kv)
