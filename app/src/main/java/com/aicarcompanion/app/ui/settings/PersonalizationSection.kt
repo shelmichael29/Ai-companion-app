@@ -329,7 +329,7 @@ private fun ResetButton(onReset: () -> Unit) {
             title = { Text("Reset personalization?") },
             text = {
                 Text(
-                    "This sets the personality back to Penelope, the voice to match the personality, removes your custom name " +
+                    "This sets the personality back to the default, the voice to match the personality, removes your custom name " +
                         "and returns speed and pitch to natural. Your detail level and other settings aren't changed.",
                 )
             },

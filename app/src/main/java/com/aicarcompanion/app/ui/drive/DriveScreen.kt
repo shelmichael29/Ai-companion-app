@@ -112,12 +112,12 @@ fun DriveContent(ui: DriveUiState, level: ExplanationLevel, assistantName: Strin
             modifier = Modifier.semantics { heading() },
         )
         VoiceBar(style, ui.voice, ui.conversationActive, ui.micLevel, assistantName, actions)
-        ui.pending?.let { ConfirmationCard(style, it, actions, ui.confirming) }
+        ui.pending?.let { ConfirmationCard(style, it, assistantName, actions, ui.confirming) }
         MediaSection(style, ui.media, actions, ui.notice)
-        MessagesSection(style, ui.messages, actions)
-        CallsSection(style, ui.calls, actions)
+        MessagesSection(style, ui.messages, assistantName, actions)
+        CallsSection(style, ui.calls, assistantName, actions)
         if (level == ExplanationLevel.DIY) HealthShortcuts(style, ui.health, actions)
-        VehicleControlsSection(style, ui.vehicleControls)
+        VehicleControlsSection(style, ui.vehicleControls, assistantName)
     }
 }
 

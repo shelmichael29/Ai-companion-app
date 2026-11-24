@@ -23,7 +23,7 @@ enum class VehicleControlFeature(val label: String) {
 /** Why a feature can't be used, in words a driver understands. */
 enum class UnavailableReason(val explanation: String) {
     OBD_ADAPTER_READ_ONLY("Standard OBD-II adapters read data; they can't control the car."),
-    NO_MANUFACTURER_INTEGRATION("This needs a connection supported by your car's maker, which Penelope doesn't have yet."),
+    NO_MANUFACTURER_INTEGRATION("This needs a connection supported by your car's maker, which I don't have yet."),
     NO_VEHICLE("Choose a vehicle first."),
 }
 

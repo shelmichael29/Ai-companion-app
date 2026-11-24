@@ -23,7 +23,7 @@ enum class ExplanationLevel(val label: String, val description: String) {
     ADVANCED("Advanced / professional", "Technical terms, code definitions and all available live data."),
 }
 
-enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark (Penelope default)") }
+enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark (default)") }
 
 /** Accent color family. Independent of [ThemeMode]: each style has a dark and a light version. */
 enum class ColorStyle(val label: String, val description: String) {

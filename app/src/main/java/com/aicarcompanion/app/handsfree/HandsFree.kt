@@ -28,12 +28,12 @@ enum class HandsFreeCapability(val spokenName: String) {
  * Android and iOS, and some may never be possible on one of them. See docs/HANDS_FREE.md.
  */
 enum class PlatformRequirement(val description: String) {
-    NOTIFICATION_ACCESS("Turn on notification access for Penelope in system settings"),
-    CALL_PERMISSION("Allow Penelope to make and manage phone calls"),
-    CONTACTS_PERMISSION("Allow Penelope to look up your contacts"),
-    DEFAULT_DIALER_ROLE("Make Penelope the default phone app (not planned)"),
+    NOTIFICATION_ACCESS("Turn on notification access for this app in system settings"),
+    CALL_PERMISSION("Allow this app to make and manage phone calls"),
+    CONTACTS_PERMISSION("Allow this app to look up your contacts"),
+    DEFAULT_DIALER_ROLE("Make this app the default phone app (not planned)"),
     /** Access is on, but Android hasn't connected Penelope's notification listener (yet). */
-    NOTIFICATION_LISTENER_CONNECTION("Reconnect Penelope's notification link: open the Drive screen, or switch notification access off and on in system settings"),
+    NOTIFICATION_LISTENER_CONNECTION("Reconnect the notification link: open the Drive screen, or switch notification access off and on in system settings"),
     USER_CONFIRMATION_PER_ACTION("The system asks you to confirm each action"),
 }
 

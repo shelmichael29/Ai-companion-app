@@ -157,7 +157,7 @@ class VinFlowUiTest {
     @Test fun `first-time camera permission offers Allow and still offers typing`() {
         var asked = false
         scan(CameraAccess.NotAsked, onRequest = { asked = true })
-        compose.onNodeWithText("needs to use the camera", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("I need to use the camera", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Allow camera").performClick()
         assertTrue(asked)
         compose.onNodeWithText("Type my VIN instead").assertIsDisplayed()

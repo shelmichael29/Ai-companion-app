@@ -45,10 +45,11 @@ class DriveUiTest {
         actions: DriveActions = DriveActions(),
         theme: ThemeMode = ThemeMode.DARK,
         fontScale: Float = 1f,
+        assistantName: String = "Penelope",
     ) = compose.setContent {
         CarCompanionTheme(themeMode = theme, reduceMotion = true) {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
-                DriveContent(ui, level, "Penelope", actions, PaddingValues())
+                DriveContent(ui, level, assistantName, actions, PaddingValues())
             }
         }
     }
@@ -109,6 +110,27 @@ class DriveUiTest {
     @Test fun `the setup text says Android lets Penelope see all notifications and Penelope keeps only messages`() {
         show(DriveFixtures.needsAccess, ExplanationLevel.EVERYDAY)
         compose.onNodeWithText("see all your notifications", substring = true).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun `a custom assistant name replaces Penelope in the messages, calls and confirmation text`() {
+        show(DriveFixtures.needsAccess, ExplanationLevel.EVERYDAY, assistantName = "Jarvis")
+        compose.onNodeWithText("Jarvis needs notification access", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Jarvis keeps only message notifications", substring = true).assertExists()
+        compose.onNodeWithText("Open the app's settings").assertExists()
+        assertEquals(0, compose.onAllNodesWithText("Penelope", substring = true).fetchSemanticsNodes().size)
+    }
+
+    @Test fun `a custom name shows in the no-messages and calls text`() {
+        show(DriveFixtures.playing.copy(messages = MessagesUiState.None), ExplanationLevel.EVERYDAY, assistantName = "Jarvis")
+        compose.onNodeWithText("No new messages. Jarvis reads messages only when you ask", substring = true).performScrollTo().assertExists()
+        compose.onNodeWithText("Jarvis can't answer or end calls", substring = true).performScrollTo().assertExists()
+        assertEquals(0, compose.onAllNodesWithText("Penelope", substring = true).fetchSemanticsNodes().size)
+    }
+
+    @Test fun `a custom name shows in the send confirmation`() {
+        show(DriveFixtures.confirmReply, ExplanationLevel.EVERYDAY, assistantName = "Jarvis")
+        compose.onNodeWithText("Jarvis hands this to Messages", substring = true).performScrollTo().assertExists()
+        assertEquals(0, compose.onAllNodesWithText("Penelope", substring = true).fetchSemanticsNodes().size)
     }
 
     @Test fun `buttons are disabled while a confirmation is being carried out`() {

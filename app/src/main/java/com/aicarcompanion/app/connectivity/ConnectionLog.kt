@@ -48,7 +48,7 @@ class ConnectionLog(private val capacity: Int = 300, private val now: () -> Inst
 
     /** Plain-text export for the Copy button. Already redacted. */
     fun export(zone: ZoneId = ZoneId.systemDefault()): String = buildString {
-        appendLine("Penelope connection log (VINs, hardware addresses and keys removed)")
+        appendLine("Connection log (VINs, hardware addresses and keys removed)")
         _events.value.forEach { e ->
             append(TIME.format(e.at.atZone(zone))).append("  ").append(e.area.label.padEnd(8)).append(e.event)
             if (e.details.isNotEmpty()) append("  ").append(e.details.entries.joinToString(", ") { "${it.key}=${it.value}" })

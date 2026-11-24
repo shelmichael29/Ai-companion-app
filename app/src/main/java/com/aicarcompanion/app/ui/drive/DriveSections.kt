@@ -272,21 +272,21 @@ private fun VolumeRow(style: DriveStyle, media: MediaUiState, actions: DriveActi
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MessagesSection(style: DriveStyle, messages: MessagesUiState, actions: DriveActions) {
+fun MessagesSection(style: DriveStyle, messages: MessagesUiState, assistantName: String, actions: DriveActions) {
     DriveCard(style) {
         DriveHeading(style, "Messages")
         when (messages) {
             MessagesUiState.NeedsAccess -> {
-                DriveBody(style, "To read and answer your messages by voice, Penelope needs notification access. Android then lets Penelope see all your notifications; Penelope keeps only message notifications, in memory, and reads them only when you ask.")
+                DriveBody(style, "To read and answer your messages by voice, $assistantName needs notification access. Android then lets $assistantName see all your notifications; $assistantName keeps only message notifications, in memory, and reads them only when you ask.")
                 DriveButton(style, "Turn on notification access", actions.onOpenNotificationAccess, emphasized = true)
-                DriveBody(style, "If Android says \"Restricted setting\" (apps installed outside Google Play): open Penelope in Settings, Apps, tap the three dots, then Allow restricted settings.")
-                DriveButton(style, "Open Penelope's app settings", actions.onOpenAppSettings)
+                DriveBody(style, "If Android says \"Restricted setting\" (apps installed outside Google Play): open this app in Settings, Apps, tap the three dots, then Allow restricted settings.")
+                DriveButton(style, "Open the app's settings", actions.onOpenAppSettings)
             }
             MessagesUiState.NotConnected -> {
-                DriveBody(style, "I can't see your notifications right now. Notification access is on, but Android hasn't connected Penelope. Open this screen again to reconnect, or switch notification access off and on.")
+                DriveBody(style, "I can't see your notifications right now. Notification access is on, but Android hasn't connected this app. Open this screen again to reconnect, or switch notification access off and on.")
                 DriveButton(style, "Open notification access", actions.onOpenNotificationAccess, emphasized = true)
             }
-            MessagesUiState.None -> DriveBody(style, "No new messages. Penelope reads messages only when you ask, and can reply only to ones still in your notifications.")
+            MessagesUiState.None -> DriveBody(style, "No new messages. $assistantName reads messages only when you ask, and can reply only to ones still in your notifications.")
             is MessagesUiState.Unread -> {
                 val count = if (messages.count == 1) "1 new message" else "${messages.count} new messages"
                 Text(count, style = MaterialTheme.typography.titleMedium, color = style.primary)
@@ -304,15 +304,15 @@ fun MessagesSection(style: DriveStyle, messages: MessagesUiState, actions: Drive
 }
 
 @Composable
-fun CallsSection(style: DriveStyle, calls: CallsUiState, actions: DriveActions) {
+fun CallsSection(style: DriveStyle, calls: CallsUiState, assistantName: String, actions: DriveActions) {
     DriveCard(style) {
         DriveHeading(style, "Calls")
         when (calls) {
             CallsUiState.DIAL_HANDOFF -> {
                 DriveButton(style, "Call someone", actions.onPickContact, icon = DriveIcons.Phone, description = "Call someone. Choose a contact", emphasized = true)
-                DriveBody(style, "You choose a contact, then I open your phone's dialer and you tap call. Penelope can't answer or end calls; use your phone or car button.")
+                DriveBody(style, "You choose a contact, then I open your phone's dialer and you tap call. $assistantName can't answer or end calls; use your phone or car button.")
             }
-            CallsUiState.NO_DIALER -> DriveBody(style, "This phone has no dialer app Penelope can open. Use your phone or car controls to call.")
+            CallsUiState.NO_DIALER -> DriveBody(style, "This phone has no dialer app I can open. Use your phone or car controls to call.")
         }
     }
 }
@@ -320,7 +320,7 @@ fun CallsSection(style: DriveStyle, calls: CallsUiState, actions: DriveActions) 
 /** The on-screen half of the confirmation: the same state the voice flow uses. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ConfirmationCard(style: DriveStyle, pending: PendingAction, actions: DriveActions, busy: Boolean = false) {
+fun ConfirmationCard(style: DriveStyle, pending: PendingAction, assistantName: String, actions: DriveActions, busy: Boolean = false) {
     DriveCard(style, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
         when (pending) {
             is PendingAction.Reply -> {
@@ -334,7 +334,7 @@ fun ConfirmationCard(style: DriveStyle, pending: PendingAction, actions: DriveAc
                 val who = pending.groupTitle?.let { "Group $it" } ?: "To ${pending.recipient}"
                 DriveBody(style, "$who${pending.appName?.let { " in $it" }.orEmpty()}", strong = true)
                 Text("“${pending.text}”", style = MaterialTheme.typography.titleMedium, color = style.primary)
-                DriveBody(style, "Penelope hands this to ${pending.appName ?: "the messaging app"}; it can't promise it arrives.")
+                DriveBody(style, "$assistantName hands this to ${pending.appName ?: "the messaging app"}; it can't promise it arrives.")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DriveButton(style, "Send", actions.onConfirm, description = "Send reply to ${pending.groupTitle ?: pending.recipient}", emphasized = true, enabled = !busy)
                     DriveButton(style, "Cancel", actions.onCancel, description = "Cancel, don't send", enabled = !busy)
@@ -356,7 +356,7 @@ fun ConfirmationCard(style: DriveStyle, pending: PendingAction, actions: DriveAc
 
 /** Car controls: every one is unavailable and says why. Rows are plain text, never buttons. */
 @Composable
-fun VehicleControlsSection(style: DriveStyle, rows: List<VehicleControlRow>) {
+fun VehicleControlsSection(style: DriveStyle, rows: List<VehicleControlRow>, assistantName: String) {
     if (style.isAdvanced) {
         DriveCard(style) {
             DriveHeading(style, "Car controls")
@@ -390,7 +390,7 @@ fun VehicleControlsSection(style: DriveStyle, rows: List<VehicleControlRow>) {
         }
         if (expanded) {
             rows.firstOrNull()?.let { DriveBody(style, it.reason.explanation) }
-            DriveBody(style, "Climate, heated seats and door locks: ${rows.joinToString { it.feature.label.lowercase() }}. None can be controlled from Penelope.")
+            DriveBody(style, "Climate, heated seats and door locks: ${rows.joinToString { it.feature.label.lowercase() }}. None can be controlled from this app.")
         }
     }
 }
