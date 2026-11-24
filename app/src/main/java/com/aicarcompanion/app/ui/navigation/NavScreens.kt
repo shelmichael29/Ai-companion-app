@@ -40,7 +40,7 @@ import java.time.Instant
 import kotlin.math.abs
 
 enum class MoreAction(val label: String, val subtitle: String, val icon: ImageVector) {
-    CHAT("Chat with Penelope", "Ask a question or talk it through", PenelopeIcons.Chat),
+    CHAT("Chat", "Ask a question or talk it through", PenelopeIcons.Chat),
     HISTORY("History", "Past checks, mileage and service records", PenelopeIcons.History),
     SETTINGS("Settings", "Voice, level, appearance", PenelopeIcons.Tune),
     ADAPTER("OBD-II adapter", "Connect or check your adapter", PenelopeIcons.Plug),

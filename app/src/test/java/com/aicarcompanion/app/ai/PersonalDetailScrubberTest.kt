@@ -82,7 +82,7 @@ class PersonalDetailScrubberTest {
         VehicleContext(car, null, service, ObdConnectionState.Disconnected, recentSymptoms = symptoms)
 
     private fun instruction(ctx: VehicleContext) =
-        PromptBuilder.systemInstruction("Penelope", ExplanationLevel.EVERYDAY, ctx, GenericDtcCatalog, emptySet(), Instant.parse("2026-11-21T12:00:00Z"))
+        PromptBuilder.systemInstruction("Penelope", com.aicarcompanion.app.assistant.persona.AssistantProfiles.default, ExplanationLevel.EVERYDAY, ctx, GenericDtcCatalog, emptySet(), Instant.parse("2026-11-21T12:00:00Z"))
 
     @Test fun `service titles and problem descriptions are scrubbed in what Gemini receives`() {
         val ctx = context(

@@ -12,7 +12,6 @@ import com.aicarcompanion.app.assistant.voice.AndroidSpeechInput
 import com.aicarcompanion.app.assistant.voice.AndroidAudioFocus
 import com.aicarcompanion.app.assistant.voice.AndroidSpeechOutput
 import com.aicarcompanion.app.assistant.voice.SpeechOutput
-import com.aicarcompanion.app.assistant.voice.VoiceConfig
 import com.aicarcompanion.app.data.DefaultDiagnosticsRepository
 import com.aicarcompanion.app.data.local.AppDatabase
 import com.aicarcompanion.app.data.local.RoomHistoryRepository
@@ -298,13 +297,8 @@ class DefaultAppContainer(context: Context) : AppContainer {
     }
 
     override val speechOutput: SpeechOutput by lazy {
-        AndroidSpeechOutput(appContext, audioFocus, audioFocus.attributes).also { output ->
-            appScope.launch {
-                settings.settings
-                    .map { VoiceConfig(it.speechRate, it.speechPitch, it.ttsEngine, it.ttsVoice) }
-                    .distinctUntilChanged()
-                    .collect(output::configure)
-            }
+        AndroidSpeechOutput(appContext, audioFocus, audioFocus.attributes, connectionLog).also { output ->
+            com.aicarcompanion.app.assistant.voice.VoiceSettingsBinder(appScope, settings, output).start()
         }
     }
 
@@ -329,7 +323,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
             scope = appScope,
             input = AndroidSpeechInput(appContext).apply { preferOffline = { !internetOnline.value } },
             output = speechOutput,
-            conversation = ConversationManager(reasoning, assistantName, { settings.settings.value.explanationLevel }),
+            conversation = ConversationManager(
+                reasoning, assistantName, { settings.settings.value.explanationLevel }, { settings.settings.value.profile },
+            ),
             focus = audioFocus,
             continuousEnabled = { settings.settings.value.continuousConversation },
             internetOnline = internetOnline,

@@ -95,7 +95,7 @@ fun HomeLayoutEditor(
             OutlinedButton(
                 onClick = { onChange(DashboardPlanner.restoreDefaults(dashboard, level)) },
                 modifier = Modifier.heightIn(min = 48.dp).padding(top = 4.dp),
-            ) { Text("Restore Penelope's layout") }
+            ) { Text("Restore the recommended layout") }
         }
     }
 }

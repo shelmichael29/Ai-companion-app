@@ -148,6 +148,31 @@ class AccessibilityAuditTest {
         auditClickables("Everyday at 200% font")
     }
 
+    @Composable
+    private fun personalizationContent() = androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) {
+        com.aicarcompanion.app.ui.settings.PersonalizationContent(
+            com.aicarcompanion.app.ui.settings.PersonalizationState(
+                com.aicarcompanion.app.data.local.AppSettings(), emptyList(), emptyList(),
+                com.aicarcompanion.app.assistant.persona.AssistantProfiles.all.associate {
+                    it.id to com.aicarcompanion.app.assistant.voice.VoiceResolution.Voice("v-${it.id}", "Female voice 1 · works offline", null, false, false)
+                },
+                nameError = null,
+            ),
+            com.aicarcompanion.app.ui.settings.PersonalizationActions(),
+        )
+    }
+
+    @Test fun personalizationSection() {
+        compose.setContent { CarCompanionTheme(ThemeMode.DARK, reduceMotion = true) { personalizationContent() } }
+        auditClickables("Personalization")
+    }
+
+    @Test fun personalizationSectionAtLargestFontSize() {
+        RuntimeEnvironment.setFontScale(2.0f)
+        compose.setContent { CarCompanionTheme(ThemeMode.LIGHT, reduceMotion = true) { personalizationContent() } }
+        auditClickables("Personalization at 200% font")
+    }
+
     /** Proves the audit itself works: a tiny, unlabeled button must be reported. */
     @Test fun auditCatchesSmallUnlabeledTargets() {
         compose.setContent {

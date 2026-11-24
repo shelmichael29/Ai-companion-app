@@ -203,7 +203,7 @@ class GeminiReasoningProvider(
             listOfNotNull(parser.extractTroubleCode(parser.normalize(request.utterance)))
         val allowedCodes = mentioned + ctx.demoCodes.map { it.code } + ctx.latestCodeRead?.codes?.map { it.code }.orEmpty() +
             verified?.text?.let { t -> CODE.findAll(t).map { it.value } }.orEmpty()
-        val system = PromptBuilder.systemInstruction(request.assistantName, request.level, ctx, knowledge, mentioned, now()) +
+        val system = PromptBuilder.systemInstruction(request.assistantName, request.profile, request.level, ctx, knowledge, mentioned, now()) +
             (verified?.let { PromptBuilder.verifiedResult(it.text) } ?: "") +
             triageFor(intent, request.utterance).orEmpty()
 

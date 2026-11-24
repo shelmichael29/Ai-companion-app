@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.assistant.voice
 
+import com.aicarcompanion.app.assistant.persona.VoiceGender
 import com.aicarcompanion.app.data.local.AppSettings
 import java.util.Locale
 
@@ -23,7 +24,8 @@ object VoiceTuning {
 
     /**
      * Voices matching the user's language, offline and higher quality first, with friendly
-     * labels ("English (United States) · Voice 2 · works offline"). Engine voices that are
+     * labels ("English (United States) · Female voice 2 · works offline"). Gender is only shown when
+     * the phone reports it; otherwise the voice is "Unlabeled". Engine voices that are
      * flagged as not installed are skipped.
      */
     fun voiceOptions(voices: List<RawVoice>, locale: Locale): List<VoiceOption> {
@@ -37,12 +39,18 @@ object VoiceTuning {
         val counters = mutableMapOf<String, Int>()
         return sorted.map { v ->
             val place = v.locale.getDisplayName(Locale.getDefault())
-            val n = counters.merge(place, 1, Int::plus)!!
+            val gender = VoiceSelector.genderOf(v)
+            val word = when (gender) {
+                VoiceGender.FEMALE -> "Female"
+                VoiceGender.MALE -> "Male"
+                null -> "Unlabeled"
+            }
+            val n = counters.merge("$place|$word", 1, Int::plus)!!
             val tags = listOfNotNull(
                 if (v.requiresNetwork) "needs internet" else "works offline",
                 "higher quality".takeIf { v.quality >= 400 },
             )
-            VoiceOption(v.name, "$place · Voice $n · ${tags.joinToString(", ")}", v.requiresNetwork, v.quality >= 400)
+            VoiceOption(v.name, "$place · $word voice $n · ${tags.joinToString(", ")}", v.requiresNetwork, v.quality >= 400)
         }
     }
 

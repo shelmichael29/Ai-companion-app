@@ -124,7 +124,7 @@ class DashboardUiTest {
         val items = DashboardPlanner.itemsFor(ExplanationLevel.EVERYDAY, dashboard)
         assertTrue(items.indexOf(DashboardItem.HISTORY) < items.indexOf(DashboardItem.CAR_HEALTH))
 
-        compose.onNodeWithText("Restore Penelope's layout").performScrollTo().performClick()
+        compose.onNodeWithText("Restore the recommended layout").performScrollTo().performClick()
         assertEquals(HomeLayout.EASY, dashboard.forLevel(ExplanationLevel.EVERYDAY).layout)
     }
 

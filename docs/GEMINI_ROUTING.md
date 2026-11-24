@@ -95,3 +95,6 @@ Owner-entered text in Gemini's background facts (the last 5 service titles and t
 ## 7. Not verified here
 - **Real Gemini latency:** the 12 s default is a starting point, so check the logged `ms` values on the phone.
 - **The exact App Check or Firebase error text** your build receives: the classifier is tested against known message formats only.
+
+## 8. Personality (v0.8.0)
+The system instruction has a fixed order: identity (the user's name for the assistant, sanitized and quoted, never an instruction), PERSONALITY (tone and wording only: the profile's instruction, humor line, and a line that personality never changes detail level, rules, facts or safety), HOW TO RESPOND (reply length from the profile, at most 60 words; plain text and no emoji unchanged; the detail line comes from the knowledge level only), RULES 1 to 9, VEHICLE FACTS. Rules, the detail line and vehicle facts are byte-identical across profiles (`PromptPersonaTest`). Personality only affects Gemini replies; deterministic, hands-free and confirmation texts stay neutral. The custom name is never logged.

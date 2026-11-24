@@ -5,13 +5,13 @@ import com.aicarcompanion.app.data.local.ExplanationLevel
 /**
  * Home-screen layout, chosen separately from the knowledge level.
  *
- * - [EASY]: Penelope picks and orders the shortcuts for the current knowledge level.
+ * - [EASY]: the app picks and orders the shortcuts for the current knowledge level.
  * - [CUSTOMIZABLE]: the user picks and orders them.
  *
  * Each knowledge level keeps its own layout, so switching level never erases a customization.
  */
 enum class HomeLayout(val label: String, val description: String) {
-    EASY("Easy", "Penelope arranges your home screen for you."),
+    EASY("Easy", "The app arranges your home screen for you."),
     CUSTOMIZABLE("Customizable", "Choose which shortcuts appear and in what order."),
 }
 
@@ -80,7 +80,7 @@ data class DashboardSettings(val byLevel: Map<ExplanationLevel, LevelLayout> = e
 /** Decides what the home screen shows. Pure logic, unit-tested. */
 object DashboardPlanner {
 
-    /** Penelope's arrangement for each level ([HomeLayout.EASY]). Never includes optional Extras tools. */
+    /** The recommended arrangement for each level ([HomeLayout.EASY]). Never includes optional Extras tools. */
     fun defaults(level: ExplanationLevel): List<DashboardItem> = when (level) {
         ExplanationLevel.EVERYDAY -> listOf(
             DashboardItem.MY_VEHICLE, DashboardItem.CAR_HEALTH, DashboardItem.HISTORY, DashboardItem.SETTINGS, DashboardItem.EXTRAS,
@@ -156,7 +156,7 @@ object DashboardPlanner {
         return settings.with(level, LevelLayout(HomeLayout.CUSTOMIZABLE, items))
     }
 
-    /** Restores Penelope's arrangement for [level] only. Other levels keep their layouts. */
+    /** Restores the recommended arrangement for [level] only. Other levels keep their layouts. */
     fun restoreDefaults(settings: DashboardSettings, level: ExplanationLevel): DashboardSettings =
         settings.with(level, LevelLayout())
 
@@ -167,7 +167,7 @@ object DashboardPlanner {
 enum class ExtraTool(val title: String, val description: String, val available: Boolean, val item: DashboardItem? = null) {
     MILEAGE_LOG("Mileage log", "Record odometer readings for your vehicle.", available = true, item = DashboardItem.MILEAGE_LOG),
     SERVICE_RECORDS("Service records", "Keep track of repairs and maintenance.", available = true),
-    SAMPLE_DATA("Sample data", "Try Penelope with labeled example readings. Settings → Data.", available = true),
+    SAMPLE_DATA("Sample data", "Try the app with labeled example readings. Settings → Data.", available = true),
     FUEL_LOG("Fuel log", "Track fill-ups and fuel economy.", available = false),
     WORK_MILEAGE("Work mileage and tax records", "Separate business trips for your records.", available = false),
     EMISSIONS_READINESS("Emissions readiness", "Check whether your car's emissions monitors are ready.", available = false),

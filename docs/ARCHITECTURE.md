@@ -438,3 +438,9 @@ Room schema v1 (unchanged in Phase 3) (`app/schemas/…/1.json`): `vehicles`, `s
 `mileage`, `response_cache`. All history tables cascade-delete with their vehicle. Enum columns
 are stored by name and read with safe fallbacks (an unknown observation kind becomes an
 unverified note). Future schema changes need a Room migration.
+
+## Assistant personalization and voice (v0.8.0)
+- `assistant/persona`: `AssistantProfiles` (ten fixed profiles), `AssistantNamePolicy` (sanitizes the custom name), `VoiceChoice`. No Android imports.
+- Settings schema 2 (`SettingsCodec`): `assistant_profile`, `custom_assistant_name`, `voice_choice`. Legacy `assistant_name` and `tts_voice` migrate once and are removed (one-way; older builds ignore the new keys).
+- `VoiceSelector` (pure) resolves a `VoiceRequest` against the voices the engine reports; gender only from the phone's data (features, Samsung or Google name codes), never guessed, never faked by pitch. `VoiceConfigFactory` is the single path from settings to `VoiceConfig`, used by `VoiceSettingsBinder` (live settings), conversation and previews. `AndroidSpeechOutput` applies a changed voice at the next utterance and retries once with the default voice if a network voice fails.
+- UI: `ui/settings/PersonalizationSection.kt` (stateless), `ProfileTileStyle.kt`. Screenshots: `docs/screenshots/personalization/` (before/ holds the old Settings voice area).
