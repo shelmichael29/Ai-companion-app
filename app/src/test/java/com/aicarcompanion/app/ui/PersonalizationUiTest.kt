@@ -117,12 +117,49 @@ class PersonalizationUiTest {
         compose.onNodeWithText("Jarvis · Confident, professional", substring = true, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
     }
 
-    @Test fun theSelectedTileShowsTheVoiceThatWillReallyBeUsed() {
-        val res = allAvailable + ("luna" to VoiceResolution.Voice("v-luna", "Female voice 4 · works offline", VoiceGender.FEMALE, false, false))
-        show(AppSettings(assistantProfileId = "atlas", voiceChoice = com.aicarcompanion.app.assistant.persona.VoiceChoice.Profile("luna")), resolutions = res)
+    @Test fun theSelectedTileShowsItsOwnVoiceAndNoDropdownExists() {
+        val res = allAvailable + ("atlas" to VoiceResolution.Voice("v-atlas", "Male voice 2 · works offline", VoiceGender.MALE, false, false))
+        show(AppSettings(assistantProfileId = "atlas"), resolutions = res)
         val tile = compose.onNode(isRadio and hasText("Atlas", substring = true)).fetchSemanticsNode()
         val texts = tile.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
-        assertTrue(texts, texts.contains("Female voice 4"))
+        assertTrue(texts, texts.contains("Male voice 2"))
+        // The separate voice dropdown is gone: no "Same as personality" option, and the summary shows the profile's own voice.
+        assertEquals(0, compose.onAllNodes(hasText("Same as personality", substring = true)).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(hasText("'s voice ·", substring = true)).fetchSemanticsNodes().size)
+        compose.onNodeWithText("More voice options").performScrollTo().assertIsDisplayed()
+    }
+
+    private val sourceRadios = SemanticsMatcher("voice source radio") {
+        it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton &&
+            (it.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { t -> t.text }).let { t -> t.contains("Online (") || t.contains("Offline (") }
+    }
+
+    @Test fun voiceSourceHasTwoRadioOptionsOfAtLeast48dp() {
+        val picked = mutableListOf<com.aicarcompanion.app.data.local.VoiceSource>()
+        show(actions = PersonalizationActions(onVoiceSource = { picked += it }))
+        val nodes = compose.onAllNodes(sourceRadios).fetchSemanticsNodes()
+        assertEquals(2, nodes.size)
+        val density = compose.activity.resources.displayMetrics.density
+        nodes.forEach { assertTrue(it.size.height / density >= 47.5f) }
+        compose.onNode(isRadio and hasText("Offline (works without internet)")).assertIsSelected()
+        compose.onNode(isRadio and hasText("Online (more natural, needs internet)")).performScrollTo().performClick()
+        assertEquals(listOf(com.aicarcompanion.app.data.local.VoiceSource.ONLINE), picked)
+    }
+
+    @Test fun onlineWithNoOnlineVoicesSaysSoHonestly() {
+        show(AppSettings(voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE))
+        compose.onNodeWithText("This phone has no online voices installed; using offline voices.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun noNoteWhenOnlineVoicesAreUsedOrOfflineIsChosen() {
+        val online = allAvailable.mapValues { (id, _) -> VoiceResolution.Voice("v-$id", "Female voice 1 · needs internet", VoiceGender.FEMALE, false, true) as VoiceResolution? }
+        show(AppSettings(voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE), resolutions = online)
+        assertEquals(0, compose.onAllNodes(hasText("no online voices", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun offlineChoiceShowsNoOnlineNote() {
+        show()
+        assertEquals(0, compose.onAllNodes(hasText("no online voices", substring = true)).fetchSemanticsNodes().size)
     }
 
     @Test fun aProfileWhoseVoiceCouldNotBeResolvedSaysSo() {
@@ -150,7 +187,6 @@ class PersonalizationUiTest {
     @Test fun missingMaleVoiceIsExplainedHonestly() {
         show(resolutions = noMale)
         compose.onNodeWithText("No male voice is installed on this phone.", substring = true).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Atlas's voice", substring = true).let { /* never offered in the picker */ }
         assertEquals(4, compose.onAllNodes(hasText("Uses the phone's default voice", substring = true)).fetchSemanticsNodes().size)
     }
 

@@ -18,9 +18,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.aicarcompanion.app.assistant.persona.AssistantProfiles
-import com.aicarcompanion.app.assistant.persona.VoiceChoice
 import com.aicarcompanion.app.assistant.persona.VoiceGender
-import com.aicarcompanion.app.assistant.voice.VoiceOption
+import com.aicarcompanion.app.data.local.VoiceSource
 import com.aicarcompanion.app.assistant.voice.VoiceResolution
 import com.aicarcompanion.app.data.local.AppSettings
 import com.aicarcompanion.app.data.local.ThemeMode
@@ -57,7 +56,7 @@ class PersonalizationScreenshotTest(private val shot: Shot) {
         @JvmStatic
         @ParameterizedRobolectricTestRunner.Parameters(name = "{0}")
         fun shots(): List<Array<Any>> = buildList {
-            for (scenario in listOf("default", "atlas-custom-name", "no-male-voice")) {
+            for (scenario in listOf("default", "atlas-custom-name", "no-male-voice", "online-no-online-voices")) {
                 for (theme in listOf(ThemeMode.LIGHT, ThemeMode.DARK)) for (font in listOf(1f, 2f)) add(Shot(scenario, theme, font))
             }
         }.map { arrayOf<Any>(it) }
@@ -72,19 +71,16 @@ class PersonalizationScreenshotTest(private val shot: Shot) {
         }
     }
 
-    private fun installedVoices(male: Boolean): List<VoiceOption> =
-        (1..6).map { VoiceOption("f$it", "English (United States) · Female voice $it · works offline", false, it > 4) } +
-            if (male) (1..3).map { VoiceOption("m$it", "English (United States) · Male voice $it · works offline", false, false) } else emptyList()
-
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private fun stateFor(s: Shot): PersonalizationState = when (s.scenario) {
         "atlas-custom-name" -> PersonalizationState(
-            AppSettings(assistantProfileId = "atlas", customName = "Jarvis", voiceChoice = VoiceChoice.Profile("luna"), speechRate = 1.2f, speechPitch = 0.9f),
-            installedVoices(male = true), emptyList(), fixtureResolutions, nameError = null,
+            AppSettings(assistantProfileId = "atlas", customName = "Jarvis", speechRate = 1.2f, speechPitch = 0.9f),
+            emptyList(), fixtureResolutions, nameError = null,
         )
-        "no-male-voice" -> PersonalizationState(AppSettings(assistantProfileId = "oliver"), installedVoices(male = false), emptyList(), noMaleResolutions, nameError = null)
-        else -> PersonalizationState(AppSettings(), installedVoices(male = true), emptyList(), fixtureResolutions, nameError = null)
+        "no-male-voice" -> PersonalizationState(AppSettings(assistantProfileId = "oliver"), emptyList(), noMaleResolutions, nameError = null)
+        "online-no-online-voices" -> PersonalizationState(AppSettings(voiceSource = VoiceSource.ONLINE), emptyList(), fixtureResolutions, nameError = null)
+        else -> PersonalizationState(AppSettings(), emptyList(), fixtureResolutions, nameError = null)
     }
 
     @Test fun render() {

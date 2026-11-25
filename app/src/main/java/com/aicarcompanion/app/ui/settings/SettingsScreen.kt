@@ -106,7 +106,10 @@ class SettingsViewModel(
         }
     }
 
-    fun selectProfile(id: String) = store.update { it.copy(assistantProfileId = AssistantProfiles.byId(id).id) }
+    /** Each profile speaks with its own voice, so choosing a profile always means "voice follows the profile". */
+    fun selectProfile(id: String) = store.update {
+        it.copy(assistantProfileId = AssistantProfiles.byId(id).id, voiceChoice = VoiceChoice.MatchPersonality)
+    }
 
     fun setVoiceSource(source: com.aicarcompanion.app.data.local.VoiceSource) {
         store.update { it.copy(voiceSource = source) }
