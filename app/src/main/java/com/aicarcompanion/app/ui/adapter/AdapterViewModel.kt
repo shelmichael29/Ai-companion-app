@@ -30,7 +30,11 @@ class AdapterViewModel(
     private val history: VehicleHistoryRepository,
     /** Beginner flow: search, connect with bounded retries, remember only adapters that worked. */
     val setup: com.aicarcompanion.app.connectivity.AdapterConnectionManager,
+    private val obdConfig: com.aicarcompanion.app.diagnostics.obd.ObdConfigStore,
 ) : ViewModel() {
+
+    /** True when the saved connection settings differ from the recommended ones (shown as a troubleshooting tip). */
+    val customConfigActive: Boolean get() = !obdConfig.config.value.isRecommended
 
     var availability by mutableStateOf(gateway.availability())
         private set

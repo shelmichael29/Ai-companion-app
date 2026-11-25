@@ -60,6 +60,19 @@ import kotlin.math.roundToInt
  * marked as such. Nothing here can send a command outside the read-only allowlist.
  */
 @Composable
+internal fun ConnectionSettingsStatus(appliesNow: Boolean) {
+    Text(
+        if (appliesNow) {
+            "These settings are active. Changes to protocol, timing or response format reconnect the adapter automatically."
+        } else {
+            "Saved, but not active: custom connection settings are switched off for now, so the app uses the recommended automatic settings. The connection test, log and console below still work."
+        },
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (appliesNow) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,
+    )
+}
+
+@Composable
 fun AdvancedConnectionScreen(
     contentPadding: PaddingValues,
     viewModel: AdvancedConnectionViewModel = viewModel(factory = AppViewModelProvider.Factory),
@@ -78,15 +91,7 @@ fun AdvancedConnectionScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text(
-                if (viewModel.appliesNow) {
-                    "These settings are active. Changes to protocol, timing or response format reconnect the adapter automatically."
-                } else {
-                    "Saved, but not active: custom connection settings are switched off for now, so the app uses the recommended automatic settings. The connection test, log and console below still work."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (viewModel.appliesNow) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,
-            )
+            ConnectionSettingsStatus(viewModel.appliesNow)
         }
 
         item {

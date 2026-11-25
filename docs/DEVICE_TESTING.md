@@ -198,6 +198,15 @@ Change the level under **Settings → Detail level**.
 9. **Over car Bluetooth:** Penelope's prompts are audible and the confirmation works by voice.
 
 
+## 0f. Phase 1B: Advanced features in DIY (v0.10.0, build 11) (NOT RUN in automated tests)
+1. Upgrade in place from v0.9.0: vehicles, history, personality, voice and layouts intact. Before upgrading, on v0.9.0 DIY save a manual protocol (e.g. CAN 29-bit 250k with fallback off). After upgrading to 0.10.0 the Connection screen says the settings are active; if the car is silent the Troubleshooting tip appears, and Restore recommended recovers the connection.
+2. DIY, Advanced connection settings: the screen says the settings are active. Change the poll interval or turn on the communication log, reconnect: the log records redacted traffic.
+3. DIY, connected to the car: the adapter card lists the supported readings (fuel trims, MAP, MAF) and omits any the car doesn't report.
+4. DIY: "are you connected?" mentions the protocol; "tell me about my engine" mentions the drivetrain. Everyday: neither.
+5. DIY home, Results shortcut opens the Diagnostics tab; back behaves sensibly.
+6. DIY with custom settings and the car not answering: Troubleshooting shows the "Restore recommended" tip; tapping Restore recommended fixes it.
+7. Everyday: home, tabs, adapter flow unchanged. Every personality is selectable at both levels and keeps its voice after switching levels. TalkBack and 200% font on the new tip and readings.
+
 ## 0e. Phase 1A: two knowledge levels (v0.9.0, build 10) (NOT RUN in automated tests)
 1. Upgrade in place (no uninstall) from a build that had Advanced selected: the app opens at DIY; vehicles, history, adapter and Live Data layouts are intact.
 2. Settings, "How much detail?" shows exactly two choices (Everyday driver, DIY enthusiast); none is named Advanced. Restart the app: the choice persists.

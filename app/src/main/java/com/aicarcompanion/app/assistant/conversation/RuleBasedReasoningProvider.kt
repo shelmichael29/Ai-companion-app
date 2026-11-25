@@ -214,7 +214,7 @@ class RuleBasedReasoningProvider(
                 sentences += "It's listed as using ${listOfNotNull(e.fuelGrade?.lowercase(), e.fuelType.label.lowercase()).joinToString(" ")}."
             }
             v.transmission?.let { sentences += "Transmission: $it." }
-            if (level == ExplanationLevel.ADVANCED) v.drivetrain?.let { sentences += "Drive: $it." }
+            if (level != ExplanationLevel.EVERYDAY) v.drivetrain?.let { sentences += "Drive: $it." }
             if (e.layout == EngineLayout.UNKNOWN && (e.cylinders ?: 0) >= 5) {
                 sentences += "The cylinder layout, inline or V, hasn't been confirmed in your profile."
             }
@@ -454,7 +454,7 @@ class RuleBasedReasoningProvider(
         is ObdConnectionState.Connected -> reply(
             "I'm connected to your adapter, ${s.adapterName}." + when {
                 s.vehicleProtocol == null -> " Your car isn't responding yet. Is the ignition on?"
-                level == ExplanationLevel.ADVANCED -> " The vehicle is responding using ${s.vehicleProtocol}."
+                level != ExplanationLevel.EVERYDAY -> " The vehicle is responding using ${s.vehicleProtocol}."
                 else -> " Your car is responding."
             },
             ReplyBasis.LIVE_VEHICLE_DATA,

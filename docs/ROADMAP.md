@@ -48,6 +48,7 @@ All of these passed the automated gate; none is device-verified yet (`docs/QUALI
 6. **Navigation and the iOS app**: separate tracks, using the same `handsfree` contracts.
 
 ## Next (recommended order)
+0. **Knowledge-level overhaul (4 prompts):** Prompt 1 (two levels, v0.9.0) merged; Prompt 2 (Advanced features into DIY, v0.10.0) built, PR not merged. **STOP after Prompt 2:** the DIY visual redesign (Prompt 3) does not start until the owner approves.
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
    ELM327 transcripts (DIY → Advanced connection settings → communication log → Copy log) and turn them into parser test fixtures.
 2. **OBD-II hardening** — foreground service for long sessions, read VIN via mode 09 PID 02
