@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,12 +56,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.aicarcompanion.app.assistant.persona.AssistantProfile
 import com.aicarcompanion.app.assistant.persona.AssistantProfiles
-import com.aicarcompanion.app.assistant.persona.VoiceChoice
 import com.aicarcompanion.app.assistant.persona.VoiceGender
 import com.aicarcompanion.app.assistant.voice.EngineOption
-import com.aicarcompanion.app.assistant.voice.VoiceOption
 import com.aicarcompanion.app.assistant.voice.VoiceResolution
 import com.aicarcompanion.app.data.local.AppSettings
+import com.aicarcompanion.app.data.local.VoiceSource
 import com.aicarcompanion.app.ui.design.ExpandableSection
 import com.aicarcompanion.app.ui.design.PenelopeIcons
 import com.aicarcompanion.app.ui.theme.Penelope
@@ -69,7 +69,6 @@ import java.util.Locale
 /** Everything the personalization section shows. Stateless: the screen and tests supply it. */
 data class PersonalizationState(
     val settings: AppSettings,
-    val voices: List<VoiceOption>,
     val engines: List<EngineOption>,
     /** Profile id to what that profile's voice resolves to on this phone (null = not known yet). */
     val resolutions: Map<String, VoiceResolution?>,
@@ -79,7 +78,7 @@ data class PersonalizationState(
 class PersonalizationActions(
     val onSelectProfile: (String) -> Unit = {},
     val onPreview: (String) -> Unit = {},
-    val onVoiceChoice: (VoiceChoice) -> Unit = {},
+    val onVoiceSource: (VoiceSource) -> Unit = {},
     val onEngine: (String?) -> Unit = {},
     val onRename: (String) -> Unit = {},
     val onSpeed: (Float) -> Unit = {},
@@ -91,36 +90,18 @@ class PersonalizationActions(
 /** From this font scale up, the profile grid becomes one column so names and descriptions never clip. */
 private const val SINGLE_COLUMN_FONT_SCALE = 1.5f
 
-private const val KEY_MATCH = "match"
-private const val KEY_PROFILE = "profile:"
-private const val KEY_INSTALLED = "installed:"
-
-private fun choiceKey(choice: VoiceChoice): String = when (choice) {
-    VoiceChoice.MatchPersonality -> KEY_MATCH
-    is VoiceChoice.Profile -> KEY_PROFILE + choice.id
-    is VoiceChoice.Installed -> KEY_INSTALLED + choice.voiceName
-}
-
-private fun choiceFromKey(key: String?): VoiceChoice = when {
-    key == null || key == KEY_MATCH -> VoiceChoice.MatchPersonality
-    key.startsWith(KEY_PROFILE) -> VoiceChoice.Profile(key.removePrefix(KEY_PROFILE))
-    else -> VoiceChoice.Installed(key.removePrefix(KEY_INSTALLED))
-}
-
 /** What the selected personality will really speak with (the same choice the conversation and its preview use). */
-private fun effectiveResolution(state: PersonalizationState): VoiceResolution? {
-    val s = state.settings
-    return when (val c = s.voiceChoice) {
-        VoiceChoice.MatchPersonality, is VoiceChoice.Installed -> state.resolutions[s.assistantProfileId]
-        is VoiceChoice.Profile -> state.resolutions[c.id]
-    }
-}
+private fun effectiveResolution(state: PersonalizationState): VoiceResolution? = state.resolutions[state.settings.assistantProfileId]
 
-/** The voice description for the current choice, or null when the phone can't say. */
-private fun currentVoiceLabel(state: PersonalizationState): String? {
-    val c = state.settings.voiceChoice
-    if (c is VoiceChoice.Installed) state.voices.firstOrNull { it.id == c.voiceName }?.let { return it.label }
-    return effectiveResolution(state)?.label
+/** The voice description for the selected profile, or null when the phone can't say. */
+private fun currentVoiceLabel(state: PersonalizationState): String? = effectiveResolution(state)?.label
+
+/** Online chosen but every resolved voice works offline: the phone has no online voice for these profiles. */
+private fun noOnlineVoiceNotice(state: PersonalizationState): String? {
+    if (state.settings.voiceSource != VoiceSource.ONLINE) return null
+    val voices = state.resolutions.values.filterIsInstance<VoiceResolution.Voice>()
+    if (voices.isEmpty() || voices.any { it.requiresNetwork }) return null
+    return "This phone has no online voices installed; using offline voices."
 }
 
 private fun missingVoiceNotice(state: PersonalizationState): String? {
@@ -151,7 +132,8 @@ fun PersonalizationContent(state: PersonalizationState, actions: Personalization
         missingVoiceNotice(state)?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        VoicePicker(state, actions)
+        VoiceSourceChoice(state, actions)
+        MoreVoiceOptions(state, actions)
         NameField(state, actions)
         LabeledSlider(
             "Speaking speed", s.speechRate, AppSettings.RATE_RANGE, actions.onSpeed,
@@ -176,9 +158,8 @@ private fun ProfileGrid(state: PersonalizationState, actions: PersonalizationAct
                     val selected = profile.id == state.settings.assistantProfileId
                     ProfileTile(
                         profile,
-                        // The selected tile shows the voice that will really be used, matching its preview.
-                        voiceLabel = if (selected) currentVoiceLabel(state) else state.resolutions[profile.id]?.label,
-                        resolution = if (selected) effectiveResolution(state) else state.resolutions[profile.id],
+                        voiceLabel = state.resolutions[profile.id]?.label,
+                        resolution = state.resolutions[profile.id],
                         loaded = state.resolutions.containsKey(profile.id),
                         selected = selected,
                         actions = actions, modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -252,27 +233,33 @@ private fun tileWarning(resolution: VoiceResolution?): String? = when {
 }
 
 @Composable
-private fun VoicePicker(state: PersonalizationState, actions: PersonalizationActions) {
-    val s = state.settings
-    val options = buildList {
-        add(KEY_MATCH to "Same as personality (default)")
-        AssistantProfiles.all.forEach { p ->
-            val r = state.resolutions[p.id]
-            // Only voices that really exist are offered.
-            if (r is VoiceResolution.Voice) add(choiceKey(VoiceChoice.Profile(p.id)) to "${p.name}'s voice · ${r.label}")
+private fun VoiceSourceChoice(state: PersonalizationState, actions: PersonalizationActions) {
+    val source = state.settings.voiceSource
+    Text("Voice", style = MaterialTheme.typography.titleSmall)
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        listOf(
+            VoiceSource.ONLINE to "Online (more natural, needs internet)",
+            VoiceSource.OFFLINE to "Offline (works without internet)",
+        ).forEach { (option, label) ->
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .selectable(source == option, role = Role.RadioButton) { actions.onVoiceSource(option) },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RadioButton(selected = source == option, onClick = null)
+                Text(label, style = MaterialTheme.typography.bodyMedium)
+            }
         }
-        state.voices.forEach { add(KEY_INSTALLED + it.id to it.label) }
     }
-    val selectedKey = choiceKey(s.voiceChoice)
-    val selectedLabel = options.firstOrNull { it.first == selectedKey }?.second
-        ?: if (s.voiceChoice is VoiceChoice.Installed) "A voice that isn't installed anymore" else "Same as personality (default)"
-    Picker(
-        label = "Voice",
-        selectedLabel = selectedLabel,
-        options = options,
-        onSelect = { actions.onVoiceChoice(choiceFromKey(it)) },
-        emptyHint = if (state.voices.isEmpty()) "Your phone didn't list any voices; the default voice is used." else null,
-    )
+    noOnlineVoiceNotice(state)?.let {
+        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun MoreVoiceOptions(state: PersonalizationState, actions: PersonalizationActions) {
+    val s = state.settings
     ExpandableSection("More voice options") {
         if (state.engines.size > 1) {
             Picker(

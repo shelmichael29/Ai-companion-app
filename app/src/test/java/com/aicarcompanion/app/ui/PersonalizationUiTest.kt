@@ -64,7 +64,7 @@ class PersonalizationUiTest {
         compose.setContent {
             CarCompanionTheme(mode, reduceMotion = true) {
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    PersonalizationContent(PersonalizationState(settings, emptyList(), emptyList(), resolutions, null), actions)
+                    PersonalizationContent(PersonalizationState(settings, emptyList(), resolutions, null), actions)
                 }
             }
         }
@@ -84,7 +84,7 @@ class PersonalizationUiTest {
             CarCompanionTheme(ThemeMode.DARK, reduceMotion = true) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     PersonalizationContent(
-                        PersonalizationState(s, emptyList(), emptyList(), allAvailable, null),
+                        PersonalizationState(s, emptyList(), allAvailable, null),
                         PersonalizationActions(onSelectProfile = { s = s.copy(assistantProfileId = it) }),
                     )
                 }
@@ -167,7 +167,7 @@ class PersonalizationUiTest {
                 if (visible) {
                     Column(Modifier.verticalScroll(rememberScrollState())) {
                         PersonalizationContent(
-                            PersonalizationState(AppSettings(), emptyList(), emptyList(), allAvailable, null),
+                            PersonalizationState(AppSettings(), emptyList(), allAvailable, null),
                             PersonalizationActions(onRename = { saved += it }),
                         )
                     }

@@ -4,6 +4,7 @@ import com.aicarcompanion.app.assistant.persona.AssistantProfiles
 import com.aicarcompanion.app.assistant.persona.VoiceChoice
 import com.aicarcompanion.app.assistant.persona.VoiceGender
 import com.aicarcompanion.app.data.local.AppSettings
+import com.aicarcompanion.app.data.local.VoiceSource
 import java.util.Locale
 
 /** What the speech engine should be asked to use. */
@@ -15,7 +16,7 @@ sealed interface VoiceRequest {
     data class Named(val name: String, val fallback: Gendered) : VoiceRequest
 
     /** The [slot]-th voice of a gender, when the phone has voices it can tell apart by gender. */
-    data class Gendered(val gender: VoiceGender, val slot: Int) : VoiceRequest
+    data class Gendered(val gender: VoiceGender, val slot: Int, val preferOnline: Boolean = false) : VoiceRequest
 }
 
 /** The outcome of choosing a voice from what is actually installed. Never claims a gender it doesn't know. */
@@ -115,7 +116,9 @@ object VoiceSelector {
     private fun gendered(request: VoiceRequest.Gendered, sorted: List<VoiceTuning.RawVoice>, notice: String?): VoiceResolution {
         val ofGender = sorted.filter { genderOf(it) == request.gender }
         val offline = ofGender.filter { !it.requiresNetwork }
-        val pool = offline.ifEmpty { ofGender }
+        val online = ofGender.filter { it.requiresNetwork }
+        // Online preferred: network voices first, offline only if there are none. Otherwise the reverse. Never an unknown gender.
+        val pool = if (request.preferOnline) online.ifEmpty { offline } else offline.ifEmpty { online }
         if (pool.isEmpty()) {
             val word = if (request.gender == VoiceGender.MALE) "male" else "female"
             return VoiceResolution.FallbackDefault(notice?.let { "$it. " }.orEmpty() + "No $word voice is installed on this phone", request.gender)
@@ -137,7 +140,9 @@ object VoiceSelector {
 object VoiceConfigFactory {
     fun request(settings: AppSettings, override: VoiceChoice? = null): VoiceRequest {
         fun forProfile(id: String): VoiceRequest.Gendered =
-            AssistantProfiles.byId(id).let { VoiceRequest.Gendered(it.voiceGender, it.voiceSlot) }
+            AssistantProfiles.byId(id).let {
+                VoiceRequest.Gendered(it.voiceGender, it.voiceSlot, settings.voiceSource == VoiceSource.ONLINE)
+            }
         return when (val choice = override ?: settings.voiceChoice) {
             VoiceChoice.MatchPersonality -> forProfile(settings.assistantProfileId)
             is VoiceChoice.Profile -> forProfile(choice.id)

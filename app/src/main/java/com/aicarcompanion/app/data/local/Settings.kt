@@ -40,6 +40,8 @@ data class AppSettings(
     val customName: String? = null,
     /** Which voice to speak with; by default the one matching the personality. */
     val voiceChoice: VoiceChoice = VoiceChoice.MatchPersonality,
+    /** Whether voices that need internet are preferred. Offline (the default) works without a connection. */
+    val voiceSource: VoiceSource = VoiceSource.OFFLINE,
     /** When on, the dashboard and Penelope use labeled sample diagnostics. Off by default. */
     val demoDataEnabled: Boolean = false,
     /** Bluetooth address of the last OBD-II adapter the user connected to. */
@@ -91,6 +93,9 @@ class InMemorySettingsStore(initial: AppSettings = AppSettings()) : SettingsStor
     override fun update(transform: (AppSettings) -> AppSettings) = state.update(transform)
 }
 
+/** Which kind of installed voice is preferred. If an online voice fails or the phone is offline, speech falls back so it never stops. */
+enum class VoiceSource { OFFLINE, ONLINE }
+
 /** Minimal key-value storage so the settings codec can be unit-tested without Android. */
 interface KeyValueStore {
     fun getString(key: String): String?
@@ -136,6 +141,7 @@ object SettingsCodec {
     private const val KEY_PROFILE = "assistant_profile"
     private const val KEY_CUSTOM_NAME = "custom_assistant_name"
     private const val KEY_VOICE_CHOICE = "voice_choice"
+    private const val KEY_VOICE_SOURCE = "voice_source"
     private const val VOICE_MATCH = "match"
     private const val KEY_SCHEMA = "settings_schema"
     private const val SCHEMA = "2"
@@ -188,6 +194,7 @@ object SettingsCodec {
             assistantProfileId = profileId,
             customName = customName,
             voiceChoice = voiceChoice,
+            voiceSource = VoiceSource.entries.firstOrNull { it.name.lowercase() == store.getString(KEY_VOICE_SOURCE) } ?: defaults.voiceSource,
             demoDataEnabled = store.getBoolean(KEY_DEMO) ?: defaults.demoDataEnabled,
             lastAdapterAddress = store.getString(KEY_ADAPTER),
             speechRate = (store.getFloat(KEY_RATE) ?: defaults.speechRate).coerceIn(AppSettings.RATE_RANGE),
@@ -229,6 +236,7 @@ object SettingsCodec {
             KEY_PROFILE to s.assistantProfileId,
             KEY_CUSTOM_NAME to s.customName,
             KEY_VOICE_CHOICE to VOICE_MATCH,
+            KEY_VOICE_SOURCE to s.voiceSource.name.lowercase(),
             KEY_SCHEMA to SCHEMA,
             KEY_LEGACY_NAME to null,
             KEY_LEGACY_VOICE to null,
