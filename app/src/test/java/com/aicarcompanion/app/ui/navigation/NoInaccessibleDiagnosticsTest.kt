@@ -37,10 +37,13 @@ class NoInaccessibleDiagnosticsTest {
         assertFalse(offersConnectionSettings(ExplanationLevel.EVERYDAY))
     }
 
-    @Test fun `a saved custom connection config applies at DIY`() {
+    @Test fun `custom connection config stays Advanced-only, so selectable levels use recommended`() {
+        // Owner decision 2026-11-25: custom connection settings apply only at the (internal) Advanced level.
         val custom = ObdConnectionConfig(protocol = ObdProtocol.CAN_11_500, pollIntervalMillis = 250, autoReconnect = false)
-        assertEquals(custom, ObdConnectionConfig.effectiveFor(diy, custom))
-        assertEquals(ObdConnectionConfig.RECOMMENDED, ObdConnectionConfig.effectiveFor(ExplanationLevel.EVERYDAY, custom))
+        ExplanationLevel.selectable.forEach {
+            assertEquals(ObdConnectionConfig.RECOMMENDED, ObdConnectionConfig.effectiveFor(it, custom))
+        }
+        assertEquals(custom, ObdConnectionConfig.effectiveFor(ExplanationLevel.ADVANCED, custom))
     }
 
     @Test fun `clear codes refusal names DIY and never Advanced`() {

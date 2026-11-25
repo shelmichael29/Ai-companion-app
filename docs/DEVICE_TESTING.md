@@ -208,5 +208,5 @@ Change the level under **Settings → Detail level**.
 1. Upgrade in place (no uninstall) from a build that had Advanced selected: the app opens at DIY; vehicles, history, adapter and Live Data layouts are intact.
 2. Settings, "How much detail?" shows exactly two choices (Everyday driver, DIY enthusiast); none is named Advanced. Restart the app: the choice persists.
 3. Everyday: home, tabs, Drive and More look as before (no new technical info).
-4. DIY: Adapter screen shows "Advanced connection settings"; More lists Connection; the saved connection settings apply; the read-only console refuses Mode 04.
+4. DIY: Adapter screen shows "Advanced connection settings"; More lists Connection; the screen says custom settings are switched off for now and the recommended settings are used; the read-only console refuses Mode 04.
 5. TalkBack: each level is read as one radio button with its description; font size 200% leaves no overlap.
