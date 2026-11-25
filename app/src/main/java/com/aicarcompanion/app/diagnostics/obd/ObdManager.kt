@@ -630,7 +630,7 @@ class ObdManager(
             is ClearCodesResult.NoAnswer -> result.remaining
             is ClearCodesResult.Refused -> null
         }
-        val text = "Trouble codes cleared by you with Penelope. $what Codes before: " +
+        val text = "Trouble codes cleared by you in the app. $what Codes before: " +
             (before.joinToString().ifEmpty { "none" }) + ". Codes reported afterwards: " +
             (after?.toString() ?: "not re-read") + "." +
             if (result is ClearCodesResult.Cleared) " Readiness monitors were reset." else ""

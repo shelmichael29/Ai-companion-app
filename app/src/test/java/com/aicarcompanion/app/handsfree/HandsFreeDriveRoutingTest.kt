@@ -37,6 +37,22 @@ class HandsFreeDriveRoutingTest {
 
     private suspend fun say(text: String, access: Boolean = true) = provider(access).respond(AssistantRequest(text, "Penelope"))
 
+    @Test fun `replies never hardcode Penelope when the user renamed the assistant`() = runTest {
+        suspend fun jarvis(text: String, access: Boolean) = provider(access).respond(AssistantRequest(text, "Jarvis"))
+        val replies = listOf(
+            jarvis("read my messages", false).text,
+            jarvis("call Sam", false).text,
+            jarvis("unlock the doors", true).text,
+        )
+        replies.forEach { assertFalse(it, it.contains("Penelope")) }
+        PlatformRequirement.entries.forEach { assertFalse(it.description.contains("Penelope")) }
+        HandsFreeCapability.entries.forEach { c ->
+            listOf(CapabilityStatus.NotImplemented, CapabilityStatus.NotSupported).forEach {
+                assertFalse(HandsFreeSafety.unavailableReply(c, it).contains("Penelope"))
+            }
+        }
+    }
+
     @Test fun `media commands ask the media app and say so honestly`() = runTest {
         assertEquals("I asked your media app to pause.", say("pause the music").text)
         assertEquals("I asked your media app to play.", say("play some music").text)

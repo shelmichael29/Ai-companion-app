@@ -263,7 +263,7 @@ fun describe(state: ObdConnectionState): Pair<String, String> = when (state) {
     is ObdConnectionState.Connected -> when (com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.of(state)) {
         com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.VEHICLE_CONNECTED -> "Vehicle connected" to "${state.adapterName} is connected and your car is responding."
         com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.DEGRADED, com.aicarcompanion.app.diagnostics.obd.VehicleLinkStage.RECOVERING ->
-            "Recovering connection" to "Your car stopped answering for a moment. Penelope is re-checking it automatically."
+            "Recovering connection" to "Your car stopped answering for a moment. I'm re-checking it automatically."
         else -> "Adapter connected" to
             "${state.adapterName} is connected, but your car isn't responding. Turn the ignition on, then tap \"Check vehicle again\"."
     }

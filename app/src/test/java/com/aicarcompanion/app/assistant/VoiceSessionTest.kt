@@ -68,7 +68,8 @@ class VoiceSessionTest {
             } finally { speakingNow-- }
         }
         override fun stop() { current?.complete(SpeakResult.Interrupted); current = null }
-        override fun configure(config: VoiceConfig) = Unit
+        val configs = mutableListOf<VoiceConfig>()
+        override fun configure(config: VoiceConfig) { configs += config }
     }
 
     private val echo = object : ReasoningProvider {
@@ -97,6 +98,29 @@ class VoiceSessionTest {
         input.say("thanks"); advanceUntilIdle()
         assertEquals(3, input.listens)
         assertEquals(4, s.conversation.turns.value.size)
+        s.end(); advanceUntilIdle()
+    }
+
+    @Test fun `changing personality while speaking does not stop speech and the next reply uses the new voice`() = runTest {
+        val input = FakeInput(); val output = FakeOutput().apply { holdSpeech = true }
+        val store = com.aicarcompanion.app.data.local.InMemorySettingsStore()
+        val binder = com.aicarcompanion.app.assistant.voice.VoiceSettingsBinder(this, store, output).start()
+        val s = session(input, output)
+        s.start(); advanceUntilIdle()
+        input.say("hello"); advanceUntilIdle()
+        assertTrue(s.state.value is VoiceState.Speaking)
+        store.update { it.copy(assistantProfileId = "atlas") }
+        advanceUntilIdle()
+        assertTrue("still speaking", s.state.value is VoiceState.Speaking)
+        assertEquals(1, output.spoken.size)
+        val applied = output.configs.last().voice as com.aicarcompanion.app.assistant.voice.VoiceRequest.Gendered
+        assertEquals(com.aicarcompanion.app.assistant.persona.VoiceGender.MALE, applied.gender)
+        // Finish this reply; the continuous loop listens again and the next reply is spoken.
+        output.current?.complete(SpeakResult.Completed); advanceUntilIdle()
+        assertTrue(s.state.value is VoiceState.Listening)
+        input.say("again"); advanceUntilIdle()
+        assertEquals(2, output.spoken.size)
+        binder.cancel()
         s.end(); advanceUntilIdle()
     }
 

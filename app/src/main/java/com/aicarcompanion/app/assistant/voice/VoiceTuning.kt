@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.assistant.voice
 
+import com.aicarcompanion.app.assistant.persona.VoiceGender
 import com.aicarcompanion.app.data.local.AppSettings
 import java.util.Locale
 
@@ -23,26 +24,25 @@ object VoiceTuning {
 
     /**
      * Voices matching the user's language, offline and higher quality first, with friendly
-     * labels ("English (United States) · Voice 2 · works offline"). Engine voices that are
+     * labels ("English (United States) · Female voice 2 · works offline"). Gender is only shown when
+     * the phone reports it; otherwise the voice is "Unlabeled". Engine voices that are
      * flagged as not installed are skipped.
      */
     fun voiceOptions(voices: List<RawVoice>, locale: Locale): List<VoiceOption> {
-        val sameLanguage = voices.filter { it.locale.language == locale.language && "notInstalled" !in it.features }
-        val sorted = sameLanguage.sortedWith(
-            compareBy<RawVoice> { it.locale.country != locale.country }
-                .thenBy { it.requiresNetwork }
-                .thenByDescending { it.quality }
-                .thenBy { it.name },
-        )
-        val counters = mutableMapOf<String, Int>()
+        val sorted = VoiceSelector.candidates(voices, locale)
         return sorted.map { v ->
             val place = v.locale.getDisplayName(Locale.getDefault())
-            val n = counters.merge(place, 1, Int::plus)!!
+            val word = when (VoiceSelector.genderOf(v)) {
+                VoiceGender.FEMALE -> "Female"
+                VoiceGender.MALE -> "Male"
+                null -> "Unlabeled"
+            }
             val tags = listOfNotNull(
                 if (v.requiresNetwork) "needs internet" else "works offline",
                 "higher quality".takeIf { v.quality >= 400 },
             )
-            VoiceOption(v.name, "$place · Voice $n · ${tags.joinToString(", ")}", v.requiresNetwork, v.quality >= 400)
+            // The same numbering the profile tiles use, so one voice has one name everywhere.
+            VoiceOption(v.name, "$place · $word voice ${VoiceSelector.ordinalOf(v, sorted)} · ${tags.joinToString(", ")}", v.requiresNetwork, v.quality >= 400)
         }
     }
 

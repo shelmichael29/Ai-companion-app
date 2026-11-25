@@ -48,3 +48,5 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 - VIN scanner and recalls, remaining checks: flashlight, camera permission prompts and the settings round trip, rotation, TalkBack, spoken guidance; for recalls, Try again after a failure, a car added by Search or Manual, an old model year (`docs/DEVICE_TESTING.md` §1c). The main flows are verified.
 
 When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/QUALITY_SUMMARY.md`.
+
+**v0.8.0 (9), assistant personalization and voice overhaul:** built on feature/assistant-personalization; automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.

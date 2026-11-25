@@ -142,7 +142,7 @@ fun EverydayDriverDashboard(
             Modifier.padding(top = 28.dp),
         )
 
-        QuickActions(actions, Modifier.padding(top = 18.dp))
+        QuickActions(actions, assistantName, Modifier.padding(top = 18.dp))
 
         // Any extra shortcuts the user added (Customizable layout). Settings, Extras, History and
         // Car Health already have a place on this dashboard, so they aren't repeated.
@@ -426,7 +426,7 @@ private fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = M
 
 /** The four beginner quick actions. Each opens a real, working feature. */
 @Composable
-fun QuickActions(actions: EverydayActions, modifier: Modifier = Modifier) {
+fun QuickActions(actions: EverydayActions, assistantName: String, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionTile(
@@ -437,7 +437,7 @@ fun QuickActions(actions: EverydayActions, modifier: Modifier = Modifier) {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionTile(PenelopeIcons.Wrench, "Maintenance", "Service records", actions.onOpenHistory, Modifier.weight(1f))
-            ActionTile(PenelopeIcons.Chat, "Ask Penelope", "Talk or type", actions.onOpenChat, Modifier.weight(1f))
+            ActionTile(PenelopeIcons.Chat, "Ask $assistantName", "Talk or type", actions.onOpenChat, Modifier.weight(1f))
         }
     }
 }

@@ -4,6 +4,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import com.aicarcompanion.app.assistant.persona.AssistantProfile
+import com.aicarcompanion.app.assistant.persona.AssistantProfiles
 import com.aicarcompanion.app.data.local.ExplanationLevel
 import java.time.Instant
 
@@ -17,7 +19,7 @@ enum class ReplyBasis(val label: String) {
     NOT_AVAILABLE("Information not available"),
     CONVERSATION("Assistant"),
     AI_EXPLANATION("AI explanation (Gemini) · not a reading from your car"),
-    OFFLINE_REFERENCE("From Penelope's offline vehicle database · not specific to your car"),
+    OFFLINE_REFERENCE("From the app's offline vehicle database · not specific to your car"),
     RECALL_DATA("NHTSA recall data · for your car's model, not confirmed for your VIN"),
 }
 
@@ -41,7 +43,12 @@ data class AssistantRequest(
     val assistantName: String,
     /** How much detail to give by default; the user can ask for more or less per question. */
     val level: ExplanationLevel = ExplanationLevel.EVERYDAY,
-)
+    /** Personality for Gemini replies (tone only). Independent of [level]. */
+    val profile: AssistantProfile = AssistantProfiles.default,
+) {
+    /** A request holds what the user said and the assistant name, so it never prints them. */
+    override fun toString() = "AssistantRequest(level=$level)"
+}
 
 enum class Speaker { USER, ASSISTANT }
 
@@ -69,6 +76,7 @@ class ConversationManager(
     private val reasoning: ReasoningProvider,
     private val assistantName: () -> String,
     private val level: () -> ExplanationLevel = { ExplanationLevel.EVERYDAY },
+    private val profile: () -> AssistantProfile = { AssistantProfiles.default },
     private val now: () -> Instant = Instant::now,
     private val maxTurns: Int = 100,
 ) {
@@ -79,7 +87,7 @@ class ConversationManager(
     suspend fun handle(utterance: String): AssistantReply {
         add(Speaker.USER, utterance.trim(), null)
         val reply = try {
-            reasoning.respond(AssistantRequest(utterance, assistantName(), level()))
+            reasoning.respond(AssistantRequest(utterance, assistantName(), level(), profile()))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             AssistantReply("Sorry, something went wrong while I was working on that.", ReplyBasis.CONVERSATION)

@@ -22,8 +22,8 @@ data class VoiceConfig(
     val pitch: Float = 1.0f,
     /** Engine package, or null for the phone's default engine. */
     val engine: String? = null,
-    /** Voice id within the engine, or null for the engine's default voice for the language. */
-    val voice: String? = null,
+    /** Which voice to use; resolved against the voices the engine really has. */
+    val voice: VoiceRequest = VoiceRequest.EngineDefault,
 )
 
 data class VoiceOption(
@@ -59,7 +59,21 @@ interface SpeechOutput {
 
     /** Installed TTS engines. */
     fun engines(): List<EngineOption> = emptyList()
+
+    /** The voice currently in use, as resolved from the phone's voices (null when unknown). */
+    val resolution: StateFlow<VoiceResolution?> get() = NoResolution
+
+    /** What [request] would resolve to on this phone right now, without speaking. */
+    suspend fun resolve(request: VoiceRequest): VoiceResolution? = null
+
+    /**
+     * Speaks [text] once using [config] (the same path as conversation speech), then restores the
+     * configuration in use. Never changes the engine.
+     */
+    suspend fun preview(text: String, config: VoiceConfig): SpeakResult = speak(text)
 }
+
+private val NoResolution: StateFlow<VoiceResolution?> = kotlinx.coroutines.flow.MutableStateFlow(null)
 
 /**
  * Shared audio focus for the assistant. Reference-counted so the conversation session and

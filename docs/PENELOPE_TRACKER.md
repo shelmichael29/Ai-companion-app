@@ -80,3 +80,4 @@ Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). 
 3. Each PR: record its URL, short change summary, executed test results, and merge state.
 4. When an implementation changes a product decision/status, update the appropriate `docs/project-memory/` file **in the same PR**.
 5. Keep secret tokens, full VINs, Bluetooth addresses, and private identifiers out of this tracker.
+- [ ] Assistant personalization (v0.8.0, build 9): ten profiles, honest voice selection, custom name. Device checks pending: `docs/DEVICE_TESTING.md` section 0d.

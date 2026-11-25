@@ -1,5 +1,6 @@
 package com.aicarcompanion.app.assistant.conversation
 
+import com.aicarcompanion.app.assistant.persona.AssistantProfiles
 import com.aicarcompanion.app.diagnostics.dtc.DtcCodeFormat
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.diagnostics.smart.SymptomCategory
@@ -60,7 +61,7 @@ sealed interface AssistantIntent {
  * Deterministic keyword parser for the first version of Penelope. A future AI reasoning
  * provider can replace or sit behind this, but these core commands should keep working offline.
  */
-class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
+class CommandParser(private val assistantName: () -> String = { AssistantProfiles.default.name }) {
 
     fun parse(utterance: String): AssistantIntent {
         val text = normalize(utterance)
@@ -123,13 +124,17 @@ class CommandParser(private val assistantName: () -> String = { "Penelope" }) {
 
     /** Lowercases, strips punctuation and a leading "hey Penelope," style address. */
     fun normalize(utterance: String): String {
-        var t = utterance.lowercase().replace(Regex("""[^\p{L}\p{Nd}'\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
-        val name = assistantName().lowercase().trim()
+        var t = stripPunctuation(utterance)
+        // The name goes through the same cleaning as the utterance, so "Janay-Latrice" still matches "janay latrice".
+        val name = stripPunctuation(assistantName())
         if (name.isNotEmpty()) {
             t = t.replace(Regex("""^(hey |ok |okay |hi )?${Regex.escape(name)}\b\s*"""), "").trim()
         }
         return t
     }
+
+    private fun stripPunctuation(text: String): String =
+        text.lowercase().replace(Regex("""[^\p{L}\p{Nd}'\s]"""), " ").replace(Regex("""\s+"""), " ").trim()
 
     /**
      * Finds a DTC in recognized speech, e.g. "p0420", "p 0420", "P zero four two zero",

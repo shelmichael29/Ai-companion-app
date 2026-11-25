@@ -54,7 +54,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aicarcompanion.app.assistant.VoiceSession
 import com.aicarcompanion.app.assistant.VoiceState
+import com.aicarcompanion.app.assistant.persona.AssistantNamePolicy
+import com.aicarcompanion.app.assistant.persona.AssistantProfiles
+import com.aicarcompanion.app.assistant.persona.VoiceChoice
 import com.aicarcompanion.app.assistant.voice.EngineOption
+import com.aicarcompanion.app.assistant.voice.VoiceConfigFactory
+import com.aicarcompanion.app.assistant.voice.VoiceResolution
 import com.aicarcompanion.app.assistant.voice.SpeechOutput
 import com.aicarcompanion.app.assistant.voice.VoiceOption
 import com.aicarcompanion.app.data.local.AppSettings
@@ -88,14 +93,52 @@ class SettingsViewModel(
     private val _engines = MutableStateFlow<List<EngineOption>>(emptyList())
     val engines = _engines.asStateFlow()
 
+    /** What each profile's voice resolves to on this phone, so the screen never advertises a voice that isn't there. */
+    private val _voiceResolutions = MutableStateFlow<Map<String, VoiceResolution?>>(emptyMap())
+    val voiceResolutions = _voiceResolutions.asStateFlow()
+
+    private var previewJob: kotlinx.coroutines.Job? = null
+
+    private val _nameError = MutableStateFlow<String?>(null)
+    val nameError = _nameError.asStateFlow()
+
     fun loadVoices() = viewModelScope.launch {
         _engines.value = speech.engines()
         _voices.value = speech.voices()
+        _voiceResolutions.value = AssistantProfiles.all.associate { p ->
+            p.id to speech.resolve(VoiceConfigFactory.request(settings.value, VoiceChoice.Profile(p.id)))
+        }
     }
 
-    fun rename(name: String) {
-        val clean = name.trim().take(MAX_NAME)
-        store.update { it.copy(assistantName = clean.ifEmpty { AppSettings.DEFAULT_ASSISTANT_NAME }) }
+    fun selectProfile(id: String) = store.update { it.copy(assistantProfileId = AssistantProfiles.byId(id).id) }
+
+    fun setVoiceChoice(choice: VoiceChoice) = store.update { it.copy(voiceChoice = choice) }
+
+    /** Saves a custom name. Blank clears it (the profile's name is used); an unusable name is rejected with a message. */
+    fun rename(raw: String) {
+        if (raw.isBlank()) {
+            _nameError.value = null
+            store.update { it.copy(customName = null) }
+            return
+        }
+        val clean = AssistantNamePolicy.sanitize(raw)
+        if (clean == null) {
+            _nameError.value = "Use letters, numbers, spaces, hyphens or apostrophes. Words like \"stop\" or \"help\" can't be names."
+            return
+        }
+        _nameError.value = null
+        store.update { it.copy(customName = clean.takeUnless { n -> n == it.profile.name }) }
+    }
+
+    /** Back to Penelope with the matching voice, no custom name and natural speed and pitch. Nothing else changes. */
+    fun resetPersonalization() {
+        _nameError.value = null
+        store.update {
+            it.copy(
+                assistantProfileId = AssistantProfiles.DEFAULT_ID, customName = null,
+                voiceChoice = VoiceChoice.MatchPersonality, speechRate = 1.0f, speechPitch = 1.0f,
+            )
+        }
     }
 
     fun setDemoData(enabled: Boolean) = store.update { it.copy(demoDataEnabled = enabled) }
@@ -104,27 +147,33 @@ class SettingsViewModel(
     fun setContinuous(enabled: Boolean) = store.update { it.copy(continuousConversation = enabled) }
     fun setLevel(level: ExplanationLevel) = store.update { it.copy(explanationLevel = level) }
     fun setDashboard(dashboard: com.aicarcompanion.app.dashboard.DashboardSettings) = store.update { it.copy(dashboard = dashboard) }
-    fun setVoice(id: String?) = store.update { it.copy(ttsVoice = id) }
     fun setTheme(mode: ThemeMode) = store.update { it.copy(themeMode = mode) }
     fun setColorStyle(style: com.aicarcompanion.app.data.local.ColorStyle) = store.update { it.copy(colorStyle = style) }
     fun setReduceMotion(enabled: Boolean) = store.update { it.copy(reduceMotion = enabled) }
 
     fun setEngine(id: String?) {
-        store.update { it.copy(ttsEngine = id, ttsVoice = null) } // Voices differ per engine.
+        // Installed voices differ per engine, so an installed-voice choice is dropped.
+        store.update { it.copy(ttsEngine = id, voiceChoice = it.voiceChoice.takeUnless { c -> c is VoiceChoice.Installed } ?: VoiceChoice.MatchPersonality) }
         viewModelScope.launch { delay(300); loadVoices() }
     }
 
-    fun resetVoice() = store.update { it.copy(speechRate = 1.0f, speechPitch = 1.0f, ttsVoice = null) }
-
-    /** Speaks a sample with the current settings. Pauses any conversation so voices don't overlap. */
-    fun preview() {
+    /**
+     * Speaks a sample in a profile's voice. The selected profile uses exactly the configuration the
+     * conversation uses; other tiles use that profile's voice with the current speed and pitch.
+     * Pauses any conversation so voices don't overlap.
+     */
+    fun preview(profileId: String? = null) {
+        previewJob?.cancel()
+        speech.stop() // Tapping another preview replaces the one that is playing.
         if (session.state.value !is VoiceState.Idle) session.pause("Paused while you previewed the voice.")
-        viewModelScope.launch {
-            speech.speak("Hi, I'm ${settings.value.assistantName}. You don't need to understand cars. I understand them for you.")
+        val current = settings.value
+        val id = profileId ?: current.assistantProfileId
+        val config = if (id == current.assistantProfileId) VoiceConfigFactory.from(current) else VoiceConfigFactory.from(current, VoiceChoice.Profile(id))
+        val name = if (id == current.assistantProfileId) current.assistantName else AssistantProfiles.byId(id).name
+        previewJob = viewModelScope.launch {
+            speech.preview("Hi, I'm $name. You don't need to understand cars. I understand them for you.", config)
         }
     }
-
-    companion object { const val MAX_NAME = 24 }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,7 +187,6 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val voices by viewModel.voices.collectAsStateWithLifecycle()
     val engines by viewModel.engines.collectAsStateWithLifecycle()
-    var nameDraft by rememberSaveable(settings.assistantName) { mutableStateOf(settings.assistantName) }
     LaunchedEffect(Unit) { viewModel.loadVoices() }
 
     Scaffold(
@@ -152,39 +200,23 @@ fun SettingsScreen(
             Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Heading("${settings.assistantName}'s voice")
-            Text(
-                "Natural speed and pitch are both 1.0. If the voice sounds squeaky or rushed, tap \"Reset to natural voice\", " +
-                    "or try a different voice or speech engine.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            val resolutions by viewModel.voiceResolutions.collectAsStateWithLifecycle()
+            val nameError by viewModel.nameError.collectAsStateWithLifecycle()
+            val context = androidx.compose.ui.platform.LocalContext.current
+            PersonalizationContent(
+                state = PersonalizationState(settings, voices, engines, resolutions, nameError),
+                actions = PersonalizationActions(
+                    onSelectProfile = viewModel::selectProfile,
+                    onPreview = viewModel::preview,
+                    onVoiceChoice = viewModel::setVoiceChoice,
+                    onEngine = viewModel::setEngine,
+                    onRename = viewModel::rename,
+                    onSpeed = viewModel::setSpeechRate,
+                    onPitch = viewModel::setSpeechPitch,
+                    onReset = viewModel::resetPersonalization,
+                    onOpenTtsSettings = { openTtsSettings(context) },
+                ),
             )
-            LabeledSlider(
-                "Speaking speed", settings.speechRate, AppSettings.RATE_RANGE, viewModel::setSpeechRate,
-                valueText = "%.2fx".format(Locale.US, settings.speechRate),
-            )
-            LabeledSlider(
-                "Voice pitch (lower ← → higher)", settings.speechPitch, AppSettings.PITCH_RANGE, viewModel::setSpeechPitch,
-                valueText = "%.2f".format(Locale.US, settings.speechPitch),
-            )
-            if (engines.size > 1) {
-                Picker(
-                    label = "Speech engine",
-                    selectedLabel = engines.firstOrNull { it.id == settings.ttsEngine }?.label ?: "Phone default",
-                    options = listOf<Pair<String?, String>>(null to "Phone default") + engines.map { it.id to it.label },
-                    onSelect = viewModel::setEngine,
-                )
-            }
-            Picker(
-                label = "Voice",
-                selectedLabel = voices.firstOrNull { it.id == settings.ttsVoice }?.label ?: "Default voice for your language",
-                options = listOf<Pair<String?, String>>(null to "Default voice for your language") + voices.map { it.id to it.label },
-                onSelect = viewModel::setVoice,
-                emptyHint = if (voices.isEmpty()) "This speech engine didn't list any voices; the default will be used." else null,
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                com.aicarcompanion.app.ui.design.GradientButton("Hear a sample", viewModel::preview)
-                OutlinedButton(onClick = viewModel::resetVoice, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reset to natural voice") }
-            }
 
             Heading("Appearance")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -236,9 +268,9 @@ fun SettingsScreen(
             com.aicarcompanion.app.ui.design.ExpandableSection("What is sent to Google?") {
                 Text(
                     "When this is on, these go to Google's Gemini API through Firebase so ${settings.assistantName} can answer: " +
-                        "what you say or type to her (speech is turned into text first), the recent conversation, your car's " +
+                        "what you say or type to the assistant (speech is turned into text first), the recent conversation, your car's " +
                         "year, make, model, trim and engine details, odometer, saved warning codes with their dates, recent " +
-                        "service titles and dates, problems you've described, adapter connection status and your detail level. " +
+                        "service titles and dates, problems you've described, adapter connection status, your detail level, and the assistant name and personality you chose. " +
                         "Before your service titles and described problems are sent, phone numbers, email addresses, street " +
                         "addresses, web links, VINs and licence plates are removed from them.",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -267,7 +299,7 @@ fun SettingsScreen(
             SwitchRow(
                 "Keep listening after ${settings.assistantName} answers",
                 "Talk back and forth without tapping the microphone each time. Say \"goodbye\" or tap End to finish. " +
-                    "${settings.assistantName} pauses automatically if she doesn't hear anything.",
+                    "${settings.assistantName} pauses automatically if nothing is heard.",
                 settings.continuousConversation,
                 viewModel::setContinuous,
             )
@@ -300,23 +332,6 @@ fun SettingsScreen(
                 onChange = viewModel::setDashboard,
             )
 
-            Heading("Assistant name")
-            OutlinedTextField(
-                value = nameDraft,
-                onValueChange = { nameDraft = it.take(SettingsViewModel.MAX_NAME) },
-                label = { Text("Name") },
-                supportingText = { Text("Default is ${AppSettings.DEFAULT_ASSISTANT_NAME}. You can start requests with this name.") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { viewModel.rename(nameDraft) }),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Button(
-                onClick = { viewModel.rename(nameDraft) },
-                enabled = nameDraft.trim() != settings.assistantName,
-                modifier = Modifier.heightIn(min = 48.dp),
-            ) { Text("Save name") }
-
             Heading("Data")
             SwitchRow(
                 "Show sample diagnostic data",
@@ -333,7 +348,6 @@ fun SettingsScreen(
                     "Android's TalkBack screen reader works alongside ${settings.assistantName}.",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            val context = androidx.compose.ui.platform.LocalContext.current
             val crashReports = remember { com.aicarcompanion.app.quality.CrashReporting.isAvailable(context) }
             if (crashReports) {
                 Text(
@@ -370,7 +384,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun Heading(text: String) {
+internal fun Heading(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.titleMedium,
@@ -380,7 +394,7 @@ private fun Heading(text: String) {
 }
 
 @Composable
-private fun LabeledSlider(
+internal fun LabeledSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float>,
@@ -413,7 +427,7 @@ private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChang
 }
 
 @Composable
-private fun Picker(
+internal fun Picker(
     label: String,
     selectedLabel: String,
     options: List<Pair<String?, String>>,

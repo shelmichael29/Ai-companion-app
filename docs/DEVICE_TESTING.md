@@ -25,6 +25,19 @@ See `docs/GEMINI_ROUTING.md` §6: check "Last answer came from" in Settings → 
 ## 0. Hands-free foundation (Phase H0)
 See `docs/HANDS_FREE.md` §4: diagnostics log entries, audio route, phone-call focus loss, and "not yet" replies for music, messages and calls.
 
+## 0d. Assistant personalization (v0.8.0, build 9) (NOT RUN in automated tests)
+Galaxy S26 Ultra. Automated tests use fake voices, so everything here needs the phone.
+- Settings, Assistant: all 10 profiles appear; tap each, the tile highlights and the summary line changes.
+- Tap each Preview button (10). Note which voices sound female or male. **Samsung vs Google engines label gender differently**: confirm by ear that "Female voice N" and "Male voice N" are right. The Google voice-code table in `VoiceSelector` is a hypothesis.
+- Different profiles should sound different where the phone has enough voices; "Shares a voice with another profile" appears otherwise.
+- Remove or lack a male voice pack: male tiles say "Uses the phone's default voice" and the notice appears. Never a fake male pitch.
+- Choose a network-only voice, go offline, preview and speak: it should fall back to the default voice instead of silence.
+- Rename to a custom name; say "hey <name>"; check Home, Drive, Chat and More show it. A name like "Janay-Latrice" is recognised when spoken.
+- Start a continuous conversation, change profile or voice mid-session: current reply is not cut off, the next reply uses the new voice, listening continues, tap-to-interrupt still works.
+- Ask the same question as Ace and as Luna (Gemini on): wording and length differ; safety advice and facts do not. Knowledge level is unchanged by profile.
+- Reset to default (confirm dialog); close and reopen the app: settings persist. Upgrading from 0.7.1 keeps a previously chosen name and voice.
+- Font 100% and 200%, light and dark: no clipped or overlapping text. TalkBack: tiles read as radio buttons, previews as "Preview <name>'s voice".
+
 ## 0c. Phase 1: three interfaces
 See `docs/PHASE1_UI.md`, "Manual check on the phone" (level switching keeps data, Easy/Customizable per level, Advanced black-and-grey with header mic, Live Data states, 200% font, TalkBack, light theme).
 

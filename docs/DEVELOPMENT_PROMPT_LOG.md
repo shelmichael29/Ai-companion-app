@@ -23,6 +23,8 @@ Record each development prompt, its intended changes, the implementation branch/
 | 2026-11-20 | Build identity + clear PR summaries | Show the source revision in the app footer and About build information; add a structured PR template and prompt/merge ledger | `main` | [#44](https://github.com/shelmichael29/Ai-companion-app/pull/44) | **Merged** (squash, verified on `main`) | CI green; device verification pending |
 | 2026-11-22 | Phase 2: Live Data workspace | Customizable gauges (DIY and Advanced), named layouts per vehicle, demand-driven single poller, honest sensor states, Room v1 to v2 | `main` | feature/live-data-workspace | Merged (#59, squash 069727f) | 799 tests, 0 failed (release gate); device and adapter verification pending |
 
+| 2026-11-24 | Assistant personalization and voice overhaul (v0.8.0, build 9) | Ten assistant profiles (personality + voice), honest voice selection, custom name, redesigned Settings personalization, hardcoded-name fixes; owner decisions 2026-11-24 applied (no hardcoded "Penelope" in user-visible text) | `main` | feature/assistant-personalization | Prompt implemented locally; PR not opened by this session; not merged | 
+
 ## Checklist for every new development prompt
 1. Add a dated entry when the prompt is created. State the requested changes and intended target branch. Use **Prompt drafted** until implementation is verified.
 2. Link the feature branch and PR once created. Use **PR open** until GitHub confirms a merge.

@@ -40,9 +40,9 @@ object VinFlowText {
         "I changed $count character${if (count == 1) "" else "s"} that can't appear in a VIN (the letters I, O and Q look like 1 and 0)."
 
     const val PERMISSION_NEEDED =
-        "To scan, Penelope needs to use the camera. The picture stays on your phone, is never saved or sent anywhere, and the camera is only on while this screen is open."
+        "To scan, I need to use the camera. The picture stays on your phone, is never saved or sent anywhere, and the camera is only on while this screen is open."
     const val PERMISSION_BLOCKED =
-        "Camera access is turned off for Penelope. You can turn it on in your phone's settings, or just type your VIN."
+        "Camera access is turned off for this app. You can turn it on in your phone's settings, or just type your VIN."
     const val NO_CAMERA = "I couldn't start the camera. You can type your VIN instead."
 
     /** The VIN in groups, easier to compare by eye: "WBAFR1C5 6BC 000001". */

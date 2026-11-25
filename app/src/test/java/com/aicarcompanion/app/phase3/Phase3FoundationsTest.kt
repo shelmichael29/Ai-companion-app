@@ -36,8 +36,8 @@ class Phase3FoundationsTest {
         val store = PersistentSettingsStore(kv)
         store.update {
             it.copy(
-                assistantName = "Ada", speechRate = 0.9f, speechPitch = 0.95f, ttsEngine = "com.google.android.tts",
-                ttsVoice = "en-us-x-iol-local", continuousConversation = false, explanationLevel = ExplanationLevel.DIY,
+                assistantProfileId = "atlas", customName = "Ada", speechRate = 0.9f, speechPitch = 0.95f, ttsEngine = "com.google.android.tts",
+                voiceChoice = com.aicarcompanion.app.assistant.persona.VoiceChoice.Installed("en-us-x-iol-local"), continuousConversation = false, explanationLevel = ExplanationLevel.DIY,
             )
         }
         assertEquals(store.settings.value, PersistentSettingsStore(kv).settings.value)

@@ -49,3 +49,4 @@ Status labels are explained in [README.md](README.md). Only the features under *
 - **Clear trouble codes:** only ever as a separate, explicit, confirmed feature. Never automatic.
 - **Vehicle simulation mode:** excluded from recent phases by the owner.
 - **Becoming the phone's default dialer:** not planned (`docs/HANDS_FREE.md`).
+| Assistant personalization: ten profiles (personality for Gemini replies + matching voice), independent voice choice, sanitized custom name, speed/pitch, reset; voice labels only claim a gender the phone reports; no pitch-faked genders | feature/assistant-personalization | 🔧 Built, not yet device-verified (v0.8.0, build 9) |

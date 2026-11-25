@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.speech.tts.Voice
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,16 +26,21 @@ class AndroidSpeechOutput(
     context: Context,
     private val focus: AudioFocusController,
     private val attributes: android.media.AudioAttributes,
+    private val log: com.aicarcompanion.app.connectivity.ConnectionLog? = null,
+    private val internetOnline: () -> Boolean = { true },
 ) : SpeechOutput {
 
     private val appContext = context.applicationContext
     private val _state = MutableStateFlow<SpeechOutputState>(SpeechOutputState.Initializing)
     override val state: StateFlow<SpeechOutputState> = _state.asStateFlow()
 
+    private val _resolution = MutableStateFlow<VoiceResolution?>(null)
+    override val resolution: StateFlow<VoiceResolution?> = _resolution.asStateFlow()
+
     private val speakMutex = Mutex()
     private val finishLock = Any()
     @Volatile private var current: Pair<String, CompletableDeferred<SpeakResult>>? = null
-    @Volatile private var config = VoiceConfig()
+    private val holder = VoiceConfigHolder()
     private var tts: TextToSpeech = create(null)
     private var engineInUse: String? = null
 
@@ -63,8 +67,8 @@ class AndroidSpeechOutput(
             return
         }
         engine.setAudioAttributes(attributes)
-        engine.setSpeechRate(VoiceTuning.rate(config.rate))
-        engine.setPitch(VoiceTuning.pitch(config.pitch))
+        engine.setSpeechRate(VoiceTuning.rate(holder.effective.rate))
+        engine.setPitch(VoiceTuning.pitch(holder.effective.pitch))
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String) {
                 synchronized(finishLock) {
@@ -88,12 +92,35 @@ class AndroidSpeechOutput(
         _state.value = SpeechOutputState.Ready
     }
 
-    /** Applies the chosen voice if it exists, otherwise the language default. Returns false if no usable language. */
-    private fun applyLanguageAndVoice(engine: TextToSpeech): Boolean {
-        val chosen = config.voice?.let { name -> runCatching { engine.voices?.firstOrNull { it.name == name } }.getOrNull() }
-        if (chosen != null && engine.setVoice(chosen) == TextToSpeech.SUCCESS) return true
+    private fun rawVoices(engine: TextToSpeech): List<VoiceTuning.RawVoice> =
+        runCatching { engine.voices }.getOrNull().orEmpty().map {
+            VoiceTuning.RawVoice(it.name, it.locale, it.isNetworkConnectionRequired, it.quality, it.features.orEmpty())
+        }
+
+    private fun setDefaultLanguage(engine: TextToSpeech): Boolean {
         val ok = { r: Int -> r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED }
         return ok(engine.setLanguage(Locale.getDefault())) || ok(engine.setLanguage(Locale.US))
+    }
+
+    /**
+     * Picks the voice for the current request from the voices the engine really has and applies it,
+     * otherwise the language default. Returns false if there is no usable language.
+     */
+    private fun applyLanguageAndVoice(engine: TextToSpeech): Boolean {
+        holder.markApplied()
+        val resolved = VoiceSelector.resolve(holder.effective.voice, rawVoices(engine), Locale.getDefault())
+        _resolution.value = resolved
+        if (resolved is VoiceResolution.Voice && resolved.requiresNetwork && !holder.networkVoiceAllowed(internetOnline())) {
+            // The online voice failed earlier and the phone is still offline: keep the default voice.
+            _resolution.value = VoiceResolution.FallbackDefault("The online voice needs internet")
+            return setDefaultLanguage(engine)
+        }
+        if (resolved is VoiceResolution.Voice) {
+            val chosen = runCatching { engine.voices?.firstOrNull { it.name == resolved.voiceName } }.getOrNull()
+            if (chosen != null && engine.setVoice(chosen) == TextToSpeech.SUCCESS) return true
+            _resolution.value = VoiceResolution.FallbackDefault("That voice couldn't be started")
+        }
+        return setDefaultLanguage(engine)
     }
 
     private fun finish(result: SpeakResult, callbackUtteranceId: String? = null) {
@@ -109,7 +136,9 @@ class AndroidSpeechOutput(
         c.second.complete(result)
     }
 
-    override suspend fun speak(text: String): SpeakResult = speakMutex.withLock {
+    override suspend fun speak(text: String): SpeakResult = speakMutex.withLock { speakLocked(text) }
+
+    private suspend fun speakLocked(text: String): SpeakResult {
         // Wait briefly for initialization (first use, or after an engine change).
         repeat(50) { if (_state.value is SpeechOutputState.Initializing) delay(100) }
         when (val s = _state.value) {
@@ -117,6 +146,21 @@ class AndroidSpeechOutput(
             SpeechOutputState.Initializing -> return SpeakResult.Failed("Text-to-speech isn't ready")
             else -> Unit
         }
+        holder.networkVoiceAllowed(internetOnline()) // Resumes a suspended online voice once the internet is back.
+        if (holder.pending) applyEffective()
+        val first = attempt(text)
+        val voice = _resolution.value as? VoiceResolution.Voice
+        if (first is SpeakResult.Failed && voice?.requiresNetwork == true) {
+            // A network voice can fail offline: retry once with the language default (focus is released per attempt).
+            log?.record(com.aicarcompanion.app.connectivity.LogArea.VOICE, "Network voice failed; using the default voice")
+            if (setDefaultLanguage(tts)) _resolution.value = VoiceResolution.FallbackDefault("The online voice wasn't available")
+            holder.suspendNetworkVoice() // Stay on the default voice until the internet is back.
+            return attempt(text)
+        }
+        return first
+    }
+
+    private suspend fun attempt(text: String): SpeakResult {
         stop()
         val done = CompletableDeferred<SpeakResult>()
         val id = UUID.randomUUID().toString()
@@ -128,13 +172,34 @@ class AndroidSpeechOutput(
             val uid = if (i == chunks.lastIndex) "$id-$i$LAST" else "$id-$i"
             if (tts.speak(chunk, mode, Bundle(), uid) != TextToSpeech.SUCCESS) {
                 finish(SpeakResult.Failed("Couldn't start speaking"))
-                return@withLock done.await()
+                return done.await()
             }
         }
-        try {
+        return try {
             done.await()
         } finally {
             if (!done.isCompleted) stop()
+        }
+    }
+
+    /** Pushes the effective rate, pitch and voice to the engine. */
+    private fun applyEffective() {
+        val c = holder.effective
+        tts.setSpeechRate(VoiceTuning.rate(c.rate))
+        tts.setPitch(VoiceTuning.pitch(c.pitch))
+        applyLanguageAndVoice(tts)
+    }
+
+    override suspend fun preview(text: String, config: VoiceConfig): SpeakResult = speakMutex.withLock {
+        // Same configuration path as conversation speech. The override is temporary: a settings
+        // change that arrives meanwhile is kept and applied when the preview ends.
+        holder.beginPreview(config)
+        try {
+            if (_state.value !is SpeechOutputState.Initializing) applyEffective()
+            speakLocked(text)
+        } finally {
+            holder.endPreview()
+            if (_state.value !is SpeechOutputState.Initializing) applyEffective()
         }
     }
 
@@ -146,7 +211,7 @@ class AndroidSpeechOutput(
 
     override fun configure(config: VoiceConfig) {
         val engineChanged = config.engine != engineInUse
-        this.config = config
+        val applyNow = holder.configure(config, busy = current != null)
         if (engineChanged) {
             stop()
             runCatching { tts.shutdown() }
@@ -154,18 +219,19 @@ class AndroidSpeechOutput(
             return
         }
         if (_state.value is SpeechOutputState.Initializing) return // Applied when ready.
-        tts.setSpeechRate(VoiceTuning.rate(config.rate))
-        tts.setPitch(VoiceTuning.pitch(config.pitch))
-        applyLanguageAndVoice(tts)
+        // Never switch voices under an utterance that is playing: the next utterance picks it up.
+        if (applyNow) applyEffective()
+    }
+
+    override suspend fun resolve(request: VoiceRequest): VoiceResolution? {
+        repeat(50) { if (_state.value is SpeechOutputState.Initializing) delay(100) }
+        if (_state.value is SpeechOutputState.Unavailable) return null
+        return VoiceSelector.resolve(request, rawVoices(tts), Locale.getDefault())
     }
 
     override suspend fun voices(): List<VoiceOption> {
         repeat(50) { if (_state.value is SpeechOutputState.Initializing) delay(100) }
-        val all: Set<Voice> = runCatching { tts.voices }.getOrNull().orEmpty()
-        return VoiceTuning.voiceOptions(
-            all.map { VoiceTuning.RawVoice(it.name, it.locale, it.isNetworkConnectionRequired, it.quality, it.features.orEmpty()) },
-            Locale.getDefault(),
-        )
+        return VoiceTuning.voiceOptions(rawVoices(tts), Locale.getDefault())
     }
 
     override fun engines(): List<EngineOption> =
