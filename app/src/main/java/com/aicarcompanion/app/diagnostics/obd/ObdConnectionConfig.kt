@@ -28,8 +28,8 @@ enum class AdaptiveTiming(val code: String, val label: String) {
 }
 
 /**
- * Connection tuning. [RECOMMENDED] is what Everyday and DIY levels always use; only the
- * Advanced level applies a customized copy (see [effectiveFor]). Every value is clamped, so a
+ * Connection tuning. [RECOMMENDED] is what the Everyday level always uses; DIY (and the internal
+ * Advanced level) applies a customized copy (see [effectiveFor]). Every value is clamped, so a
  * bad stored value can't stall the connection. None of these settings can make the adapter
  * send anything other than the read-only commands allowed by [ReadOnlyCommandPolicy].
  */
@@ -91,12 +91,11 @@ data class ObdConnectionConfig(
         val RECONNECT_RANGE = 0..5
 
         /**
-         * What the connection actually uses. Everyday and DIY always get the recommended,
-         * automatic configuration so a setting changed at Advanced can't silently degrade a
-         * beginner's connection.
+         * What the connection actually uses. Everyday always gets the recommended, automatic
+         * configuration so a setting changed at DIY can't silently degrade a beginner's connection.
          */
         fun effectiveFor(level: ExplanationLevel, stored: ObdConnectionConfig): ObdConnectionConfig =
-            if (level == ExplanationLevel.ADVANCED) stored.clamped() else RECOMMENDED
+            if (level != ExplanationLevel.EVERYDAY) stored.clamped() else RECOMMENDED
     }
 }
 

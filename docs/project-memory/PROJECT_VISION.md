@@ -6,7 +6,7 @@
 ## Target users
 - **Everyday drivers first:** plain language, no jargon, one-tap actions, voice by default.
 - **DIY** and **Advanced** users get more detail and control in the same app.
-- **Knowledge level** (Everyday / DIY / Advanced) and **home layout** (Easy / Customizable) are separate settings.
+- **Knowledge level** (Everyday / DIY) and **home layout** (Easy / Customizable) are separate settings.
 
 ## Long-term goals
 1. A trustworthy car expert in your pocket: honest, safe, and never inventing readings.

@@ -304,7 +304,7 @@ Package `diagnostics/smart`:
 
 ### Connection settings by skill level (Phase 4.1)
 
-The automotive skill level (Everyday / DIY / Advanced, `AppSettings.explanationLevel`) decides
+The automotive skill level (Everyday / DIY since Phase 1A; `ExplanationLevel.ADVANCED` stays as an internal-only value that is migrated to DIY, `AppSettings.explanationLevel`) decides
 how much of the connection is exposed. It is independent of any future home-screen layout
 setting (the planned Easy Mode and Customizable layouts): layout must not change connection
 behavior, and the skill level must not change the home layout.

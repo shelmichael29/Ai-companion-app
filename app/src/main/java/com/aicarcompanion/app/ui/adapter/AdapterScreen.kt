@@ -55,6 +55,9 @@ import com.aicarcompanion.app.ui.components.LabeledValue
 import com.aicarcompanion.app.ui.components.SectionCard
 import com.aicarcompanion.app.ui.results.ClearCodesControl
 
+/** The full Connection settings screen is offered to DIY (and the internal Advanced level), never to Everyday. */
+internal fun offersConnectionSettings(level: ExplanationLevel): Boolean = level != ExplanationLevel.EVERYDAY
+
 @Composable
 fun AdapterScreen(
     contentPadding: PaddingValues,
@@ -88,7 +91,7 @@ fun AdapterScreen(
                 SectionCard("Troubleshooting") { tips.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) } }
             }
         }
-        if (level == ExplanationLevel.ADVANCED) {
+        if (offersConnectionSettings(level)) {
             item {
                 OutlinedButton(onClick = onOpenAdvanced, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text("Advanced connection settings")

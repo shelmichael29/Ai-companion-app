@@ -20,7 +20,17 @@ import kotlinx.coroutines.flow.update
 enum class ExplanationLevel(val label: String, val description: String) {
     EVERYDAY("Everyday driver", "Simple explanations and clear next steps. No car knowledge needed."),
     DIY("DIY enthusiast", "Adds things you can check yourself and optional sensor readings."),
+    /** Internal only since Phase 1A: never offered to the user. A stored ADVANCED value is migrated to [DIY]. */
     ADVANCED("Advanced / professional", "Technical terms, code definitions and all available live data."),
+    ;
+
+    /** The level the user sees and the app treats as selected; [ADVANCED] maps to [DIY]. */
+    fun toSelectable(): ExplanationLevel = if (this == ADVANCED) DIY else this
+
+    companion object {
+        /** The only levels the user can choose, in display order. */
+        val selectable: List<ExplanationLevel> = listOf(EVERYDAY, DIY)
+    }
 }
 
 enum class ThemeMode(val label: String) { SYSTEM("Match phone"), LIGHT("Light"), DARK("Dark (default)") }
@@ -155,6 +165,37 @@ object SettingsCodec {
     /** True when the stored values predate the personality settings and should be rewritten. */
     fun needsMigration(store: KeyValueStore): Boolean = store.getString(KEY_SCHEMA) == null
 
+    private fun storedLevel(store: KeyValueStore): ExplanationLevel? =
+        ExplanationLevel.entries.firstOrNull { it.name == store.getString(KEY_LEVEL) }
+
+    /** True when the stored level is the retired ADVANCED value and must become DIY. */
+    fun needsLevelMigration(store: KeyValueStore): Boolean = storedLevel(store) == ExplanationLevel.ADVANCED
+
+    /**
+     * Moves a stored ADVANCED user to DIY in place. Writes only the level key (and the DIY layout keys when
+     * the saved Advanced layout is carried over). It deliberately does not call [write], so the schema marker,
+     * other settings and the Advanced layout keys are left exactly as they were. Safe to repeat.
+     */
+    fun migrateLevel(store: KeyValueStore, migrated: AppSettings) {
+        val values = mutableMapOf<String, Any?>(KEY_LEVEL to ExplanationLevel.DIY.name)
+        val diy = ExplanationLevel.DIY
+        if (store.getString(keyLayout(diy)) == null) {
+            migrated.dashboard.byLevel[diy]?.let { choice ->
+                values[keyLayout(diy)] = choice.layout.name
+                values[keyItems(diy)] = choice.customItems?.joinToString(",") { it.name }
+            }
+        }
+        store.write(values)
+    }
+
+    /** A saved Advanced home layout becomes the DIY layout when DIY has none of its own. */
+    private fun carryAdvancedLayout(d: DashboardSettings): DashboardSettings {
+        val advanced = d.byLevel[ExplanationLevel.ADVANCED] ?: return d
+        if (ExplanationLevel.DIY in d.byLevel) return d
+        val items = advanced.customItems?.filter { it.availableAt(ExplanationLevel.DIY) }
+        return d.with(ExplanationLevel.DIY, LevelLayout(advanced.layout, items))
+    }
+
     private fun encodeVoice(choice: VoiceChoice): String = when (choice) {
         VoiceChoice.MatchPersonality -> "match"
         is VoiceChoice.Profile -> "profile:${choice.id}"
@@ -203,13 +244,12 @@ object SettingsCodec {
             speechPitch = (store.getFloat(KEY_PITCH) ?: defaults.speechPitch).coerceIn(AppSettings.PITCH_RANGE),
             ttsEngine = store.getString(KEY_ENGINE),
             continuousConversation = store.getBoolean(KEY_CONTINUOUS) ?: defaults.continuousConversation,
-            explanationLevel = ExplanationLevel.entries.firstOrNull { it.name == store.getString(KEY_LEVEL) }
-                ?: defaults.explanationLevel,
+            explanationLevel = (storedLevel(store) ?: defaults.explanationLevel).toSelectable(),
             themeMode = ThemeMode.entries.firstOrNull { it.name == store.getString(KEY_THEME) } ?: defaults.themeMode,
             colorStyle = ColorStyle.entries.firstOrNull { it.name == store.getString(KEY_COLOR_STYLE) } ?: defaults.colorStyle,
             reduceMotion = store.getBoolean(KEY_REDUCE_MOTION) ?: defaults.reduceMotion,
             aiEnabled = store.getBoolean(KEY_AI) ?: defaults.aiEnabled,
-            dashboard = readDashboard(store),
+            dashboard = readDashboard(store).let { if (storedLevel(store) == ExplanationLevel.ADVANCED) carryAdvancedLayout(it) else it },
         )
     }
 
@@ -260,6 +300,8 @@ class PersistentSettingsStore(private val store: KeyValueStore) : SettingsStore 
     private val state = MutableStateFlow(SettingsCodec.read(store)).also {
         // Rewrite legacy values once so the old keys are gone and the new ones are authoritative.
         if (SettingsCodec.needsMigration(store)) SettingsCodec.write(store, it.value)
+        // Retired Advanced level: becomes DIY in place, once. Touches only the level (and DIY layout) keys.
+        else if (SettingsCodec.needsLevelMigration(store)) SettingsCodec.migrateLevel(store, it.value)
     }
     override val settings: StateFlow<AppSettings> = state.asStateFlow()
 

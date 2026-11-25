@@ -82,7 +82,7 @@ fun AdvancedConnectionScreen(
                 if (viewModel.appliesNow) {
                     "These settings are active. Changes to protocol, timing or response format reconnect the adapter automatically."
                 } else {
-                    "Saved, but not active: Everyday and DIY levels always use the recommended automatic settings. Switch to Advanced in Settings to use them."
+                    "Saved, but not active: Everyday Driver always uses the recommended automatic settings. Switch to DIY Enthusiast in Settings to use them."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (viewModel.appliesNow) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,

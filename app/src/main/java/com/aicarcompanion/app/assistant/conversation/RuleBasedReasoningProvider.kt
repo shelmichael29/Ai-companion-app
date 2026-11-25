@@ -367,7 +367,12 @@ class RuleBasedReasoningProvider(
         val list = values.joinToString("; ") { (pid, r) ->
             "${if (level == ExplanationLevel.EVERYDAY) pid.friendlyName else pid.label}: ${SpokenFormat.liveValue(pid, r.value)}"
         }
-        val more = if (level != ExplanationLevel.ADVANCED) " Say \"give me the technical explanation\" or switch to a higher detail level in Settings for more readings." else ""
+        val more = when (level) {
+            ExplanationLevel.EVERYDAY ->
+                " Say \"give me the technical explanation\" or switch to a higher detail level in Settings for more readings."
+            ExplanationLevel.DIY -> " Ask me for a specific reading, or open Live Data to see more."
+            ExplanationLevel.ADVANCED -> ""
+        }
         return reply("Here's what your car is reporting right now: $list.$more", ReplyBasis.LIVE_VEHICLE_DATA)
     }
 

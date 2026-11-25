@@ -73,10 +73,10 @@ class ObdConnectionSettingsTest {
         assertEquals(listOf("ATZ", "ATE0", "ATL0", "ATS1", "ATH0", "ATAT1", "ATSP0", "0100", "0120", "0140", "ATDPN"), a.written)
     }
 
-    @Test fun `everyday and DIY always use recommended settings, advanced uses saved ones`() {
+    @Test fun `everyday always uses recommended settings, DIY and internal advanced use saved ones`() {
         val custom = ObdConnectionConfig(protocol = ObdProtocol.CAN_11_500, pollIntervalMillis = 250, autoReconnect = false)
         assertEquals(ObdConnectionConfig.RECOMMENDED, ObdConnectionConfig.effectiveFor(ExplanationLevel.EVERYDAY, custom))
-        assertEquals(ObdConnectionConfig.RECOMMENDED, ObdConnectionConfig.effectiveFor(ExplanationLevel.DIY, custom))
+        assertEquals(custom, ObdConnectionConfig.effectiveFor(ExplanationLevel.DIY, custom))
         assertEquals(custom, ObdConnectionConfig.effectiveFor(ExplanationLevel.ADVANCED, custom))
     }
 

@@ -81,7 +81,7 @@ interface AppContainer {
     val bluetooth: BluetoothGateway
     /** Beginner-friendly adapter search and connection with bounded retries. */
     val adapterSetup: com.aicarcompanion.app.connectivity.AdapterConnectionManager
-    /** Saved OBD-II connection settings (applied only at the Advanced level). */
+    /** Saved OBD-II connection settings (applied at DIY; Everyday always uses the recommended settings). */
     val obdConfig: ObdConfigStore
     val obdControls: ObdAdvancedControls
     val voiceSession: VoiceSession

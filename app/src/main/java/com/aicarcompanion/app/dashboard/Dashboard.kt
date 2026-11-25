@@ -56,7 +56,7 @@ enum class DashboardItem(
     ADAPTER("Adapter", "Connect and troubleshoot your OBD-II adapter", minLevel = ExplanationLevel.DIY),
     CONNECTION_SETTINGS(
         "Connection", "Protocol, timing, adapter test and communication log",
-        minLevel = ExplanationLevel.ADVANCED,
+        minLevel = ExplanationLevel.DIY,
     ),
     MILEAGE_LOG("Mileage log", "Record odometer readings", optional = true),
     EXTRAS("Extras", "Optional tools", required = true),

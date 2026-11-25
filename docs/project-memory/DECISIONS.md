@@ -29,6 +29,7 @@ Approved product and technical decisions. Dates are when the change merged into 
 | 2026-11-16 | Knowledge level and home layout are independent settings; Car Health and Extras can't be hidden | PR #13, `CLAUDE.md` |
 | 2026-11-15 | Gemini only via Firebase AI Logic with App Check enforced; never embed the API key; fall back safely when configuration is missing | PR #5 |
 | 2026-11-15 | OBD-II settings by skill level: Everyday automatic, DIY manual, Advanced full control, all read-only | PR #6 |
+| 2026-11-25 | Two knowledge levels only: Everyday Driver and DIY Enthusiast. Advanced is no longer selectable; stored Advanced migrates to DIY. Supersedes the earlier three-level decision. The DIY redesign follows in Prompt 2 | Owner prompt, Phase 1A |
 | Owner rules | Never merge without the owner's approval; one PR per stage from the latest `main` | `CLAUDE.md` |
 
 ## ❓ Waiting for the owner

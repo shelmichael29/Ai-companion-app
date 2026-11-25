@@ -24,8 +24,8 @@ class AdvancedConnectionViewModel(
 
     val config = store.config
 
-    /** Settings only take effect at the Advanced level; lower levels always use the recommended config. */
-    val appliesNow: Boolean get() = settings.settings.value.explanationLevel == ExplanationLevel.ADVANCED
+    /** Settings take effect at DIY (and the internal Advanced level); Everyday always uses the recommended config. */
+    val appliesNow: Boolean get() = settings.settings.value.explanationLevel != ExplanationLevel.EVERYDAY
 
     var report by mutableStateOf<ConnectionDiagnosticReport?>(null)
         private set

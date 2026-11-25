@@ -29,7 +29,7 @@ Follow `docs/DEVELOPMENT_QUALITY_GATES.md`. In short:
 - **Merging:** never merge without the owner's explicit approval.
 - **Integration base:** `main`, which contains only the Penelope app.
 - **ENET is separate:** the experimental BMW ENET tester is not part of Penelope. It lives only in the separate `shelmichael29/Enet-Development` repository (branches `experiment/*`). Never add ENET code, dependencies, build, CI or quality-gate steps to this repository, and never merge ENET work here, until the owner explicitly clears it. Standing merge approval never covers ENET.
-- **Settings:** knowledge level (Everyday / DIY / Advanced) and home layout (Easy / Customizable) are independent settings.
+- **Settings:** knowledge level (Everyday / DIY) and home layout (Easy / Customizable) are independent settings.
 
 ## Model delegation
 Use the least expensive model that will give a reliable result. Escalate when a task proves harder than expected. Agents are defined in `.claude/agents/`.
