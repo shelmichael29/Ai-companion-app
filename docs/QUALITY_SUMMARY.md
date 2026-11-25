@@ -48,3 +48,4 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.
 | 2026-11-24 | Assistant personalization and voice overhaul (v0.8.0, build 9) | PASS (local, --release) | 1072 run, 0 failed (incl. owner-decision follow-up) | 0 / 2 | 0 | NOT RUN on device (voice gender, engines, network voices, TalkBack) | NEEDS MANUAL VERIFICATION |
+| 2026-11-25 | Remove voice dropdown; Online/Offline voice setting | compile, detekt, lintDebug, unit tests PASS locally (`./gradlew :app:compileDebugKotlin :app:testDebugUnitTest :app:detekt :app:lintDebug -q`); `scripts/quality-gate.sh` NOT RUN | 1087+ run, 0 failed | n/a | 0 | NOT RUN on device (online voices, offline fallback, TalkBack) | NEEDS MANUAL DEVICE CHECK |

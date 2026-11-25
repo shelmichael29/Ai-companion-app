@@ -70,7 +70,15 @@ class PersonalizationUiTest {
         }
     }
 
-    private val isRadio = SemanticsMatcher("is a radio button") { it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton }
+    private fun isSourceRadio(n: androidx.compose.ui.semantics.SemanticsConfiguration): Boolean {
+        val t = n.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
+        return n.getOrNull(SemanticsProperties.Role) == Role.RadioButton && (t.contains("Online (") || t.contains("Offline ("))
+    }
+
+    /** A profile tile: a radio button that is not one of the two voice-source options. */
+    private val isRadio = SemanticsMatcher("is a profile tile") {
+        it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton && !isSourceRadio(it.config)
+    }
 
     @Test fun allTenProfilesAreSelectableTiles() {
         show()
@@ -129,10 +137,7 @@ class PersonalizationUiTest {
         compose.onNodeWithText("More voice options").performScrollTo().assertIsDisplayed()
     }
 
-    private val sourceRadios = SemanticsMatcher("voice source radio") {
-        it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton &&
-            (it.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { t -> t.text }).let { t -> t.contains("Online (") || t.contains("Offline (") }
-    }
+    private val sourceRadios = SemanticsMatcher("voice source radio") { isSourceRadio(it.config) }
 
     @Test fun voiceSourceHasTwoRadioOptionsOfAtLeast48dp() {
         val picked = mutableListOf<com.aicarcompanion.app.data.local.VoiceSource>()
@@ -141,8 +146,8 @@ class PersonalizationUiTest {
         assertEquals(2, nodes.size)
         val density = compose.activity.resources.displayMetrics.density
         nodes.forEach { assertTrue(it.size.height / density >= 47.5f) }
-        compose.onNode(isRadio and hasText("Offline (works without internet)")).assertIsSelected()
-        compose.onNode(isRadio and hasText("Online (more natural, needs internet)")).performScrollTo().performClick()
+        compose.onNode(sourceRadios and hasText("Offline (works without internet)")).assertIsSelected()
+        compose.onNode(sourceRadios and hasText("Online (more natural, needs internet)")).performScrollTo().performClick()
         assertEquals(listOf(com.aicarcompanion.app.data.local.VoiceSource.ONLINE), picked)
     }
 

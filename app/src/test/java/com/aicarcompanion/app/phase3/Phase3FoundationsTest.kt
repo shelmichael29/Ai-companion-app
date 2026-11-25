@@ -37,7 +37,7 @@ class Phase3FoundationsTest {
         store.update {
             it.copy(
                 assistantProfileId = "atlas", customName = "Ada", speechRate = 0.9f, speechPitch = 0.95f, ttsEngine = "com.google.android.tts",
-                voiceChoice = com.aicarcompanion.app.assistant.persona.VoiceChoice.Installed("en-us-x-iol-local"), continuousConversation = false, explanationLevel = ExplanationLevel.DIY,
+                voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE, continuousConversation = false, explanationLevel = ExplanationLevel.DIY,
             )
         }
         assertEquals(store.settings.value, PersistentSettingsStore(kv).settings.value)

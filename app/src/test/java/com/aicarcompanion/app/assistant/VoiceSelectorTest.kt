@@ -151,4 +151,38 @@ class VoiceSelectorTest {
         val r = VoiceSelector.resolve(VoiceRequest.EngineDefault, google, us)
         assertTrue(r is VoiceResolution.FallbackDefault)
     }
+
+    private val mixed = listOf(
+        v("en-us-x-sfg-local"), v("en-us-x-tpf-local"),
+        v("en-us-x-sfg-network", net = true), v("en-us-x-tpf-network", net = true),
+        v("en-us-x-iom-local"), v("mystery-net", net = true),
+    )
+
+    private fun pick(g: VoiceGender, slot: Int, online: Boolean, voices: List<RawVoice> = mixed) =
+        VoiceSelector.resolve(VoiceRequest.Gendered(g, slot, online), voices, us) as VoiceResolution.Voice
+
+    @Test fun `offline mode prefers offline voices and online mode prefers network voices of the same gender`() {
+        val off = pick(VoiceGender.FEMALE, 0, online = false)
+        assertFalse(off.requiresNetwork)
+        val on = pick(VoiceGender.FEMALE, 0, online = true)
+        assertTrue(on.requiresNetwork)
+        assertEquals(VoiceGender.FEMALE, on.gender)
+        assertTrue(on.label.endsWith("needs internet"))
+        // Deterministic: same answer every time, and slots map onto the online pool.
+        assertEquals(on, pick(VoiceGender.FEMALE, 0, online = true))
+        assertTrue(pick(VoiceGender.FEMALE, 1, online = true).voiceName != on.voiceName)
+    }
+
+    @Test fun `online mode never picks an unknown gender and falls back to offline when a gender has no network voice`() {
+        val male = pick(VoiceGender.MALE, 0, online = true)
+        assertEquals("en-us-x-iom-local", male.voiceName)
+        assertFalse(male.requiresNetwork)
+        assertTrue(listOf("mystery-net") .none { pick(VoiceGender.FEMALE, 0, true).voiceName == it })
+        assertTrue(gendered(VoiceGender.FEMALE, 0, listOf(v("mystery-net", net = true))) is VoiceResolution.FallbackDefault)
+        assertTrue(VoiceSelector.resolve(VoiceRequest.Gendered(VoiceGender.FEMALE, 0, true), listOf(v("mystery-net", net = true)), us) is VoiceResolution.FallbackDefault)
+    }
+
+    @Test fun `online mode marks voices shared when fewer network voices than profiles`() {
+        assertTrue(pick(VoiceGender.FEMALE, 0, online = true).shared)
+    }
 }

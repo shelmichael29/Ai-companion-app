@@ -1,6 +1,7 @@
 package com.aicarcompanion.app.data.local
 
 import com.aicarcompanion.app.assistant.persona.VoiceChoice
+import com.aicarcompanion.app.data.local.VoiceSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -25,9 +26,9 @@ class SettingsMigrationTest {
         }
     }
 
-    @Test fun `legacy voice becomes an installed voice choice`() {
+    @Test fun `legacy voice is normalized to follow the profile`() {
         val s = SettingsCodec.read(legacy("tts_voice" to "en-us-x-iol-local"))
-        assertEquals(VoiceChoice.Installed("en-us-x-iol-local"), s.voiceChoice)
+        assertEquals(VoiceChoice.MatchPersonality, s.voiceChoice)
         assertEquals(VoiceChoice.MatchPersonality, SettingsCodec.read(legacy()).voiceChoice)
     }
 
@@ -45,7 +46,7 @@ class SettingsMigrationTest {
         assertFalse(kv.map.containsKey("assistant_name"))
         assertFalse(kv.map.containsKey("tts_voice"))
         assertEquals("Jarvis", kv.map["custom_assistant_name"])
-        assertEquals("installed:v1", kv.map["voice_choice"])
+        assertEquals("match", kv.map["voice_choice"])
         assertEquals("penelope", kv.map["assistant_profile"])
     }
 
@@ -71,15 +72,37 @@ class SettingsMigrationTest {
         assertEquals(VoiceChoice.MatchPersonality, SettingsCodec.read(legacy("settings_schema" to "2", "voice_choice" to "installed:")).voiceChoice)
     }
 
-    @Test fun `all voice choices and profile round-trip`() {
-        listOf(VoiceChoice.MatchPersonality, VoiceChoice.Profile("max"), VoiceChoice.Installed("en-gb-x-gbb-local")).forEach { choice ->
+    @Test fun `profile name and voice source round-trip and the voice always follows the profile`() {
+        VoiceSource.entries.forEach { source ->
             val kv = MapKeyValueStore()
             val store = PersistentSettingsStore(kv)
-            store.update { it.copy(assistantProfileId = "ace", customName = "Zoë", voiceChoice = choice) }
+            store.update { it.copy(assistantProfileId = "ace", customName = "Zoë", voiceChoice = VoiceChoice.Profile("max"), voiceSource = source) }
             val back = PersistentSettingsStore(kv).settings.value
-            assertEquals(choice, back.voiceChoice)
+            assertEquals(VoiceChoice.MatchPersonality, back.voiceChoice)
+            assertEquals(source, back.voiceSource)
             assertEquals("ace", back.assistantProfileId)
             assertEquals("Zoë", back.assistantName)
+        }
+    }
+
+    @Test fun `voice source defaults to offline and a bad value falls back to offline`() {
+        assertEquals(VoiceSource.OFFLINE, SettingsCodec.read(legacy()).voiceSource)
+        assertEquals(VoiceSource.OFFLINE, SettingsCodec.read(legacy("settings_schema" to "2", "voice_source" to "weird")).voiceSource)
+        assertEquals(VoiceSource.ONLINE, SettingsCodec.read(legacy("settings_schema" to "2", "voice_source" to "online")).voiceSource)
+        val kv = MapKeyValueStore()
+        PersistentSettingsStore(kv).update { it.copy(voiceSource = VoiceSource.ONLINE) }
+        assertEquals("online", kv.map["voice_source"])
+    }
+
+    @Test fun `a stored installed or profile voice choice is normalized to match and persisted once`() {
+        listOf("installed:en-gb-x-gbb-local", "profile:max").forEach { stored ->
+            val kv = legacy("settings_schema" to "2", "assistant_profile" to "ace", "custom_assistant_name" to "Zed", "voice_choice" to stored)
+            assertTrue(SettingsCodec.needsVoiceNormalization(kv))
+            val s = PersistentSettingsStore(kv).settings.value
+            assertEquals(VoiceChoice.MatchPersonality, s.voiceChoice)
+            assertEquals("match", kv.map["voice_choice"])
+            assertEquals("ace", kv.map["assistant_profile"]); assertEquals("Zed", kv.map["custom_assistant_name"])
+            assertFalse(SettingsCodec.needsVoiceNormalization(kv))
         }
     }
 
@@ -88,7 +111,10 @@ class SettingsMigrationTest {
         assertFalse(SettingsCodec.needsMigration(kv))
         val s = PersistentSettingsStore(kv).settings.value
         assertEquals("ace", s.assistantProfileId); assertEquals("Zed", s.customName)
-        assertEquals(VoiceChoice.Profile("luna"), s.voiceChoice)
+        assertEquals(VoiceChoice.MatchPersonality, s.voiceChoice)
+        // Normalizing the voice touches only that key: the newer schema marker and other keys stay.
+        assertEquals("match", kv.map["voice_choice"])
+        assertEquals("3", kv.map["settings_schema"])
         assertEquals("Zed", kv.map["custom_assistant_name"])
     }
 
