@@ -31,6 +31,7 @@ Approved product and technical decisions. Dates are when the change merged into 
 | 2026-11-15 | OBD-II settings by skill level: Everyday automatic, DIY manual, Advanced full control, all read-only | PR #6 |
 | 2026-11-25 | Two knowledge levels only: Everyday Driver and DIY Enthusiast. Advanced is no longer selectable; stored Advanced migrates to DIY. Supersedes the earlier three-level decision. The DIY redesign follows in Prompt 2 | Owner prompt, Phase 1A |
 | 2026-11-25 | **Custom connection settings stay Advanced-only.** With Advanced no longer selectable, Everyday and DIY always use the recommended connection settings; saved custom settings are kept but not applied. The Connection screen (test, log, read-only console) stays reachable from DIY | Owner, 2026-11-25 (Phase 1A PR) |
+| 2026-11-25 P2 | **DIY applies custom connection settings** (clamped); Everyday never does. Supersedes the Phase 1A interim row above. Also fixes the communication log never recording at DIY. Pending owner confirmation in the Phase 1B PR | Architect plan; owner to confirm (Phase 1B PR) |
 | Owner rules | Never merge without the owner's approval; one PR per stage from the latest `main` | `CLAUDE.md` |
 
 ## ❓ Waiting for the owner

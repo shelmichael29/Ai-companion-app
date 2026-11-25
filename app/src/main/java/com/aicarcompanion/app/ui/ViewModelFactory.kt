@@ -50,7 +50,7 @@ object AppViewModelProvider {
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            AdapterViewModel(c.bluetooth, c.obdConnection, c.obdControls, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository, c.adapterSetup)
+            AdapterViewModel(c.bluetooth, c.obdConnection, c.obdControls, c.diagnosticCommands, c.settings, c.vehicleRepository, c.historyRepository, c.adapterSetup, c.obdConfig)
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

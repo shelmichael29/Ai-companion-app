@@ -48,4 +48,5 @@ One line per stage, newest first. Full reports are attached to each CI run as th
 ## Known warnings
 - `OldTargetApi`: `targetSdk` is still 35 while compileSdk is 37. Kept on purpose: raising the target changes runtime behavior on the phone and needs its own stage with device testing.
 | 2026-11-24 | Assistant personalization and voice overhaul (v0.8.0, build 9) | PASS (local, --release) | 1072 run, 0 failed (incl. owner-decision follow-up) | 0 / 2 | 0 | NOT RUN on device (voice gender, engines, network voices, TalkBack) | NEEDS MANUAL VERIFICATION |
+| 2026-11-25 | Phase 1B Prompt 2: Advanced features into DIY (v0.10.0, build 11) | PASS (local: compile, Detekt, Lint, tests; full quality-gate.sh not run) | 1148 run, 0 failed, 0 skipped | Detekt 0, Lint 0 errors | Device checks NOT RUN (0f) |
 | 2026-11-25 | Phase 1A Prompt 1: two knowledge levels (v0.9.0, build 10) | PASS (local, --release) | 1114 run, 0 failed | 0 / 0 errors, 2 warnings (Detekt 0, Lint 0 errors / 2 warnings), secret scan clean | 0 | NOT RUN on device (Advanced to DIY migration on an upgraded install, TalkBack, Settings) | NEEDS MANUAL VERIFICATION |

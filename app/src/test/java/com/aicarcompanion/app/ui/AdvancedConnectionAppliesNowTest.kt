@@ -12,7 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.lang.reflect.Proxy
 
-/** Custom connection settings are Advanced-only (owner decision 2026-11-25); Advanced is internal. */
+/** Custom connection settings apply at DIY, never Everyday (owner decision 2026-11-25, Phase 1B; supersedes the Phase 1A interim rule). */
 class AdvancedConnectionAppliesNowTest {
     private inline fun <reified T : Any> unused(): T =
         Proxy.newProxyInstance(T::class.java.classLoader, arrayOf(T::class.java)) { _, _, _ -> error("not used") } as T
@@ -22,9 +22,9 @@ class AdvancedConnectionAppliesNowTest {
         InMemorySettingsStore(AppSettings(explanationLevel = level)),
     ).appliesNow
 
-    @Test fun `appliesNow is false at Everyday and DIY and true only at the internal Advanced level`() {
+    @Test fun `appliesNow is false at Everyday and true at DIY and the internal Advanced level`() {
         assertEquals(false, applies(ExplanationLevel.EVERYDAY))
-        assertEquals(false, applies(ExplanationLevel.DIY))
+        assertEquals(true, applies(ExplanationLevel.DIY))
         assertEquals(true, applies(ExplanationLevel.ADVANCED))
     }
 }

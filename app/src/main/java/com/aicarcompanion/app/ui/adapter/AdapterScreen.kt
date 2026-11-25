@@ -46,6 +46,7 @@ import com.aicarcompanion.app.diagnostics.bluetooth.BluetoothAvailability
 import com.aicarcompanion.app.diagnostics.obd.AdapterDevice
 import com.aicarcompanion.app.diagnostics.obd.AdapterRadio
 import com.aicarcompanion.app.diagnostics.obd.ConnectionTroubleshooter
+import com.aicarcompanion.app.diagnostics.obd.ObdConnectionConfig
 import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
 import com.aicarcompanion.app.domain.model.SensorReading
@@ -86,9 +87,9 @@ fun AdapterScreen(
         item { StatusCard(state, setup, viewModel) }
         if (offersConnectionSettings(level)) {
             item { ConnectionDetailsCard(state, viewModel) }
-            val tips = ConnectionTroubleshooter.tips(state, stats, info)
+            val tips = ConnectionTroubleshooter.tips(state, stats, info, viewModel.customConfigActive && ObdConnectionConfig.customAppliesAt(level))
             if (tips.isNotEmpty()) item {
-                SectionCard("Troubleshooting") { tips.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) } }
+                TroubleshootingCard(tips)
             }
         }
         if (offersConnectionSettings(level)) {
@@ -278,13 +279,9 @@ fun describe(state: ObdConnectionState): Pair<String, String> = when (state) {
 @Composable
 private fun LiveDataCard(viewModel: AdapterViewModel) {
     val readings by viewModel.obd.liveReadings.collectAsStateWithLifecycle(initialValue = emptyList())
+    val everyday = viewModel.level == ExplanationLevel.EVERYDAY
     SectionCard("Live readings from your car") {
-        if (readings.isEmpty()) Text("Waiting for values…")
-        val everyday = viewModel.level == ExplanationLevel.EVERYDAY
-        readings.forEach { r ->
-            val pid = ObdPid.fromCommand(r.pid)
-            LabeledValue(if (everyday && pid != null) pid.friendlyName else r.name, formatReading(r))
-        }
+        LiveReadingRows(readings, everyday)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = viewModel::readCodes, enabled = !viewModel.busy, modifier = Modifier.heightIn(min = 48.dp)) {
                 Text(if (viewModel.busy) "Reading…" else "Read trouble codes")
@@ -296,6 +293,20 @@ private fun LiveDataCard(viewModel: AdapterViewModel) {
             ) { Text("Save snapshot") }
         }
         if (!everyday) ClearCodesControl(Modifier.padding(top = 8.dp))
+    }
+}
+
+@Composable
+internal fun TroubleshootingCard(tips: List<String>) {
+    SectionCard("Troubleshooting") { tips.forEach { Text("• $it", style = MaterialTheme.typography.bodyMedium) } }
+}
+
+@Composable
+internal fun LiveReadingRows(readings: List<SensorReading>, everyday: Boolean) {
+    if (readings.isEmpty()) Text("Waiting for values…")
+    readings.forEach { r ->
+        val pid = ObdPid.fromCommand(r.pid)
+        LabeledValue(if (everyday && pid != null) pid.friendlyName else r.name, formatReading(r))
     }
 }
 
