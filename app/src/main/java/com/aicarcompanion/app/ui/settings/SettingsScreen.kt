@@ -59,7 +59,6 @@ import com.aicarcompanion.app.assistant.voice.EngineOption
 import com.aicarcompanion.app.assistant.voice.VoiceConfigFactory
 import com.aicarcompanion.app.assistant.voice.VoiceResolution
 import com.aicarcompanion.app.assistant.voice.SpeechOutput
-import com.aicarcompanion.app.assistant.voice.VoiceOption
 import com.aicarcompanion.app.data.local.AppSettings
 import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.data.local.SettingsStore
@@ -86,8 +85,6 @@ class SettingsViewModel(
     /** Clears the transcript and the AI's conversation memory. */
     fun resetConversation() = session.conversation.clear()
 
-    private val _voices = MutableStateFlow<List<VoiceOption>>(emptyList())
-    val voices = _voices.asStateFlow()
     private val _engines = MutableStateFlow<List<EngineOption>>(emptyList())
     val engines = _engines.asStateFlow()
 
@@ -102,15 +99,20 @@ class SettingsViewModel(
 
     fun loadVoices() = viewModelScope.launch {
         _engines.value = speech.engines()
-        _voices.value = speech.voices()
         _voiceResolutions.value = AssistantProfiles.all.associate { p ->
             p.id to speech.resolve(VoiceConfigFactory.request(settings.value, VoiceChoice.Profile(p.id)))
         }
     }
 
-    fun selectProfile(id: String) = store.update { it.copy(assistantProfileId = AssistantProfiles.byId(id).id) }
+    /** Each profile speaks with its own voice, so choosing a profile always means "voice follows the profile". */
+    fun selectProfile(id: String) = store.update {
+        it.copy(assistantProfileId = AssistantProfiles.byId(id).id, voiceChoice = VoiceChoice.MatchPersonality)
+    }
 
-    fun setVoiceChoice(choice: VoiceChoice) = store.update { it.copy(voiceChoice = choice) }
+    fun setVoiceSource(source: com.aicarcompanion.app.data.local.VoiceSource) {
+        store.update { it.copy(voiceSource = source) }
+        loadVoices() // Refresh which voices the tiles and the note describe.
+    }
 
     /** Saves a custom name. Blank clears it (the profile's name is used); an unusable name is rejected with a message. */
     fun rename(raw: String) {
@@ -150,8 +152,7 @@ class SettingsViewModel(
     fun setReduceMotion(enabled: Boolean) = store.update { it.copy(reduceMotion = enabled) }
 
     fun setEngine(id: String?) {
-        // Installed voices differ per engine, so an installed-voice choice is dropped.
-        store.update { it.copy(ttsEngine = id, voiceChoice = it.voiceChoice.takeUnless { c -> c is VoiceChoice.Installed } ?: VoiceChoice.MatchPersonality) }
+        store.update { it.copy(ttsEngine = id) }
         viewModelScope.launch { delay(300); loadVoices() }
     }
 
@@ -183,7 +184,6 @@ fun SettingsScreen(
     connectionStatus: ConnectionStatusViewModel? = null,
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val voices by viewModel.voices.collectAsStateWithLifecycle()
     val engines by viewModel.engines.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { viewModel.loadVoices() }
 
@@ -202,11 +202,11 @@ fun SettingsScreen(
             val nameError by viewModel.nameError.collectAsStateWithLifecycle()
             val context = androidx.compose.ui.platform.LocalContext.current
             PersonalizationContent(
-                state = PersonalizationState(settings, voices, engines, resolutions, nameError),
+                state = PersonalizationState(settings, engines, resolutions, nameError),
                 actions = PersonalizationActions(
                     onSelectProfile = viewModel::selectProfile,
                     onPreview = viewModel::preview,
-                    onVoiceChoice = viewModel::setVoiceChoice,
+                    onVoiceSource = viewModel::setVoiceSource,
                     onEngine = viewModel::setEngine,
                     onRename = viewModel::rename,
                     onSpeed = viewModel::setSpeechRate,

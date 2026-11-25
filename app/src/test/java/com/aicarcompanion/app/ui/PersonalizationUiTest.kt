@@ -64,13 +64,21 @@ class PersonalizationUiTest {
         compose.setContent {
             CarCompanionTheme(mode, reduceMotion = true) {
                 Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                    PersonalizationContent(PersonalizationState(settings, emptyList(), emptyList(), resolutions, null), actions)
+                    PersonalizationContent(PersonalizationState(settings, emptyList(), resolutions, null), actions)
                 }
             }
         }
     }
 
-    private val isRadio = SemanticsMatcher("is a radio button") { it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton }
+    private fun isSourceRadio(n: androidx.compose.ui.semantics.SemanticsConfiguration): Boolean {
+        val t = n.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
+        return n.getOrNull(SemanticsProperties.Role) == Role.RadioButton && (t.contains("Online (") || t.contains("Offline ("))
+    }
+
+    /** A profile tile: a radio button that is not one of the two voice-source options. */
+    private val isRadio = SemanticsMatcher("is a profile tile") {
+        it.config.getOrNull(SemanticsProperties.Role) == Role.RadioButton && !isSourceRadio(it.config)
+    }
 
     @Test fun allTenProfilesAreSelectableTiles() {
         show()
@@ -84,7 +92,7 @@ class PersonalizationUiTest {
             CarCompanionTheme(ThemeMode.DARK, reduceMotion = true) {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     PersonalizationContent(
-                        PersonalizationState(s, emptyList(), emptyList(), allAvailable, null),
+                        PersonalizationState(s, emptyList(), allAvailable, null),
                         PersonalizationActions(onSelectProfile = { s = s.copy(assistantProfileId = it) }),
                     )
                 }
@@ -117,12 +125,46 @@ class PersonalizationUiTest {
         compose.onNodeWithText("Jarvis · Confident, professional", substring = true, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
     }
 
-    @Test fun theSelectedTileShowsTheVoiceThatWillReallyBeUsed() {
-        val res = allAvailable + ("luna" to VoiceResolution.Voice("v-luna", "Female voice 4 · works offline", VoiceGender.FEMALE, false, false))
-        show(AppSettings(assistantProfileId = "atlas", voiceChoice = com.aicarcompanion.app.assistant.persona.VoiceChoice.Profile("luna")), resolutions = res)
+    @Test fun theSelectedTileShowsItsOwnVoiceAndNoDropdownExists() {
+        val res = allAvailable + ("atlas" to VoiceResolution.Voice("v-atlas", "Male voice 2 · works offline", VoiceGender.MALE, false, false))
+        show(AppSettings(assistantProfileId = "atlas"), resolutions = res)
         val tile = compose.onNode(isRadio and hasText("Atlas", substring = true)).fetchSemanticsNode()
         val texts = tile.config.getOrNull(SemanticsProperties.Text).orEmpty().joinToString { it.text }
-        assertTrue(texts, texts.contains("Female voice 4"))
+        assertTrue(texts, texts.contains("Male voice 2"))
+        // The separate voice dropdown is gone: no "Same as personality" option, and the summary shows the profile's own voice.
+        assertEquals(0, compose.onAllNodes(hasText("Same as personality", substring = true)).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(hasText("'s voice ·", substring = true)).fetchSemanticsNodes().size)
+        compose.onNodeWithText("More voice options").performScrollTo().assertIsDisplayed()
+    }
+
+    private val sourceRadios = SemanticsMatcher("voice source radio") { isSourceRadio(it.config) }
+
+    @Test fun voiceSourceHasTwoRadioOptionsOfAtLeast48dp() {
+        val picked = mutableListOf<com.aicarcompanion.app.data.local.VoiceSource>()
+        show(actions = PersonalizationActions(onVoiceSource = { picked += it }))
+        val nodes = compose.onAllNodes(sourceRadios).fetchSemanticsNodes()
+        assertEquals(2, nodes.size)
+        val density = compose.activity.resources.displayMetrics.density
+        nodes.forEach { assertTrue(it.size.height / density >= 47.5f) }
+        compose.onNode(sourceRadios and hasText("Offline (works without internet)")).assertIsSelected()
+        compose.onNode(sourceRadios and hasText("Online (more natural, needs internet)")).performScrollTo().performClick()
+        assertEquals(listOf(com.aicarcompanion.app.data.local.VoiceSource.ONLINE), picked)
+    }
+
+    @Test fun onlineWithNoOnlineVoicesSaysSoHonestly() {
+        show(AppSettings(voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE))
+        compose.onNodeWithText("This phone has no online voices installed; using offline voices.").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun noNoteWhenOnlineVoicesAreUsedOrOfflineIsChosen() {
+        val online = allAvailable.mapValues { (id, _) -> VoiceResolution.Voice("v-$id", "Female voice 1 · needs internet", VoiceGender.FEMALE, false, true) as VoiceResolution? }
+        show(AppSettings(voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE), resolutions = online)
+        assertEquals(0, compose.onAllNodes(hasText("no online voices", substring = true)).fetchSemanticsNodes().size)
+    }
+
+    @Test fun offlineChoiceShowsNoOnlineNote() {
+        show()
+        assertEquals(0, compose.onAllNodes(hasText("no online voices", substring = true)).fetchSemanticsNodes().size)
     }
 
     @Test fun aProfileWhoseVoiceCouldNotBeResolvedSaysSo() {
@@ -150,7 +192,6 @@ class PersonalizationUiTest {
     @Test fun missingMaleVoiceIsExplainedHonestly() {
         show(resolutions = noMale)
         compose.onNodeWithText("No male voice is installed on this phone.", substring = true).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("Atlas's voice", substring = true).let { /* never offered in the picker */ }
         assertEquals(4, compose.onAllNodes(hasText("Uses the phone's default voice", substring = true)).fetchSemanticsNodes().size)
     }
 
@@ -167,7 +208,7 @@ class PersonalizationUiTest {
                 if (visible) {
                     Column(Modifier.verticalScroll(rememberScrollState())) {
                         PersonalizationContent(
-                            PersonalizationState(AppSettings(), emptyList(), emptyList(), allAvailable, null),
+                            PersonalizationState(AppSettings(), emptyList(), allAvailable, null),
                             PersonalizationActions(onRename = { saved += it }),
                         )
                     }

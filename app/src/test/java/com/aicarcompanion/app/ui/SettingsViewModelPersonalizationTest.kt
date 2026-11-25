@@ -116,11 +116,20 @@ class SettingsViewModelPersonalizationTest {
         assertEquals("atlas", store.settings.value.assistantProfileId)
     }
 
-    @Test fun `voice choice is independent of the profile and survives a profile change`() {
+    @Test fun `selecting a profile always sets the voice to follow the profile`() {
+        val store = InMemorySettingsStore(AppSettings(voiceChoice = VoiceChoice.Installed("v1")))
+        val vm = viewModel(store, FakeOutput())
+        vm.selectProfile("luna")
+        assertEquals(VoiceChoice.MatchPersonality, store.settings.value.voiceChoice)
+        assertEquals("luna", store.settings.value.assistantProfileId)
+    }
+
+    @Test fun `voice source is saved and applied to the next voice configuration`() {
         val store = InMemorySettingsStore()
         val vm = viewModel(store, FakeOutput())
-        vm.setVoiceChoice(VoiceChoice.Profile("oliver")); vm.selectProfile("luna")
-        assertEquals(VoiceChoice.Profile("oliver"), store.settings.value.voiceChoice)
+        vm.setVoiceSource(com.aicarcompanion.app.data.local.VoiceSource.ONLINE); dispatcher.scheduler.advanceUntilIdle()
+        assertEquals(com.aicarcompanion.app.data.local.VoiceSource.ONLINE, store.settings.value.voiceSource)
+        assertEquals(VoiceRequest.Gendered(VoiceGender.FEMALE, 0, preferOnline = true), VoiceConfigFactory.from(store.settings.value).voice)
     }
 
     @Test fun `reset restores only personalization`() {
@@ -163,11 +172,12 @@ class SettingsViewModelPersonalizationTest {
         assertEquals("luna", store.settings.value.assistantProfileId)
     }
 
-    @Test fun `a profile voice that follows an installed choice still previews the real configuration`() {
-        val store = InMemorySettingsStore(AppSettings(assistantProfileId = "luna", voiceChoice = VoiceChoice.Installed("v1")))
+    @Test fun `online preview uses the same request as the conversation`() {
+        val store = InMemorySettingsStore(AppSettings(assistantProfileId = "luna", voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE))
         val out = FakeOutput()
         viewModel(store, out).preview(null); dispatcher.scheduler.advanceUntilIdle()
-        assertTrue(out.previews.single().second.voice is VoiceRequest.Named)
+        assertEquals(VoiceConfigFactory.from(store.settings.value), out.previews.single().second)
+        assertTrue((out.previews.single().second.voice as VoiceRequest.Gendered).preferOnline)
     }
 
     @Test fun `a new preview stops the one that is playing`() {

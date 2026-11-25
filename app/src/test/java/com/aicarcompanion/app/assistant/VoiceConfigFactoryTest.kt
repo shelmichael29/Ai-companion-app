@@ -42,6 +42,12 @@ class VoiceConfigFactoryTest {
         assertEquals(VoiceRequest.Gendered(VoiceGender.MALE, 1), VoiceConfigFactory.from(s, VoiceChoice.Profile("atlas")).voice)
     }
 
+    @Test fun `voice source online asks for network voices and the binder applies a change`() {
+        val c = VoiceConfigFactory.from(AppSettings(assistantProfileId = "ace", voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE))
+        assertEquals(VoiceRequest.Gendered(VoiceGender.MALE, 3, preferOnline = true), c.voice)
+        assertEquals(VoiceRequest.Gendered(VoiceGender.MALE, 3), VoiceConfigFactory.from(AppSettings(assistantProfileId = "ace")).voice)
+    }
+
     @Test fun `rate pitch and engine carry over and are clamped`() {
         val c = VoiceConfigFactory.from(AppSettings(speechRate = 1.2f, speechPitch = 0.9f, ttsEngine = "com.x"))
         assertEquals(1.2f, c.rate); assertEquals(0.9f, c.pitch); assertEquals("com.x", c.engine)
@@ -65,7 +71,9 @@ class VoiceConfigFactoryTest {
         store.update { it.copy(assistantProfileId = "ace") }; advanceUntilIdle()
         store.update { it.copy(customName = "Zed") }; advanceUntilIdle() // name doesn't affect voice
         store.update { it.copy(voiceChoice = VoiceChoice.Profile("luna")) }; advanceUntilIdle()
-        assertEquals(4, out.configs.size)
+        store.update { it.copy(voiceSource = com.aicarcompanion.app.data.local.VoiceSource.ONLINE) }; advanceUntilIdle()
+        assertEquals(5, out.configs.size)
+        assertEquals(VoiceRequest.Gendered(VoiceGender.FEMALE, 3, preferOnline = true), out.configs[4].voice)
         assertEquals(1.3f, out.configs[1].rate)
         assertEquals(VoiceRequest.Gendered(VoiceGender.MALE, 3), out.configs[2].voice)
         assertEquals(VoiceRequest.Gendered(VoiceGender.FEMALE, 3), out.configs[3].voice)

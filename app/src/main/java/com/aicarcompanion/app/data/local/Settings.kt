@@ -50,6 +50,8 @@ data class AppSettings(
     val customName: String? = null,
     /** Which voice to speak with; by default the one matching the personality. */
     val voiceChoice: VoiceChoice = VoiceChoice.MatchPersonality,
+    /** Whether voices that need internet are preferred. Offline (the default) works without a connection. */
+    val voiceSource: VoiceSource = VoiceSource.OFFLINE,
     /** When on, the dashboard and Penelope use labeled sample diagnostics. Off by default. */
     val demoDataEnabled: Boolean = false,
     /** Bluetooth address of the last OBD-II adapter the user connected to. */
@@ -101,6 +103,9 @@ class InMemorySettingsStore(initial: AppSettings = AppSettings()) : SettingsStor
     override fun update(transform: (AppSettings) -> AppSettings) = state.update(transform)
 }
 
+/** Which kind of installed voice is preferred. If an online voice fails or the phone is offline, speech falls back so it never stops. */
+enum class VoiceSource { OFFLINE, ONLINE }
+
 /** Minimal key-value storage so the settings codec can be unit-tested without Android. */
 interface KeyValueStore {
     fun getString(key: String): String?
@@ -146,6 +151,8 @@ object SettingsCodec {
     private const val KEY_PROFILE = "assistant_profile"
     private const val KEY_CUSTOM_NAME = "custom_assistant_name"
     private const val KEY_VOICE_CHOICE = "voice_choice"
+    private const val KEY_VOICE_SOURCE = "voice_source"
+    private const val VOICE_MATCH = "match"
     private const val KEY_SCHEMA = "settings_schema"
     private const val SCHEMA = "2"
     private const val KEY_DEMO = "demo_data_enabled"
@@ -196,39 +203,29 @@ object SettingsCodec {
         return d.with(ExplanationLevel.DIY, LevelLayout(advanced.layout, items))
     }
 
-    private fun encodeVoice(choice: VoiceChoice): String = when (choice) {
-        VoiceChoice.MatchPersonality -> "match"
-        is VoiceChoice.Profile -> "profile:${choice.id}"
-        is VoiceChoice.Installed -> "installed:${choice.voiceName}"
-    }
-
-    /** A corrupt or unknown value falls back to the matching voice. */
-    private fun decodeVoice(raw: String?): VoiceChoice = when {
-        raw == null || raw == "match" -> VoiceChoice.MatchPersonality
-        raw.startsWith("profile:") -> raw.removePrefix("profile:").takeIf { id -> AssistantProfiles.all.any { it.id == id } }
-            ?.let { VoiceChoice.Profile(it) } ?: VoiceChoice.MatchPersonality
-        raw.startsWith("installed:") -> raw.removePrefix("installed:").takeIf { it.isNotBlank() }
-            ?.let { VoiceChoice.Installed(it) } ?: VoiceChoice.MatchPersonality
-        else -> VoiceChoice.MatchPersonality
-    }
-
     /**
-     * Legacy settings (no schema marker) stored a free-text name and a raw voice name. A name that
-     * differs from "Penelope" becomes a custom name on the Penelope profile; a saved voice becomes
-     * an installed-voice choice. Migration is one-way: older app versions ignore the new keys.
+     * The voice always follows the selected profile; there is no separate voice picker any more, so no
+     * stored value (a saved installed voice, another profile's voice, the legacy voice) can survive a read.
      */
     private fun readPersonalization(store: KeyValueStore): Triple<String, String?, VoiceChoice> {
         // Only a missing marker means legacy; any stored version (even a newer one) already uses the new keys.
         if (store.getString(KEY_SCHEMA) != null) {
             val profile = AssistantProfiles.byId(store.getString(KEY_PROFILE)).id
-            return Triple(profile, AssistantNamePolicy.sanitize(store.getString(KEY_CUSTOM_NAME)), decodeVoice(store.getString(KEY_VOICE_CHOICE)))
+            return Triple(profile, AssistantNamePolicy.sanitize(store.getString(KEY_CUSTOM_NAME)), VoiceChoice.MatchPersonality)
         }
         val legacyName = AssistantNamePolicy.sanitize(store.getString(KEY_LEGACY_NAME))
             ?.takeUnless { it.equals(AppSettings.DEFAULT_ASSISTANT_NAME, ignoreCase = true) }
-        val voice = store.getString(KEY_LEGACY_VOICE)?.takeIf { it.isNotBlank() }?.let { VoiceChoice.Installed(it) }
-            ?: VoiceChoice.MatchPersonality
-        return Triple(AssistantProfiles.DEFAULT_ID, legacyName, voice)
+        return Triple(AssistantProfiles.DEFAULT_ID, legacyName, VoiceChoice.MatchPersonality)
     }
+
+    /** True when a stored voice choice is anything but "match" and must be reset once. */
+    fun needsVoiceNormalization(store: KeyValueStore): Boolean {
+        val raw = store.getString(KEY_VOICE_CHOICE)
+        return store.getString(KEY_SCHEMA) != null && raw != null && raw != VOICE_MATCH
+    }
+
+    /** Resets only the voice key, so other keys (and a newer schema marker) are left exactly as they are. */
+    fun normalizeVoice(store: KeyValueStore) = store.write(mapOf(KEY_VOICE_CHOICE to VOICE_MATCH))
 
     fun read(store: KeyValueStore): AppSettings {
         val defaults = AppSettings()
@@ -238,6 +235,7 @@ object SettingsCodec {
             assistantProfileId = profileId,
             customName = customName,
             voiceChoice = voiceChoice,
+            voiceSource = VoiceSource.entries.firstOrNull { it.name.lowercase() == store.getString(KEY_VOICE_SOURCE) } ?: defaults.voiceSource,
             demoDataEnabled = store.getBoolean(KEY_DEMO) ?: defaults.demoDataEnabled,
             lastAdapterAddress = store.getString(KEY_ADAPTER),
             speechRate = (store.getFloat(KEY_RATE) ?: defaults.speechRate).coerceIn(AppSettings.RATE_RANGE),
@@ -277,7 +275,8 @@ object SettingsCodec {
             KEY_ACTIVE to s.activeVehicleId,
             KEY_PROFILE to s.assistantProfileId,
             KEY_CUSTOM_NAME to s.customName,
-            KEY_VOICE_CHOICE to encodeVoice(s.voiceChoice),
+            KEY_VOICE_CHOICE to VOICE_MATCH,
+            KEY_VOICE_SOURCE to s.voiceSource.name.lowercase(),
             KEY_SCHEMA to SCHEMA,
             KEY_LEGACY_NAME to null,
             KEY_LEGACY_VOICE to null,
@@ -300,8 +299,11 @@ class PersistentSettingsStore(private val store: KeyValueStore) : SettingsStore 
     private val state = MutableStateFlow(SettingsCodec.read(store)).also {
         // Rewrite legacy values once so the old keys are gone and the new ones are authoritative.
         if (SettingsCodec.needsMigration(store)) SettingsCodec.write(store, it.value)
-        // Retired Advanced level: becomes DIY in place, once. Touches only the level (and DIY layout) keys.
-        else if (SettingsCodec.needsLevelMigration(store)) SettingsCodec.migrateLevel(store, it.value)
+        else {
+            if (SettingsCodec.needsVoiceNormalization(store)) SettingsCodec.normalizeVoice(store)
+            // Retired Advanced level: becomes DIY in place, once. Touches only the level (and DIY layout) keys.
+            if (SettingsCodec.needsLevelMigration(store)) SettingsCodec.migrateLevel(store, it.value)
+        }
     }
     override val settings: StateFlow<AppSettings> = state.asStateFlow()
 

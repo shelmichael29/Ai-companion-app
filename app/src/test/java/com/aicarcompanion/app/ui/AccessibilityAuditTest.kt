@@ -152,7 +152,7 @@ class AccessibilityAuditTest {
     private fun personalizationContent() = androidx.compose.foundation.layout.Column(Modifier.verticalScroll(rememberScrollState())) {
         com.aicarcompanion.app.ui.settings.PersonalizationContent(
             com.aicarcompanion.app.ui.settings.PersonalizationState(
-                com.aicarcompanion.app.data.local.AppSettings(), emptyList(), emptyList(),
+                com.aicarcompanion.app.data.local.AppSettings(), emptyList(),
                 com.aicarcompanion.app.assistant.persona.AssistantProfiles.all.associate {
                     it.id to com.aicarcompanion.app.assistant.voice.VoiceResolution.Voice("v-${it.id}", "Female voice 1 · works offline", null, false, false)
                 },

@@ -31,11 +31,11 @@ Galaxy S26 Ultra. Automated tests use fake voices, so everything here needs the 
 - Tap each Preview button (10). Note which voices sound female or male. **Samsung vs Google engines label gender differently**: confirm by ear that "Female voice N" and "Male voice N" are right. The Google voice-code table in `VoiceSelector` is a hypothesis.
 - Different profiles should sound different where the phone has enough voices; "Shares a voice with another profile" appears otherwise.
 - Remove or lack a male voice pack: male tiles say "Uses the phone's default voice" and the notice appears. Never a fake male pitch.
-- Choose a network-only voice, go offline, preview and speak: it should fall back to the default voice instead of silence.
+- There is no Voice dropdown; the tiles are the only voice choice. Set Voice to Online: previews use network voices of the profile's gender if installed, else the note "This phone has no online voices installed; using offline voices." appears. With Online chosen, go offline, preview and speak: it falls back to the default voice instead of silence, and returns to the online voice when internet is back. Offline (default) never uses a network voice while an offline one exists.
 - Rename to a custom name; say "hey <name>"; check Home, Drive, Chat and More show it. A name like "Janay-Latrice" is recognised when spoken.
-- Start a continuous conversation, change profile or voice mid-session: current reply is not cut off, the next reply uses the new voice, listening continues, tap-to-interrupt still works.
+- Start a continuous conversation, change profile or the Online/Offline setting mid-session: current reply is not cut off, the next reply uses the new voice, listening continues, tap-to-interrupt still works.
 - Ask the same question as Ace and as Luna (Gemini on): wording and length differ; safety advice and facts do not. Knowledge level is unchanged by profile.
-- Reset to default (confirm dialog); close and reopen the app: settings persist. Upgrading from 0.7.1 keeps a previously chosen name and voice.
+- Reset to default (confirm dialog); close and reopen the app: settings persist. Upgrading from 0.7.1 keeps a previously chosen name; a previously chosen separate voice now follows the selected profile.
 - Font 100% and 200%, light and dark: no clipped or overlapping text. TalkBack: tiles read as radio buttons, previews as "Preview <name>'s voice".
 
 ## 0c. Phase 1: three interfaces
