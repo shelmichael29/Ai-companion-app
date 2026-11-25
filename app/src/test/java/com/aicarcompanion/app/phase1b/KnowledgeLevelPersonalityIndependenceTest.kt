@@ -30,6 +30,14 @@ class KnowledgeLevelPersonalityIndependenceTest {
             )
         }
         val expected = voiceFields(store.settings.value)
+        assertEquals("ace", expected[0])
+        assertEquals("Zoë", expected[1])
+        assertEquals(VoiceChoice.Profile("max"), expected[2])
+        assertEquals(1.2f, expected[3])
+        assertEquals(0.9f, expected[4])
+        assertEquals("com.example.tts", expected[5])
+        assertEquals(false, expected[6])
+        assertEquals(LevelLayout(HomeLayout.CUSTOMIZABLE, listOf(DashboardItem.ADAPTER, DashboardItem.HISTORY)), expected[8])
         listOf(ExplanationLevel.EVERYDAY, ExplanationLevel.DIY, ExplanationLevel.EVERYDAY, ExplanationLevel.DIY).forEach { level ->
             store.update { it.copy(explanationLevel = level) }
             assertEquals(level, store.settings.value.explanationLevel)

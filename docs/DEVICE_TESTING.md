@@ -199,7 +199,7 @@ Change the level under **Settings → Detail level**.
 
 
 ## 0f. Phase 1B: Advanced features in DIY (v0.10.0, build 11) (NOT RUN in automated tests)
-1. Upgrade in place from v0.9.0: vehicles, history, personality, voice and layouts intact.
+1. Upgrade in place from v0.9.0: vehicles, history, personality, voice and layouts intact. Before upgrading, on v0.9.0 DIY save a manual protocol (e.g. CAN 29-bit 250k with fallback off). After upgrading to 0.10.0 the Connection screen says the settings are active; if the car is silent the Troubleshooting tip appears, and Restore recommended recovers the connection.
 2. DIY, Advanced connection settings: the screen says the settings are active. Change the poll interval or turn on the communication log, reconnect: the log records redacted traffic.
 3. DIY, connected to the car: the adapter card lists the supported readings (fuel trims, MAP, MAF) and omits any the car doesn't report.
 4. DIY: "are you connected?" mentions the protocol; "tell me about my engine" mentions the drivetrain. Everyday: neither.

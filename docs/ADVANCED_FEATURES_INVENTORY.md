@@ -1,12 +1,12 @@
-# Advanced-only features: inventory for the DIY redesign (Phase 1A, Prompt 1)
+# Advanced-only features: inventory for the DIY redesign (Phase 1A, Prompt 1; updated in Phase 1B, Prompt 2)
 
-Since v0.9.0 only Everyday Driver and DIY Enthusiast are selectable. `ExplanationLevel.ADVANCED` stays in the code as an internal-only value (a stored Advanced level is migrated to DIY on startup). Nothing below was deleted. "Access after 1A" says how a DIY user reaches it now. Prompt 2 decides what moves into the DIY design.
+Since v0.9.0 only Everyday Driver and DIY Enthusiast are selectable. `ExplanationLevel.ADVANCED` stays in the code as an internal-only value (a stored Advanced level is migrated to DIY on startup). Nothing below was deleted. "Access after 1A" says how a DIY user reaches it now. Phase 1B (Prompt 2, v0.10.0) moved the behaviour noted in the last column into DIY; visual and tab-set changes are deferred to Prompt 3.
 
 | Feature | Where | Access before | Access after 1A | Prompt 2 notes | After Prompt 2 (Phase 1B, v0.10.0) |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | Telemetry home (AdvancedDashboard) | `ui/home/AdvancedDashboard.kt`, `dashboard/Dashboard.kt` | Advanced home | Not shown (DIY keeps the DIY home). Code kept and tested | Candidate DIY home content | Deferred to Prompt 3 (visual redesign); not shown |
 | Advanced design tokens, plain nav bar, LiveColors | `AdvancedTokens`, `FloatingNavBar(plain)`, `ui/livedata/LiveColors.kt` | Advanced | Unused unless level is the internal Advanced | Decide whether DIY adopts them | Deferred to Prompt 3; not shown |
-| Advanced tab set (Overview, Live Data, Diagnostics, Drive, More) | `ui/navigation/LevelNavigation.kt` | Advanced | DIY keeps its own tabs; Live Data via home shortcut and `liveDataAvailable` | Decide DIY tab set | Deferred to Prompt 3; DIY keeps its tabs; Diagnostics tab opens from home Results |
+| Advanced tab set (Overview, Live Data, Diagnostics, Drive, More) | `ui/navigation/LevelNavigation.kt` | Advanced | DIY keeps its own tabs; Live Data via home shortcut and `liveDataAvailable` | Decide DIY tab set | Tab set deferred to Prompt 3. Diagnostics is already a DIY tab and home Results now opens it |
 | Advanced Drive style | `ui/drive/DriveSections.kt` | Advanced | Not shown | Optional | Deferred to Prompt 3; not shown |
 | Advanced Connection screen (type, protocol, timing, poll, reconnection, adapter ID, adapter test, communication log, expert ELM options, read-only console) | `ui/adapter/AdvancedConnectionScreen.kt` | Advanced (Adapter button, More row, home shortcut) | DIY: Adapter button, More "Connection" row, optional home shortcut | Fully reachable; consider placing in DIY dashboard | Unchanged and reachable; settings now apply at DIY |
 | Custom connection config applying | `ObdConnectionConfig.effectiveFor`, `AdvancedConnectionViewModel.appliesNow` | Advanced only | Still Advanced only (owner decision 2026-11-25). Selectable levels always use the recommended config; the Connection screen (test, log, read-only console) stays reachable from DIY and says custom settings are switched off for now | Prompt 2: decide whether the folded-in DIY tools may apply a custom config | Applied at DIY (clamped); Everyday never. Supersedes the Phase 1A interim rule; pending owner confirmation in the PR |
@@ -21,4 +21,6 @@ Since v0.9.0 only Everyday Driver and DIY Enthusiast are selectable. `Explanatio
 | DIY sensor-list hint | `RuleBasedReasoningProvider.kt` :373 | Said "switch to a higher detail level" | "Ask me for a specific reading, or open Live Data to see more." | Review wording | Unchanged |
 | Advanced-only polling of trims, MAF, MAP | `ObdManager.kt` :672 | Advanced | Not polled for home/adapter card at DIY; Live Data workspace still offers them | Decide | Now DIY (up to 14 PIDs, supported ones only) |
 | Plain navigation bar | `CarCompanionApp.kt` :270 | Advanced | Not shown | Optional | Deferred to Prompt 3 |
-| Custom connection settings | `ObdConnectionConfig.effectiveFor` | Advanced only | Off for now (everyone uses recommended settings) | Owner decision pending | Applied at DIY (see above); readiness monitors remain a Planned placeholder |
+| Custom connection settings | `ObdConnectionConfig.effectiveFor` | Advanced only | Off for now (everyone uses recommended settings) | Owner decision pending | Applied at DIY (see above) |
+| Freeze frame as a feature (only available through the console today) | Connection screen console (Mode 02) | Advanced | DIY via the console only | Possibly a DIY tool | **Planned**, not built |
+| Readiness monitors | Placeholder only | None | None | Possibly a DIY tool | **Planned**, not built |

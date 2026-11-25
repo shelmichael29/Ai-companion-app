@@ -21,7 +21,11 @@ import com.aicarcompanion.app.data.local.ThemeMode
 import com.aicarcompanion.app.ui.design.PenelopeBackground
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.aicarcompanion.app.diagnostics.obd.ConnectionStats
+import com.aicarcompanion.app.diagnostics.obd.ConnectionTroubleshooter
+import com.aicarcompanion.app.diagnostics.obd.ObdConnectionState
 import com.aicarcompanion.app.diagnostics.obd.ObdPid
+import com.aicarcompanion.app.diagnostics.obd.ObdTransport
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.SensorReading
 import com.aicarcompanion.app.ui.adapter.ConnectionSettingsStatus
@@ -85,9 +89,9 @@ class Phase1bScreenshotTest(private val shot: Shot) {
                                         LiveReadingRows(sampleReadings(), everyday = false)
                                     }
                                     Part.TIPS -> TroubleshootingCard(
-                                        listOf(
-                                            "The adapter is fine but the car isn't answering. Turn the ignition fully on, then tap \"Check vehicle again\".",
-                                            "Custom connection settings are on. If the car doesn't answer, open Advanced connection settings and tap Restore recommended.",
+                                        ConnectionTroubleshooter.tips(
+                                            ObdConnectionState.Connected(ObdTransport.BLUETOOTH_CLASSIC, "OBDII", null),
+                                            ConnectionStats(), null, customConfig = true,
                                         ),
                                     )
                                 }
@@ -106,6 +110,12 @@ class Phase1bScreenshotTest(private val shot: Shot) {
 
 private const val ROOT = "screenshot_root_phase1b"
 
-private fun sampleReadings(): List<SensorReading> = ObdPid.entries.map {
-    SensorReading(it.label, if (it == ObdPid.ENGINE_RPM) 800.0 else 20.0, it.unit, Instant.EPOCH, DataOrigin.SAMPLE, it.command)
+private fun sampleReadings(): List<SensorReading> {
+    val values = mapOf(
+        ObdPid.ENGINE_LOAD to 22.0, ObdPid.COOLANT_TEMP to 90.0, ObdPid.SHORT_TERM_FUEL_TRIM_B1 to 1.6,
+        ObdPid.LONG_TERM_FUEL_TRIM_B1 to -2.3, ObdPid.SHORT_TERM_FUEL_TRIM_B2 to 1.2, ObdPid.LONG_TERM_FUEL_TRIM_B2 to -1.9,
+        ObdPid.INTAKE_MAP to 34.0, ObdPid.ENGINE_RPM to 780.0, ObdPid.VEHICLE_SPEED to 0.0, ObdPid.INTAKE_AIR_TEMP to 24.0,
+        ObdPid.MAF_RATE to 3.9, ObdPid.THROTTLE_POSITION to 14.0, ObdPid.FUEL_LEVEL to 62.0, ObdPid.CONTROL_MODULE_VOLTAGE to 14.1,
+    )
+    return ObdPid.entries.map { SensorReading(it.label, values.getValue(it), it.unit, Instant.EPOCH, DataOrigin.SAMPLE, it.command) }
 }
