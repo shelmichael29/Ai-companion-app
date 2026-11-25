@@ -84,7 +84,7 @@ fun AdapterScreen(
     ) {
         val level = viewModel.level
         item { StatusCard(state, setup, viewModel) }
-        if (level != ExplanationLevel.EVERYDAY) {
+        if (offersConnectionSettings(level)) {
             item { ConnectionDetailsCard(state, viewModel) }
             val tips = ConnectionTroubleshooter.tips(state, stats, info)
             if (tips.isNotEmpty()) item {

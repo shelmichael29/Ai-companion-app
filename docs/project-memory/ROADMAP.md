@@ -5,7 +5,7 @@
 ## Next phases (recommended order)
 1. **Device verification** on the S26 Ultra, the adapter and the 528i. This is the biggest gap: nothing is device-verified yet.
 2. **H1: media control.** Play, pause and skip through media keys; no special permission.
-3. **A3 / A4:** DIY and Advanced dashboards.
+3. **A3 / A4:** DIY dashboard (A4, the Advanced dashboard, is superseded by the two-level decision of 2026-11-25; its pieces are inventoried in `docs/ADVANCED_FEATURES_INVENTORY.md`).
 4. **Offline knowledge follow-ups:** sample-accuracy review of the code data; VIN-specific recall status (not possible with NHTSA's public API: needs a manufacturer or NHTSA VIN source; today it's a link); server-side bulletins and investigations.
 5. **OBD hardening:** freeze-frame, VIN via Mode 09, foreground service for long sessions.
 6. **Mechanic handoff report:** shareable PDF or text.

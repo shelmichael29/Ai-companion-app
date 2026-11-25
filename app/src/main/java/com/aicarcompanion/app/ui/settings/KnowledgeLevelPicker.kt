@@ -31,7 +31,7 @@ fun KnowledgeLevelPicker(selected: ExplanationLevel, onSelect: (ExplanationLevel
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RadioButton(selected = current == level, onClick = null)
-                Column(Modifier.padding(start = 12.dp)) {
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(level.label + if (level == ExplanationLevel.EVERYDAY) " (recommended)" else "", style = MaterialTheme.typography.bodyLarge)
                     Text(level.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

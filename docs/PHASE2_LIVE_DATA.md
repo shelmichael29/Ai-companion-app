@@ -3,7 +3,7 @@
 Status: implemented on `feature/live-data-workspace`, not merged. Device and adapter checks are still needed (below).
 
 ## What the owner gets
-- DIY and Advanced only. Everyday has no Live Data (`LevelNavigation.liveDataAvailable`; the route redirects Everyday to Home). Advanced has the Live Data tab; DIY reaches it from the "Live readings" shortcut on its Home dashboard.
+- DIY only (Advanced is internal since Phase 1A). Everyday has no Live Data (`LevelNavigation.liveDataAvailable`; the route redirects Everyday to Home). Advanced has the Live Data tab; DIY reaches it from the "Live readings" shortcut on its Home dashboard.
 - Dashboard of up to 8 gauges per layout. Edit mode: add, remove, move up/down, resize (small, wide, large), choose style (analog dial, digital, numeric, line graph, status) and unit (C/F, km/h or mph, kPa/psi/bar, g/s or lb/min).
 - Several named layouts per vehicle (new, rename, delete, pick). A vehicle with none shows a "Default" layout (engine speed, vehicle speed, coolant temperature, module voltage), saved only when edited.
 - "All sensors" tab lists every known sensor, supported first, with a Vehicle or SAMPLE origin label.

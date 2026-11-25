@@ -58,7 +58,7 @@ data class TrafficLogEntry(val atMillis: Long, val command: String, val response
 
 /**
  * Privacy-conscious, in-memory record of adapter traffic for troubleshooting.
- * - Off unless enabled at the Advanced level; never written to disk; cleared when turned off.
+ * - Off unless turned on from the Connection screen (DIY); never written to disk; cleared when turned off.
  * - Vehicle identifiers are redacted: responses to mode 09 information requests (VIN,
  *   calibration IDs, CVNs, ECU name) and anything shaped like a VIN.
  * - Adapter Bluetooth addresses and device names are never logged.

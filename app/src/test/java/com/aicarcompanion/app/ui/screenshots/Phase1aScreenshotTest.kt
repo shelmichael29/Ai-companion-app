@@ -43,7 +43,7 @@ class Phase1aScreenshotTest(private val shot: Shot) {
     data class Shot(val level: ExplanationLevel, val theme: ThemeMode, val fontScale: Float) {
         val fileName: String get() = "level-picker-${level.name.lowercase()}-selected_${theme.name.lowercase()}_font${(fontScale * 100).toInt()}.png"
         override fun toString() = fileName
-        val height: Int get() = if (fontScale > 1f) 420 else 220
+        val height: Int get() = if (fontScale > 1f) 560 else 240
     }
 
     companion object {

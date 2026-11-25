@@ -179,7 +179,7 @@ object SettingsCodec {
     fun migrateLevel(store: KeyValueStore, migrated: AppSettings) {
         val values = mutableMapOf<String, Any?>(KEY_LEVEL to ExplanationLevel.DIY.name)
         val diy = ExplanationLevel.DIY
-        if (store.getString(keyLayout(diy)) == null) {
+        if (diy !in readDashboard(store).byLevel) {
             migrated.dashboard.byLevel[diy]?.let { choice ->
                 values[keyLayout(diy)] = choice.layout.name
                 values[keyItems(diy)] = choice.customItems?.joinToString(",") { it.name }

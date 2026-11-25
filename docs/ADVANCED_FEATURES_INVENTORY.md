@@ -16,3 +16,9 @@ Since v0.9.0 only Everyday Driver and DIY Enthusiast are selectable. `Explanatio
 | Gemini ADVANCED detail line | `ai/PromptBuilder.kt` | Advanced | Not used (settings only yield Everyday or DIY); branch kept | Possibly merge into DIY |
 | Advanced default shortcuts and saved layout | `DashboardPlanner.defaults`, `home_layout_advanced` keys | Advanced | Saved Advanced layout copied to DIY once if DIY had none; Advanced keys left in storage | Review copied layouts |
 | Clear codes (Mode 04, confirmed gate) | `ClearCodesControl`, `VehicleWriteGate` | DIY and Advanced | DIY unchanged | None |
+| Technical details in rule-based replies (vehicle, code, sensor, connection) | `RuleBasedReasoningProvider.kt` ~:217, :311, :350, :457 | Advanced replies | Not reached from DIY | Decide what DIY gets |
+| "Tell me more" from DIY | `RuleBasedReasoningProvider.kt` :128 | Moved DIY to Advanced tier | Still moves to the Advanced reply tier | Review |
+| DIY sensor-list hint | `RuleBasedReasoningProvider.kt` :373 | Said "switch to a higher detail level" | "Ask me for a specific reading, or open Live Data to see more." | Review wording |
+| Advanced-only polling of trims, MAF, MAP | `ObdManager.kt` :672 | Advanced | Not polled for home/adapter card at DIY; Live Data workspace still offers them | Decide |
+| Plain navigation bar | `CarCompanionApp.kt` :270 | Advanced | Not shown | Optional |
+| Custom connection settings | `ObdConnectionConfig.effectiveFor` | Advanced only | Off for now (everyone uses recommended settings) | Owner decision pending |

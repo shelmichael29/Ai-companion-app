@@ -38,7 +38,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 
 ## Proposed (📋)
 - **Hands-free:** answering calls, calling by name (needs the contacts permission), background voice and car microphone (H5), navigation. (Media, reading and replying to messages and the call handoff are built in Drive.)
-- **Dashboards:** DIY (A3) and Advanced (A4).
+- **Dashboards:** DIY (A3). Advanced (A4) superseded by the two-level decision (2026-11-25).
 - **Diagnostics:** freeze-frame, VIN via Mode 09, foreground service for long OBD sessions, mechanic handoff report, BMW/N52 knowledge pack, predictive maintenance.
 - **Adapters:** BLE, Wi-Fi and USB.
 - **Voice:** barge-in with echo cancellation, ElevenLabs voice, steering-wheel button activation.

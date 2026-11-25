@@ -214,10 +214,29 @@ class SettingsMigrationTest {
         assertNull(kv.map["home_items_diy"])
     }
 
-    @Test fun `choosing advanced programmatically stores DIY`() {
-        val kv = MapKeyValueStore()
-        val store = PersistentSettingsStore(kv)
-        store.update { it.copy(explanationLevel = ExplanationLevel.ADVANCED.toSelectable()) }
+    @Test fun `legacy settings with advanced and a custom advanced layout write DIY keys and keep advanced keys`() {
+        val kv = legacy(
+            "assistant_name" to "Jarvis", "explanation_level" to "ADVANCED",
+            "home_layout_advanced" to "CUSTOMIZABLE", "home_items_advanced" to "CAR_HEALTH,ADAPTER,EXTRAS",
+        )
+        val s = PersistentSettingsStore(kv).settings.value
+        assertEquals(ExplanationLevel.DIY, s.explanationLevel)
         assertEquals("DIY", kv.map["explanation_level"])
+        assertEquals("CUSTOMIZABLE", kv.map["home_layout_diy"])
+        assertEquals("CAR_HEALTH,ADAPTER,EXTRAS", kv.map["home_items_diy"])
+        assertEquals("CUSTOMIZABLE", kv.map["home_layout_advanced"])
+        assertEquals("CAR_HEALTH,ADAPTER,EXTRAS", kv.map["home_items_advanced"])
+    }
+
+    @Test fun `a corrupt DIY layout gets the carried advanced layout persisted`() {
+        val kv = current(
+            "explanation_level" to "ADVANCED", "home_layout_diy" to "BOGUS",
+            "home_layout_advanced" to "CUSTOMIZABLE", "home_items_advanced" to "CAR_HEALTH,ADAPTER,EXTRAS",
+        )
+        val first = PersistentSettingsStore(kv).settings.value.dashboard.forLevel(ExplanationLevel.DIY)
+        assertEquals(HomeLayout.CUSTOMIZABLE, first.layout)
+        val second = PersistentSettingsStore(kv).settings.value.dashboard.forLevel(ExplanationLevel.DIY)
+        assertEquals(first, second)
+        assertEquals("CUSTOMIZABLE", kv.map["home_layout_diy"])
     }
 }
