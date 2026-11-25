@@ -49,4 +49,4 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 
 When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/QUALITY_SUMMARY.md`.
 
-**v0.8.0 (9), assistant personalization and voice overhaul:** built on feature/assistant-personalization; automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
+**v0.8.0 (9), assistant personalization and voice overhaul:** merged (#72, 2026-11-25); automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
