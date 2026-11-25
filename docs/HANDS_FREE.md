@@ -4,7 +4,7 @@ Penelope is becoming a voice-first driving assistant: music, messages, calls, ve
 
 ## Drive (Phase 3): what works, what is a handoff, what is deferred
 
-Drive is the Drive tab on all three levels (one shared implementation, three presentations, see `ui/drive/`). **No new `uses-permission`**: no SMS, call, contacts or phone-state permission and no foreground service (`ManifestPolicyTest` enforces this). The only new manifest entries are the notification listener service (inactive until the user turns on notification access) and `queries` for the dialer, contact picker and media apps.
+Drive is the Drive tab on both selectable levels (one shared implementation; the internal Advanced presentation is kept, see `ui/drive/`). **No new `uses-permission`**: no SMS, call, contacts or phone-state permission and no foreground service (`ManifestPolicyTest` enforces this). The only new manifest entries are the notification listener service (inactive until the user turns on notification access) and `queries` for the dialer, contact picker and media apps.
 
 | Capability | Status | How (and what it is not) |
 |---|---|---|

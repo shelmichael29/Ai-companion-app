@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,7 +25,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -145,7 +143,7 @@ class SettingsViewModel(
     fun setSpeechRate(rate: Float) = store.update { it.copy(speechRate = rate) }
     fun setSpeechPitch(pitch: Float) = store.update { it.copy(speechPitch = pitch) }
     fun setContinuous(enabled: Boolean) = store.update { it.copy(continuousConversation = enabled) }
-    fun setLevel(level: ExplanationLevel) = store.update { it.copy(explanationLevel = level) }
+    fun setLevel(level: ExplanationLevel) = store.update { it.copy(explanationLevel = level.toSelectable()) }
     fun setDashboard(dashboard: com.aicarcompanion.app.dashboard.DashboardSettings) = store.update { it.copy(dashboard = dashboard) }
     fun setTheme(mode: ThemeMode) = store.update { it.copy(themeMode = mode) }
     fun setColorStyle(style: com.aicarcompanion.app.data.local.ColorStyle) = store.update { it.copy(colorStyle = style) }
@@ -309,21 +307,7 @@ fun SettingsScreen(
                 "You can also ask anytime: \"explain that more simply\" or \"give me the technical explanation\".",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            ExplanationLevel.entries.forEach { level ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 56.dp)
-                        .selectable(settings.explanationLevel == level, role = Role.RadioButton) { viewModel.setLevel(level) },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(selected = settings.explanationLevel == level, onClick = null)
-                    Column(Modifier.padding(start = 12.dp)) {
-                        Text(level.label + if (level == ExplanationLevel.EVERYDAY) " (recommended)" else "", style = MaterialTheme.typography.bodyLarge)
-                        Text(level.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
+            KnowledgeLevelPicker(settings.explanationLevel, viewModel::setLevel)
 
             Heading("Home screen")
             com.aicarcompanion.app.ui.dashboard.HomeLayoutEditor(

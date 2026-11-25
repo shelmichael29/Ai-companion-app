@@ -8,7 +8,7 @@ data class CodeReadSession(val vehicleId: String, val sessionId: String, val rea
 
 /** Why a clear was not sent. [message] is shown to the user. */
 enum class ClearCodesRefusal(val message: String) {
-    LEVEL_NOT_ALLOWED("Clearing codes is only available at the DIY and Advanced knowledge levels."),
+    LEVEL_NOT_ALLOWED("Clearing codes is only available at the DIY Enthusiast level."),
     NOT_CONNECTED("Not connected to the adapter."),
     VEHICLE_NOT_RESPONDING("The car isn't responding. Turn the ignition on, then try again."),
     CODES_NOT_READ("Read codes first."),

@@ -55,7 +55,7 @@ fun moreActions(level: ExplanationLevel): List<MoreAction> = buildList {
     add(MoreAction.HISTORY)
     add(MoreAction.SETTINGS)
     add(MoreAction.ADAPTER)
-    if (level == ExplanationLevel.ADVANCED) add(MoreAction.CONNECTION)
+    if (level != ExplanationLevel.EVERYDAY) add(MoreAction.CONNECTION)
     add(MoreAction.EXTRAS)
     if (LevelNavigation.moreNeedsGarage(level)) add(MoreAction.GARAGE)
 }

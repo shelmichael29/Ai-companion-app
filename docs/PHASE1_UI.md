@@ -1,4 +1,6 @@
-# Phase 1: UI redesign (three knowledge levels)
+# Phase 1: UI redesign (three knowledge levels; superseded by two levels in Phase 1A, v0.9.0)
+
+> **Phase 1A update (2026-11-25):** only Everyday Driver and DIY Enthusiast are selectable now. The Advanced interface below is kept in the code (internal only, not reachable by choosing a level) until the DIY redesign (Prompt 2). A stored Advanced level becomes DIY. See `docs/ADVANCED_FEATURES_INVENTORY.md`.
 
 Each knowledge level gets its own dashboard and navigation, becoming plainer, denser and faster to scan as the level rises. The two settings stay independent and persistent: **knowledge level** (Everyday Driver, DIY Enthusiast, Advanced / Professional; the owner calls them Beginner, Advanced and Pro) and **home layout** (Easy or Customizable, kept per level). Switching either never touches vehicles, history, maintenance or saved layouts.
 

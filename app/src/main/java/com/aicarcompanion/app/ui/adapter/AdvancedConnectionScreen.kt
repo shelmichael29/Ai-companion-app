@@ -82,7 +82,7 @@ fun AdvancedConnectionScreen(
                 if (viewModel.appliesNow) {
                     "These settings are active. Changes to protocol, timing or response format reconnect the adapter automatically."
                 } else {
-                    "Saved, but not active: Everyday and DIY levels always use the recommended automatic settings. Switch to Advanced in Settings to use them."
+                    "Saved, but not active: custom connection settings are switched off for now, so the app uses the recommended automatic settings. The connection test, log and console below still work."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = if (viewModel.appliesNow) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.tertiary,

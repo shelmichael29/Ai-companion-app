@@ -84,6 +84,15 @@ class SettingsViewModelPersonalizationTest {
         assertEquals("penelope", store.settings.value.assistantProfileId)
     }
 
+    @Test fun `setLevel never stores the retired advanced level`() {
+        val store = InMemorySettingsStore()
+        val vm = viewModel(store, FakeOutput())
+        vm.setLevel(ExplanationLevel.ADVANCED)
+        assertEquals(ExplanationLevel.DIY, store.settings.value.explanationLevel)
+        vm.setLevel(ExplanationLevel.EVERYDAY)
+        assertEquals(ExplanationLevel.EVERYDAY, store.settings.value.explanationLevel)
+    }
+
     @Test fun `rename sanitizes blank clears and unusable names are rejected without changing anything`() {
         val store = InMemorySettingsStore()
         val vm = viewModel(store, FakeOutput())

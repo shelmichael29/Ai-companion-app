@@ -55,9 +55,9 @@ class LevelNavigationTest {
         assertTrue(MoreAction.GARAGE in moreActions(ExplanationLevel.ADVANCED))
     }
 
-    @Test fun `connection row is advanced only`() {
+    @Test fun `connection row is for DIY and above, never Everyday`() {
         assertTrue(MoreAction.CONNECTION !in moreActions(ExplanationLevel.EVERYDAY))
-        assertTrue(MoreAction.CONNECTION !in moreActions(ExplanationLevel.DIY))
+        assertTrue(MoreAction.CONNECTION in moreActions(ExplanationLevel.DIY))
         assertTrue(MoreAction.CONNECTION in moreActions(ExplanationLevel.ADVANCED))
     }
 
@@ -65,11 +65,11 @@ class LevelNavigationTest {
         val store = InMemorySettingsStore(AppSettings())
         val dashboard = DashboardPlanner.setLayout(DashboardSettings(), ExplanationLevel.DIY, HomeLayout.CUSTOMIZABLE)
         store.update { it.copy(dashboard = dashboard) }
-        ExplanationLevel.entries.forEach { level -> store.update { it.copy(explanationLevel = level) } }
+        ExplanationLevel.selectable.forEach { level -> store.update { it.copy(explanationLevel = level) } }
         assertEquals(dashboard, store.settings.value.dashboard)
 
         store.update { it.copy(dashboard = DashboardSettings()) }
-        assertEquals(ExplanationLevel.entries.last(), store.settings.value.explanationLevel)
+        assertEquals(ExplanationLevel.selectable.last(), store.settings.value.explanationLevel)
     }
 
     @Test fun `live data is for DIY and Advanced only`() {
