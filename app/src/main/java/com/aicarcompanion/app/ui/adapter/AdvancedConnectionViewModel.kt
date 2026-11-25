@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aicarcompanion.app.data.local.ExplanationLevel
 import com.aicarcompanion.app.data.local.SettingsStore
 import com.aicarcompanion.app.diagnostics.obd.ConnectionDiagnosticReport
 import com.aicarcompanion.app.diagnostics.obd.ConsoleResult
@@ -24,8 +23,8 @@ class AdvancedConnectionViewModel(
 
     val config = store.config
 
-    /** Settings only take effect at the Advanced level; lower levels always use the recommended config. */
-    val appliesNow: Boolean get() = settings.settings.value.explanationLevel == ExplanationLevel.ADVANCED
+    /** Settings take effect at DIY; Everyday always uses the recommended config. */
+    val appliesNow: Boolean get() = ObdConnectionConfig.customAppliesAt(settings.settings.value.explanationLevel)
 
     var report by mutableStateOf<ConnectionDiagnosticReport?>(null)
         private set

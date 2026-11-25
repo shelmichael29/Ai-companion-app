@@ -50,3 +50,7 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/QUALITY_SUMMARY.md`.
 
 **v0.8.0 (9), assistant personalization and voice overhaul:** merged (#72, 2026-11-25); automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
+
+**v0.10.0 (11), Phase 1B Prompt 2 (Advanced features into DIY):** merged (#75, 2026-11-25); automated tests only (fakes). Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0f). Visual redesign (Prompt 3) not started; STOP until the owner approves.
+
+**v0.9.0 (10), Phase 1A Prompt 1 (two knowledge levels):** PR open, not merged; automated tests only. Advanced migration, TalkBack and the Settings screen are NOT verified on a device. Merged (PR #74).

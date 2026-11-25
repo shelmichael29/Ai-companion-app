@@ -58,7 +58,7 @@ data class TrafficLogEntry(val atMillis: Long, val command: String, val response
 
 /**
  * Privacy-conscious, in-memory record of adapter traffic for troubleshooting.
- * - Off unless enabled at the Advanced level; never written to disk; cleared when turned off.
+ * - Off unless turned on from the Connection screen (DIY); never written to disk; cleared when turned off.
  * - Vehicle identifiers are redacted: responses to mode 09 information requests (VIN,
  *   calibration IDs, CVNs, ECU name) and anything shaped like a VIN.
  * - Adapter Bluetooth addresses and device names are never logged.
@@ -124,7 +124,7 @@ data class ConnectionDiagnosticReport(val steps: List<DiagnosticStep>) {
 
 /** Plain-language troubleshooting for the current connection state (DIY level and up). */
 object ConnectionTroubleshooter {
-    fun tips(state: ObdConnectionState, stats: ConnectionStats, info: AdapterInfo?): List<String> {
+    fun tips(state: ObdConnectionState, stats: ConnectionStats, info: AdapterInfo?, customConfig: Boolean = false): List<String> {
         val tips = mutableListOf<String>()
         when (state) {
             ObdConnectionState.Disconnected, is ObdConnectionState.Failed -> {
@@ -139,6 +139,10 @@ object ConnectionTroubleshooter {
             }
             is ObdConnectionState.Reconnecting -> tips += "The Bluetooth link dropped. Keep the phone near the adapter; it will reconnect by itself."
             else -> Unit
+        }
+        val carSilent = state is ObdConnectionState.Failed || (state is ObdConnectionState.Connected && state.vehicleProtocol == null)
+        if (customConfig && carSilent) {
+            tips += "Custom connection settings are on. If the car doesn't answer, open Advanced connection settings and tap Restore recommended."
         }
         if (stats.requests >= 10 && stats.timeoutRate > 0.2) {
             tips += "Many requests are timing out. Fewer live readings (Everyday level) or a better-quality adapter usually helps."

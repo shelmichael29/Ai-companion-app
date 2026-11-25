@@ -168,9 +168,10 @@ class Phase3FoundationsTest {
         assertEquals(33.0, Elm327ResponseParser.decodePid("41 0B 21", ObdPid.INTAKE_MAP)!!, 0.001)
     }
 
-    @Test fun `beginners see only the everyday readings`() {
+    @Test fun `beginners see exactly the five everyday readings and DIY sees every reading`() {
         val everyday = ObdPid.entries.filter { it.visibleAt(ExplanationLevel.EVERYDAY) }
         assertEquals(setOf(ObdPid.COOLANT_TEMP, ObdPid.ENGINE_RPM, ObdPid.VEHICLE_SPEED, ObdPid.FUEL_LEVEL, ObdPid.CONTROL_MODULE_VOLTAGE), everyday.toSet())
+        assertTrue(ObdPid.entries.all { it.visibleAt(ExplanationLevel.DIY) })
         assertTrue(ObdPid.entries.all { it.visibleAt(ExplanationLevel.ADVANCED) })
     }
 }

@@ -245,13 +245,13 @@ descriptions and state descriptions; the status line is a polite live region.
 
 ## Beginner-first explanations
 
-`ExplanationLevel` = Everyday (default) / DIY / Advanced, stored in settings and passed in every
+`ExplanationLevel` = Everyday (default) / DIY selectable (Advanced is internal-only since Phase 1A), stored in settings and passed in every
 `AssistantRequest`. The reasoning is identical across levels; only rendering changes:
 - `DtcInfo` carries `simple`, `diyChecks` and `technical` text plus a plain `severity.advice`.
 - `ObdPid.friendlyName` and `minLevel` control which live readings beginners see, and live
   polling only requests readings visible at the current level.
 - Conversational overrides: "explain that more simply" (Everyday), "give me the technical
-  explanation" (Advanced), "tell me more" (one level up), "show me the sensor readings".
+  explanation" (the internal Advanced reply tier), "tell me more" (one level up; at DIY this reaches the Advanced reply tier), "show me the sensor readings".
 
 ## Smart Diagnostics (foundation only)
 
@@ -304,7 +304,7 @@ Package `diagnostics/smart`:
 
 ### Connection settings by skill level (Phase 4.1)
 
-The automotive skill level (Everyday / DIY / Advanced, `AppSettings.explanationLevel`) decides
+The automotive skill level (Everyday / DIY since Phase 1A; `ExplanationLevel.ADVANCED` stays as an internal-only value that is migrated to DIY, `AppSettings.explanationLevel`) decides
 how much of the connection is exposed. It is independent of any future home-screen layout
 setting (the planned Easy Mode and Customizable layouts): layout must not change connection
 behavior, and the skill level must not change the home layout.
@@ -312,8 +312,8 @@ behavior, and the skill level must not change the home layout.
 | Level | Adapter screen |
 |---|---|
 | Everyday | One **Connect my adapter** button. `AdapterAutoSelector` picks the last-used adapter, else the only paired device that looks like an OBD-II adapter, and otherwise asks. It never guesses an unrelated device such as headphones. Protocol detection, timing and reconnection are automatic. MAC addresses, radio types and protocols are hidden. |
-| DIY | Full paired-device list with technical details. Also: **Reconnect**, **Reset adapter** (full `ATZ` re-initialization), and **Connection details** (transport, firmware, protocol, port voltage, requests/timeouts, average latency). Plain-language **Troubleshooting** comes from `ConnectionTroubleshooter`. |
-| Advanced | Everything above plus **Advanced connection settings** (`AdvancedConnectionScreen`). |
+| DIY | Full paired-device list with technical details. Also reaches **Advanced connection settings** (`AdvancedConnectionScreen`: connection test, communication log, read-only console; custom settings are switched off, see below). Also: **Reconnect**, **Reset adapter** (full `ATZ` re-initialization), and **Connection details** (transport, firmware, protocol, port voltage, requests/timeouts, average latency). Plain-language **Troubleshooting** comes from `ConnectionTroubleshooter`. |
+| Advanced (internal only) | Everything above; the only level where custom settings apply. Not selectable since Phase 1A. |
 
 `ObdConnectionConfig` (persisted by `ObdConfigStore` in its own `obd_settings` preferences file):
 
@@ -327,7 +327,7 @@ behavior, and the skill level must not change the home layout.
 | Compact responses (expert) | `ATS0`; the parser accepts both formats | Re-initializes |
 | Communication log | Redacted in-memory `TrafficLog` | Immediately |
 
-- **Advanced settings apply only at the Advanced level.** `ObdConnectionConfig.effectiveFor(level, stored)`
+- **Custom settings apply only at the Advanced level.** Advanced is internal-only since Phase 1A, so in practice every user gets `RECOMMENDED`. `ObdConnectionConfig.effectiveFor(level, stored)`
   returns `RECOMMENDED` for Everyday and DIY, so changing the level can never leave a beginner
   with a manual protocol or aggressive timing. The recommended config sends exactly the
   pre-4.1 init sequence (covered by a test).
@@ -359,14 +359,14 @@ behavior, and the skill level must not change the home layout.
 Two independent settings decide the home screen:
 
 - **Knowledge level** (`ExplanationLevel`) picks the dashboard kind (`DashboardKind`):
-  Everyday → `COMPANION`, DIY → `WORKSHOP`, Advanced → `TELEMETRY`. All three keep the voice orb;
+  Everyday → `COMPANION`, DIY → `WORKSHOP`, Advanced (internal only) → `TELEMETRY`. All three keep the voice orb;
   only its size changes (`orbScale`).
 - **Home layout** (`HomeLayout`): `EASY` (Penelope's arrangement) or `CUSTOMIZABLE` (the user's
   shortcuts and order). Stored **per knowledge level** in `AppSettings.dashboard`
   (`home_layout_<level>`, `home_items_<level>`), so changing level never erases a customization.
 
 `dashboard/Dashboard.kt` (pure Kotlin, unit-tested) holds the rules in `DashboardPlanner`:
-- **Defaults per level:** Everyday has 5 shortcuts. DIY adds Adapter. Advanced adds Adapter and Connection.
+- **Defaults per level:** Everyday has 5 shortcuts. DIY adds Adapter (and may add a Connection shortcut). Advanced (internal only) adds Adapter and Connection.
 - **Saved lists are cleaned up, not trusted:** duplicates, unknown names and items not offered at that level are dropped.
 - **Required shortcuts:** **Car Health** and **Extras** can be moved but never hidden, so a warning is never hidden by a customization and optional tools stay discoverable.
 - **Optional (Extras) tools** never appear on a default home screen.

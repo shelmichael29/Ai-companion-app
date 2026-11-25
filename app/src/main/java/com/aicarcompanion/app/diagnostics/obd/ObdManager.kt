@@ -33,7 +33,7 @@ import java.io.IOException
 import java.time.Instant
 import java.util.UUID
 
-/** Connection controls used by the DIY and Advanced levels. */
+/** Connection controls used by DIY (and the internal Advanced level). */
 interface ObdAdvancedControls {
     val adapterInfo: StateFlow<AdapterInfo?>
     val stats: StateFlow<ConnectionStats>
@@ -80,7 +80,7 @@ class ObdManager(
     private val log: com.aicarcompanion.app.connectivity.ConnectionLog? = null,
     /** Overrides [RecoveryPolicy.RECHECK_DELAYS_MILLIS] (tests). */
     private val recheckDelaysOverride: List<Long>? = null,
-    /** True only at the DIY and Advanced knowledge levels. Off unless the container says otherwise. */
+    /** True at DIY (and the internal Advanced level). Off unless the container says otherwise. */
     private val clearCodesAllowed: () -> Boolean = { false },
     private val writeGate: VehicleWriteGate = VehicleWriteGate(now),
     /** Saves the "cleared by you" note in the vehicle's history. */

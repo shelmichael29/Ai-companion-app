@@ -214,7 +214,7 @@ class RuleBasedReasoningProvider(
                 sentences += "It's listed as using ${listOfNotNull(e.fuelGrade?.lowercase(), e.fuelType.label.lowercase()).joinToString(" ")}."
             }
             v.transmission?.let { sentences += "Transmission: $it." }
-            if (level == ExplanationLevel.ADVANCED) v.drivetrain?.let { sentences += "Drive: $it." }
+            if (level != ExplanationLevel.EVERYDAY) v.drivetrain?.let { sentences += "Drive: $it." }
             if (e.layout == EngineLayout.UNKNOWN && (e.cylinders ?: 0) >= 5) {
                 sentences += "The cylinder layout, inline or V, hasn't been confirmed in your profile."
             }
@@ -367,7 +367,12 @@ class RuleBasedReasoningProvider(
         val list = values.joinToString("; ") { (pid, r) ->
             "${if (level == ExplanationLevel.EVERYDAY) pid.friendlyName else pid.label}: ${SpokenFormat.liveValue(pid, r.value)}"
         }
-        val more = if (level != ExplanationLevel.ADVANCED) " Say \"give me the technical explanation\" or switch to a higher detail level in Settings for more readings." else ""
+        val more = when (level) {
+            ExplanationLevel.EVERYDAY ->
+                " Say \"give me the technical explanation\" or switch to a higher detail level in Settings for more readings."
+            ExplanationLevel.DIY -> " Ask me for a specific reading, or open Live Data to see more."
+            ExplanationLevel.ADVANCED -> ""
+        }
         return reply("Here's what your car is reporting right now: $list.$more", ReplyBasis.LIVE_VEHICLE_DATA)
     }
 
@@ -449,7 +454,7 @@ class RuleBasedReasoningProvider(
         is ObdConnectionState.Connected -> reply(
             "I'm connected to your adapter, ${s.adapterName}." + when {
                 s.vehicleProtocol == null -> " Your car isn't responding yet. Is the ignition on?"
-                level == ExplanationLevel.ADVANCED -> " The vehicle is responding using ${s.vehicleProtocol}."
+                level != ExplanationLevel.EVERYDAY -> " The vehicle is responding using ${s.vehicleProtocol}."
                 else -> " Your car is responding."
             },
             ReplyBasis.LIVE_VEHICLE_DATA,

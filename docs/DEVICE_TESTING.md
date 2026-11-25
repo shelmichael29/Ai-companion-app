@@ -177,20 +177,14 @@ Change the level under **Settings → Detail level**.
    the port voltage at about 12.4 V engine off or about 14 V running) and **Troubleshooting** with
    the ignition off. **Reset adapter** should reconnect within a few seconds. **Reconnect**
    should appear after a failure.
-3. **Advanced:** **Advanced connection settings**:
+3. **DIY: Advanced connection settings** (custom settings are switched off at DIY; the screen says they are saved but not active):
    - **Run connection test** with the engine running: every step should be OK or Check.
-   - Protocol → *ISO 15765-4 CAN 11-bit 500k*. The adapter reconnects and "Car is answering on"
-     stays CAN 11-bit 500k.
-   - Protocol → *SAE J1850 PWM* with fallback on: the car should still connect (fallback). With
-     fallback off, expect no vehicle response. Then **Restore recommended defaults**.
-   - Adaptive timing → Off, adapter wait 200 ms. Live data should keep updating.
-   - Polling 0.25 s versus 3 s: the update speed changes visibly.
+   - Changing protocol, timing or polling is saved but does not change the connection (still automatic).
    - Communication log on: entries appear. Send `0902` in the console (after ticking the
      acknowledgement). The reply is shown on screen, but the log shows "[redacted: vehicle
      identifier]". **Copy log**, paste it somewhere private, and confirm no VIN appears.
    - Console: `04`, `ATSH7E0` and `ATZ` must all be refused.
-4. Switch back to **Everyday** with custom settings saved. The connection must return to
-   automatic, and the Advanced screen should say the settings are saved but not active.
+4. Everyday has no Connection screen entry and always connects automatically.
 
 ## Drive (Phase 3): checks on the phone (NOT RUN in automated tests)
 1. **Media without notification access:** play music in any app, open Drive, tap Pause, Play, Next, Previous. The music app should respond; Drive says "I asked your media app…". Note which apps ignore the keys.
@@ -203,3 +197,19 @@ Change the level under **Settings → Detail level**.
 8. **TalkBack, large font, light and dark themes** on each level; two-way voice still works on Drive.
 9. **Over car Bluetooth:** Penelope's prompts are audible and the confirmation works by voice.
 
+
+## 0f. Phase 1B: Advanced features in DIY (v0.10.0, build 11) (NOT RUN in automated tests)
+1. Upgrade in place from v0.9.0: vehicles, history, personality, voice and layouts intact. Before upgrading, on v0.9.0 DIY save a manual protocol (e.g. CAN 29-bit 250k with fallback off). After upgrading to 0.10.0 the Connection screen says the settings are active; if the car is silent the Troubleshooting tip appears, and Restore recommended recovers the connection.
+2. DIY, Advanced connection settings: the screen says the settings are active. Change the poll interval or turn on the communication log, reconnect: the log records redacted traffic.
+3. DIY, connected to the car: the adapter card lists the supported readings (fuel trims, MAP, MAF) and omits any the car doesn't report.
+4. DIY: "are you connected?" mentions the protocol; "tell me about my engine" mentions the drivetrain. Everyday: neither.
+5. DIY home, Results shortcut opens the Diagnostics tab; back behaves sensibly.
+6. DIY with custom settings and the car not answering: Troubleshooting shows the "Restore recommended" tip; tapping Restore recommended fixes it.
+7. Everyday: home, tabs, adapter flow unchanged. Every personality is selectable at both levels and keeps its voice after switching levels. TalkBack and 200% font on the new tip and readings.
+
+## 0e. Phase 1A: two knowledge levels (v0.9.0, build 10) (NOT RUN in automated tests)
+1. Upgrade in place (no uninstall) from a build that had Advanced selected: the app opens at DIY; vehicles, history, adapter and Live Data layouts are intact.
+2. Settings, "How much detail?" shows exactly two choices (Everyday driver, DIY enthusiast); none is named Advanced. Restart the app: the choice persists.
+3. Everyday: home, tabs, Drive and More look as before (no new technical info).
+4. DIY: Adapter screen shows "Advanced connection settings"; More lists Connection; the screen says custom settings are switched off for now and the recommended settings are used; the read-only console refuses Mode 04.
+5. TalkBack: each level is read as one radio button with its description; font size 200% leaves no overlap.

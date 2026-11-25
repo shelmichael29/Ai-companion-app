@@ -24,7 +24,7 @@ ELM327-compatible Bluetooth adapter (read-only), and keeps per-vehicle history.
 | Offline: cached lookups, manual entry, profiles stored on-device (Room) | Implemented |
 | Penelope hands-free conversation: listens again after each reply; goodbye/pause; tap to interrupt; auto-pause on silence, background or calls | Implemented; state machine unit-tested with fake engines; **needs on-device check** |
 | Natural voice: explicit pitch + separate speed, voice/engine choice, sample, reset | Implemented; **needs on-device listening check** |
-| Everyday / DIY / Advanced explanations; "explain more simply", "technical explanation", "sensor readings" | Implemented, unit-tested |
+| Everyday / DIY explanations; "explain more simply", "technical explanation", "sensor readings" | Implemented, unit-tested |
 | Symptom conversations ("why is my car shaking?") with safety-first guidance and one follow-up question | Implemented (general guidance only), unit-tested |
 | Purple-and-black redesign (v0.6): dark-first theme, smoother voice orb with distinct listening/thinking/speaking/paused/error states, AI status under the orb, round quick-access tiles, build-generated version label | Implemented; contrast unit-tested; rendered off-device; **needs on-device check** |
 | Penelope UI 2.0: brand design system (light + dark), glowing voice orb driven by real voice state and mic level, floating nav, redesigned Home/Chat/Garage, vehicle showcase with your own photo, car-health result cards | Implemented; rendered off-device for review; **needs on-device check** |

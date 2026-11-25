@@ -155,6 +155,20 @@ class ReasoningProviderTest {
         assertTrue(adv.text.contains("Long-term fuel trim (bank 1)"))
     }
 
+    private val everydayHint = " Say \"give me the technical explanation\" or switch to a higher detail level in Settings for more readings."
+    private val diyHint = " Ask me for a specific reading, or open Live Data to see more."
+
+    @Test fun `sensor list hint is unchanged for everyday and points DIY to live data`() = runTest {
+        val everyday = provider(ctx(obd = connected), handler(14.1)).ask("show me the sensor readings", ExplanationLevel.EVERYDAY)
+        assertTrue(everyday.text, everyday.text.endsWith(everydayHint))
+        val diy = provider(ctx(obd = connected), handler(14.1)).ask("show me the sensor readings", ExplanationLevel.DIY)
+        assertTrue(diy.text, diy.text.endsWith(diyHint))
+        assertFalse(diy.text.contains("higher detail level"))
+        val adv = provider(ctx(obd = connected), handler(14.1)).ask("show me the sensor readings", ExplanationLevel.ADVANCED)
+        assertFalse(adv.text.contains("Ask me for a specific reading"))
+        assertFalse(adv.text.contains("higher detail level"))
+    }
+
     @Test fun `trouble codes without adapter or history`() = runTest {
         val r = provider(ctx()).ask("read my trouble codes")
         assertEquals(ReplyBasis.NOT_AVAILABLE, r.basis)

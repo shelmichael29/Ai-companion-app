@@ -6,7 +6,7 @@
   push-to-talk voice (continuous conversation came in M3), read-only Bluetooth Classic OBD-II, per-vehicle history.
 
 - **M3 (Phase 3)** — Hands-free continuous conversation, natural voice settings (pitch fix,
-  voice/engine choice), Everyday/DIY/Advanced explanations, symptom conversations, Smart
+  voice/engine choice), Everyday/DIY explanations, symptom conversations, Smart
   Diagnostics / SmartFix / Mechanic Pro contracts.
 
 - **M4 (Phase 4)** — Penelope UI 2.0: design system, voice orb, floating navigation, redesigned
@@ -48,8 +48,9 @@ All of these passed the automated gate; none is device-verified yet (`docs/QUALI
 6. **Navigation and the iOS app**: separate tracks, using the same `handsfree` contracts.
 
 ## Next (recommended order)
+0. **Knowledge-level overhaul (4 prompts):** Prompt 1 (two levels, v0.9.0) merged; Prompt 2 (Advanced features into DIY, v0.10.0) merged (#75). **STOP after Prompt 2:** the DIY visual redesign (Prompt 3) does not start until the owner approves.
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
-   ELM327 transcripts (Advanced → communication log → Copy log) and turn them into parser test fixtures.
+   ELM327 transcripts (DIY → Advanced connection settings → communication log → Copy log) and turn them into parser test fixtures.
 2. **OBD-II hardening** — foreground service for long sessions, read VIN via mode 09 PID 02
    and compare with the profile, freeze-frame (mode 02) with codes, adaptive polling.
 3. **Mechanic handoff report** — PDF/text via the share sheet: profile, codes with

@@ -54,7 +54,8 @@ class DashboardPlannerTest {
     @Test fun `technical shortcuts are offered only at the levels that need them`() {
         assertFalse(DashboardItem.ADAPTER in DashboardPlanner.choices(everyday))
         assertTrue(DashboardItem.ADAPTER in DashboardPlanner.choices(diy))
-        assertFalse(DashboardItem.CONNECTION_SETTINGS in DashboardPlanner.choices(diy))
+        assertFalse(DashboardItem.CONNECTION_SETTINGS in DashboardPlanner.choices(everyday))
+        assertTrue(DashboardItem.CONNECTION_SETTINGS in DashboardPlanner.choices(diy))
         assertTrue(DashboardItem.CONNECTION_SETTINGS in DashboardPlanner.choices(pro))
     }
 

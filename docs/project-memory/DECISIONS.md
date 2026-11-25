@@ -30,7 +30,13 @@ Approved product and technical decisions. Dates are when the change merged into 
 | 2026-11-16 | Knowledge level and home layout are independent settings; Car Health and Extras can't be hidden | PR #13, `CLAUDE.md` |
 | 2026-11-15 | Gemini only via Firebase AI Logic with App Check enforced; never embed the API key; fall back safely when configuration is missing | PR #5 |
 | 2026-11-15 | OBD-II settings by skill level: Everyday automatic, DIY manual, Advanced full control, all read-only | PR #6 |
+| 2026-11-25 | Two knowledge levels only: Everyday Driver and DIY Enthusiast. Advanced is no longer selectable; stored Advanced migrates to DIY. Supersedes the earlier three-level decision. The DIY redesign follows in Prompt 2 | Owner prompt, Phase 1A |
+| 2026-11-25 | **(Superseded 2026-11-25 by the Phase 1B row below.) Custom connection settings stay Advanced-only.** With Advanced no longer selectable, Everyday and DIY always use the recommended connection settings; saved custom settings are kept but not applied. The Connection screen (test, log, read-only console) stays reachable from DIY | Owner, 2026-11-25 (Phase 1A PR) |
+| 2026-11-25 | **DIY applies saved custom connection settings.** Protocol, timing, polling, timeout, reconnect and communication-log settings apply at DIY Enthusiast; Everyday always uses the recommended settings. Values are clamped, protocol fallback stays on by default, and "Restore recommended defaults" resets everything. Supersedes the Phase 1A interim row. Also fixes the communication log never recording at DIY | Owner, 2026-11-25 ("Yes use saved settings"); PR #75 |
 | Owner rules | Never merge without the owner's approval; one PR per stage from the latest `main` | `CLAUDE.md` |
 
 ## ❓ Waiting for the owner
-None right now. (The Gemini personal-details question was decided on 2026-11-21: automatic scrubbing.)
+
+None right now.
+
+(Resolved earlier: the Gemini personal-details question was decided on 2026-11-21: automatic scrubbing.)

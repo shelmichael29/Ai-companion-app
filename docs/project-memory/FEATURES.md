@@ -13,7 +13,8 @@ Status labels are explained in [README.md](README.md). Only the features under *
 |---|---|---|
 | Vehicle profiles, VIN decode (NHTSA), catalog (FuelEconomy.gov), offline cache | M2 | `docs/ARCHITECTURE.md` |
 | Penelope continuous voice conversation; voice, rate and pitch settings | M3 | `docs/ARCHITECTURE.md` |
-| Everyday / DIY / Advanced explanations | M3 | |
+| Everyday / DIY explanations (Advanced retired as a selectable level in v0.9.0; stored Advanced migrates to DIY) | M3, Phase 1A | `docs/ADVANCED_FEATURES_INVENTORY.md` |
+| DIY applies custom connection settings; trims, MAP, MAF and protocol/drivetrain details at DIY (v0.10.0, merged #75). Freeze frame as a feature and readiness monitors remain 📋 Proposed | Phase 1B | `docs/ADVANCED_FEATURES_INVENTORY.md` |
 | Read-only Bluetooth Classic OBD-II: codes (modes 03/07), live data, history | M2–M4.1 | |
 | OBD connection settings by level; redacted traffic log; read-only console | M4.1 | |
 | Penelope UI 2.0: orb, floating navigation, garage, results, user car photo | M4 | |
@@ -38,7 +39,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 
 ## Proposed (📋)
 - **Hands-free:** answering calls, calling by name (needs the contacts permission), background voice and car microphone (H5), navigation. (Media, reading and replying to messages and the call handoff are built in Drive.)
-- **Dashboards:** DIY (A3) and Advanced (A4).
+- **Dashboards:** DIY (A3). Advanced (A4) superseded by the two-level decision (2026-11-25).
 - **Diagnostics:** freeze-frame, VIN via Mode 09, foreground service for long OBD sessions, mechanic handoff report, BMW/N52 knowledge pack, predictive maintenance.
 - **Adapters:** BLE, Wi-Fi and USB.
 - **Voice:** barge-in with echo cancellation, ElevenLabs voice, steering-wheel button activation.

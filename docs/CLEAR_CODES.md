@@ -1,6 +1,6 @@
 # Clear codes (Mode 04)
 
-The first and only vehicle-modifying command in Penelope. Owner decision 2026-11-21: DIY and Advanced only, next to "Read codes", only after codes were read in the current connection, only after an explicit confirmation. Never at the Everyday level.
+The first and only vehicle-modifying command in Penelope. Owner decision 2026-11-21: DIY (and the internal Advanced level) only, next to "Read codes", only after codes were read in the current connection, only after an explicit confirmation. Never at the Everyday level.
 
 ## Safety design
 

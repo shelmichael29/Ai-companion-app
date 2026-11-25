@@ -110,4 +110,18 @@ class PromptPersonaTest {
         assertTrue(playful.contains("Playful humor is welcome when the topic is relaxed."))
         assertTrue(prompt(AssistantProfiles.byId("luna")).contains("No jokes."))
     }
+
+    @Test fun `every selectable level has its own detail line and advanced is never selectable`() {
+        val lines = ExplanationLevel.selectable.map { detailLine(prompt(AssistantProfiles.default, it)) }
+        assertEquals(lines.size, lines.toSet().size)
+        assertEquals(listOf(ExplanationLevel.EVERYDAY, ExplanationLevel.DIY), ExplanationLevel.selectable)
+    }
+
+    @Test fun `a prompt built from stored advanced settings uses the DIY detail level`() {
+        val kv = com.aicarcompanion.app.data.local.MapKeyValueStore().apply {
+            map["settings_schema"] = "2"; map["explanation_level"] = "ADVANCED"
+        }
+        val level = com.aicarcompanion.app.data.local.PersistentSettingsStore(kv).settings.value.explanationLevel
+        assertTrue(prompt(AssistantProfiles.default, level).contains("DIY ENTHUSIAST"))
+    }
 }

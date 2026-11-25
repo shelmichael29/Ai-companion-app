@@ -24,4 +24,4 @@
 
 ## Testing on the car (pending)
 - **Checklists:** `docs/BLUETOOTH_CONNECTION.md` §5 (adapter) and `docs/CONNECTION_RECOVERY.md` §4 (protocol fallback, recovery, ignition off/on).
-- **Capturing evidence:** Advanced → communication log → Copy log, which is redacted. These raw transcripts can become parser test fixtures. Never share VINs or `.logcat` files.
+- **Capturing evidence:** DIY → Adapter → Advanced connection settings → communication log → Copy log, which is redacted. These raw transcripts can become parser test fixtures. Never share VINs or `.logcat` files.
