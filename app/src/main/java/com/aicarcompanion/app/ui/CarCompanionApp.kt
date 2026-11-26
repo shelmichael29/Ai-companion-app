@@ -106,8 +106,9 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
     val enter: EnterTransition = if (t.reducedMotion) EnterTransition.None else fadeIn(tween(260)) + slideInVertically(tween(260)) { it / 24 }
     val exit: ExitTransition = if (t.reducedMotion) ExitTransition.None else fadeOut(tween(180))
 
-    // Only the DIY dashboard has the animated waves. Everyday uses soft light; Advanced paints its own plain background.
-    PenelopeBackground(waves = currentRoute == Routes.HOME && level == com.aicarcompanion.app.data.local.ExplanationLevel.DIY) {
+    // No level uses the animated waves any more: the DIY Overview is flat and dense. Everyday uses soft light;
+    // Advanced paints its own plain background.
+    PenelopeBackground(waves = false) {
         NavHost(
             navController,
             startDestination = Routes.HOME,
@@ -131,6 +132,7 @@ fun CarCompanionApp(navController: NavHostController = rememberNavController()) 
                     onOpenConnectionSettings = { navController.navigate(Routes.ADAPTER_ADVANCED) },
                     onOpenDiagnostics = { navController.navigateOrTab(Routes.DIAGNOSTICS, LevelNavigation.isTab(level, Routes.DIAGNOSTICS)) },
                     onOpenLiveData = { navController.navigateOrTab(Routes.LIVE_DATA, LevelNavigation.isTab(level, Routes.LIVE_DATA)) },
+                    onOpenDrive = { navController.navigateTab(Routes.DRIVE) },
                 )
             }
             composable(Routes.GARAGE) {

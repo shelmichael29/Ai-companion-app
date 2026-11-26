@@ -198,6 +198,17 @@ Change the level under **Settings → Detail level**.
 9. **Over car Bluetooth:** Penelope's prompts are audible and the confirmation works by voice.
 
 
+## 0g. Phase 1C: DIY Overview (v0.11.0, build 12) (NOT RUN in automated tests)
+1. Upgrade in place from v0.10.0 at DIY: vehicles, history, personality, voice, home layout and Live Data layouts intact. The tab bar reads Overview, Live Data, Diagnostics, Drive, More; Garage is under More.
+2. Galaxy S26 Ultra, light and dark, normal and 200% font, TalkBack on: the pinned vehicle header and voice bar never hide the first panel; the voice bar stays one short row; nothing overlaps or is cut off; the nav bar clears the last panel.
+3. TalkBack order: header (vehicle), voice bar (mic, chat, conversation details), then Connection, Vehicle health, Live data, History and maintenance, Tools and shortcuts. Status text and the connection sentence are announced when they change. The decorative orb is skipped. Panel titles are headings.
+4. Real adapter, ignition on: the Connection steps go Bluetooth, then Adapter, then Vehicle ECU one at a time. With the adapter plugged in and the ignition off, it stops at "Adapter ready" and says the vehicle is not responding (never "Vehicle responding"). Turn the ignition on: it advances. Pull the adapter's power while connected: readings go "Stale" with their age, then the connection recovers or shows a problem in plain words.
+5. Live data strip: values match the Live Data tab; unsupported sensors say "Not supported"; stale values are labeled with their age; sample data (Settings, Data) is labeled "Sample data" and the connection still says not connected. Changing the gauges on the Live Data tab changes the strip. No extra OBD traffic: the communication log shows no new PIDs.
+6. Voice from the bar: tap the mic and talk; continuous conversation keeps going; Pause and End work; expanding the bar shows the last three turns, "Personality: ..." opens Settings, and "Open full conversation" opens the chat. Denying the microphone shows "Allow the microphone", which opens the app's settings. Every personality is still selectable and keeps its voice after switching levels.
+7. Health: after Read codes, the counts and the check-engine wording match the Diagnostics tab. "Clear codes..." still needs its confirmation (never run it on the car without wanting to).
+8. Level switch while on Live Data or Garage: Everyday goes Home; DIY keeps Live Data. Everyday home, tabs, Drive and More look as before.
+9. More (DIY): Garage, History, OBD-II adapter, Connection, Settings, Chat, Extras are all reachable; Settings shows Personality at the top.
+
 ## 0f. Phase 1B: Advanced features in DIY (v0.10.0, build 11) (NOT RUN in automated tests)
 1. Upgrade in place from v0.9.0: vehicles, history, personality, voice and layouts intact. Before upgrading, on v0.9.0 DIY save a manual protocol (e.g. CAN 29-bit 250k with fallback off). After upgrading to 0.10.0 the Connection screen says the settings are active; if the car is silent the Troubleshooting tip appears, and Restore recommended recovers the connection.
 2. DIY, Advanced connection settings: the screen says the settings are active. Change the poll interval or turn on the communication log, reconnect: the log records redacted traffic.

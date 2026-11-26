@@ -14,6 +14,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | Vehicle profiles, VIN decode (NHTSA), catalog (FuelEconomy.gov), offline cache | M2 | `docs/ARCHITECTURE.md` |
 | Penelope continuous voice conversation; voice, rate and pitch settings | M3 | `docs/ARCHITECTURE.md` |
 | Everyday / DIY explanations (Advanced retired as a selectable level in v0.9.0; stored Advanced migrates to DIY) | M3, Phase 1A | `docs/ADVANCED_FEATURES_INVENTORY.md` |
+| DIY Overview (v0.11.0, PR open, not merged): compact voice bar with expandable conversation, Bluetooth / Adapter / Vehicle ECU steps, health counts, Live Data strip, tabs Overview, Live Data, Diagnostics, Drive, More. Panel-level customization is ❓ Undecided (needs owner approval) | Phase 1C | `docs/PHASE1_UI.md` |
 | DIY applies custom connection settings; trims, MAP, MAF and protocol/drivetrain details at DIY (v0.10.0, merged #75). Freeze frame as a feature and readiness monitors remain 📋 Proposed | Phase 1B | `docs/ADVANCED_FEATURES_INVENTORY.md` |
 | Read-only Bluetooth Classic OBD-II: codes (modes 03/07), live data, history | M2–M4.1 | |
 | OBD connection settings by level; redacted traffic log; read-only console | M4.1 | |

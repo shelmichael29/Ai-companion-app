@@ -36,3 +36,16 @@ New destinations: **Drive** (honest placeholder; music, calls and messages come 
 4. Phone font size at maximum and display size larger: nothing overlaps or is cut off; the nav shows the selected label.
 5. TalkBack: every tab, tile and button reads a clear name; the status strip reads "Codes: 0 stored, 1 pending, 0 permanent".
 6. Light theme (Settings → appearance) on each level.
+
+## Phase 1C: DIY Overview (v0.11.0, Prompt 3 of 4)
+
+DIY keeps the `DashboardKind.WORKSHOP` home but it is now the **Overview** in `ui/diy/` (the old `DiyDashboard.kt` is kept, unrouted, until the cleanup stage). Everyday and the voice system are unchanged.
+
+- **Tabs (DIY):** Overview, Live Data, Diagnostics, Drive, More. Garage is under More (opened with a back arrow), and from the header on the Overview. More (DIY) lists Garage, History, OBD-II adapter, Connection, Settings, Chat, Extras with richer subtitles (`MoreAction.subtitleFor`). Everyday's More is unchanged.
+- **Pinned top:** vehicle line (tap for the garage, or add a vehicle; a switcher when there are several; the VIN is never shown), settings, and a compact voice bar. The bar shows the real `VoiceState` in one line, the existing mic, pause and end controls, a chat button, and an expand button. Expanded: the last three turns, the AI status, "Personality: ...", up to three starter questions, "Open full conversation". The orb is a decorative 44 dp indicator (hidden from TalkBack).
+- **Scrolling panels:** Connection (Bluetooth link, Adapter setup, Vehicle ECU as three separate steps, with icon and words; protocol, adapter version, data age when stale), Vehicle health (check-engine likelihood, stored, pending and permanent counts, up to three codes, Read codes, the existing Clear codes control and its confirmation), Live data (the first four gauges of the vehicle's active Live Data layout, honest per-sensor states), History and maintenance, Tools and shortcuts (the owner's Easy or Customizable layout, plus Drive).
+- **Honesty:** `DiyConnectionMapper` only says the vehicle ECU is responding when a vehicle protocol exists (or the connect phase says an ECU answered). Bluetooth alone leaves the ECU step waiting; sample values never raise the stage; no number is shown without a live, stale (labeled) or sample (labeled) source. No new OBD requests: the strip reads what Live Data already polls (`OverviewNoNewPidsTest`).
+- **Visual system:** `DiyTokens` derives flat, opaque colors from the Penelope theme (light and dark, Midnight and Amethyst; contrast of at least 4.5:1 is tested), 16 dp panels, 12 dp chips, one accent for the primary action, links and the active voice ring. No gradients or waves; motion only for the panel expand and status colors, and none with reduced motion.
+- **Customization:** existing infrastructure only (Settings layout editor for shortcuts, Live Data gauge editor and per-vehicle layouts). Hiding, showing or reordering panels, choosing strip gauges separately and multiple saved home configurations are not built and need owner approval.
+- **Screenshots:** `docs/screenshots/phase1c` (after) and `docs/screenshots/phase1c/before` (v0.10.0 DIY). Robolectric renders, not device captures.
+

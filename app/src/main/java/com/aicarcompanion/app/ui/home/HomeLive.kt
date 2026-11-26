@@ -127,6 +127,10 @@ data class ProDashboardActions(
     val onOpenAppSettings: () -> Unit,
     /** "Clear codes…" button shown next to "Read codes" (DIY only); null in previews and tests. */
     val clearCodes: (@Composable () -> Unit)? = null,
+    /** Opens the Drive tab (DIY Overview). */
+    val onOpenDrive: () -> Unit = {},
+    /** Switches the active vehicle (DIY Overview header). */
+    val onSelectVehicle: (String) -> Unit = {},
 )
 
 /** One shortcut from the home layout ([com.aicarcompanion.app.dashboard.DashboardPlanner.itemsFor]). */
