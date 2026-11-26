@@ -148,13 +148,17 @@ class SqliteOfflineKnowledge(
         else -> "no"
     }
 
+    /** Free bytes for the app per StatFs (Lint: File.usableSpace can be inaccurate); -1 if unknown. */
+    private fun availableBytes(dir: File?): Long =
+        dir?.let { runCatching { android.os.StatFs(it.path).availableBytes }.getOrNull() } ?: -1L
+
     private fun snapshot(startedNanos: Long): String {
         val dir = installDir
         val listing = dir?.listFiles()?.joinToString(",") { "${it.name}:${it.length()}" }.orEmpty()
         val rt = Runtime.getRuntime()
         val t = Thread.currentThread()
         return "source=$source copied=$copied manifestBytes=$expectedBytes target=${fileInfo(installTarget)} " +
-            "temp=${fileInfo(installTemp)} dir=[$listing] usable=${dir?.usableSpace ?: -1} " +
+            "temp=${fileInfo(installTemp)} dir=[$listing] available=${availableBytes(dir)} " +
             "heapMax=${rt.maxMemory()} heapTotal=${rt.totalMemory()} heapFree=${rt.freeMemory()} " +
             "thread=${sanitize(t.name)} interrupted=${t.isInterrupted} " +
             "elapsedMs=${(System.nanoTime() - startedNanos) / 1_000_000} threads=${Thread.activeCount()}"
