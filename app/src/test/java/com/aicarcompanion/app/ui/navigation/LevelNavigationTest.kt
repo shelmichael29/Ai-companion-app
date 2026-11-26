@@ -18,7 +18,7 @@ class LevelNavigationTest {
         assertEquals(listOf("Home", "Drive", "My Vehicle", "More"), labels(ExplanationLevel.EVERYDAY))
 
     @Test fun `diy tabs`() =
-        assertEquals(listOf("Home", "Diagnostics", "Drive", "Garage", "More"), labels(ExplanationLevel.DIY))
+        assertEquals(listOf("Overview", "Live Data", "Diagnostics", "Drive", "More"), labels(ExplanationLevel.DIY))
 
     @Test fun `advanced tabs`() =
         assertEquals(listOf("Overview", "Live Data", "Diagnostics", "Drive", "More"), labels(ExplanationLevel.ADVANCED))
@@ -38,20 +38,21 @@ class LevelNavigationTest {
     @Test fun `switching level keeps a valid tab or goes home`() {
         // Diagnostics is not an Everyday tab.
         assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.EVERYDAY, NavRoutes.DIAGNOSTICS))
-        // Live Data exists only in Advanced.
-        assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.DIY, NavRoutes.LIVE_DATA))
-        // Garage is not an Advanced tab.
+        // Live Data is a DIY and Advanced tab, never an Everyday one (Phase 1C: DIY gained it).
+        assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.EVERYDAY, NavRoutes.LIVE_DATA))
+        assertNull(LevelNavigation.routeAfterLevelChange(ExplanationLevel.DIY, NavRoutes.LIVE_DATA))
+        // Garage is not a DIY or Advanced tab (it is under More).
+        assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.DIY, NavRoutes.GARAGE))
         assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.ADVANCED, NavRoutes.GARAGE))
         // Still-valid tabs, and non-tab screens such as Settings, are left alone.
         assertNull(LevelNavigation.routeAfterLevelChange(ExplanationLevel.ADVANCED, NavRoutes.DRIVE))
-        assertNull(LevelNavigation.routeAfterLevelChange(ExplanationLevel.DIY, NavRoutes.GARAGE))
         assertNull(LevelNavigation.routeAfterLevelChange(ExplanationLevel.EVERYDAY, "settings"))
         assertNull(LevelNavigation.routeAfterLevelChange(ExplanationLevel.EVERYDAY, null))
     }
 
     @Test fun `more lists garage only when it is not a tab`() {
         assertTrue(MoreAction.GARAGE !in moreActions(ExplanationLevel.EVERYDAY))
-        assertTrue(MoreAction.GARAGE !in moreActions(ExplanationLevel.DIY))
+        assertTrue(MoreAction.GARAGE in moreActions(ExplanationLevel.DIY))
         assertTrue(MoreAction.GARAGE in moreActions(ExplanationLevel.ADVANCED))
     }
 
@@ -80,5 +81,7 @@ class LevelNavigationTest {
         assertTrue(LevelNavigation.isTab(ExplanationLevel.ADVANCED, NavRoutes.LIVE_DATA))
         assertTrue(!LevelNavigation.isTab(ExplanationLevel.EVERYDAY, NavRoutes.LIVE_DATA))
         assertEquals(NavRoutes.HOME, LevelNavigation.routeAfterLevelChange(ExplanationLevel.EVERYDAY, NavRoutes.LIVE_DATA))
+        // DIY now has Live Data as a tab too.
+        assertTrue(LevelNavigation.isTab(ExplanationLevel.DIY, NavRoutes.LIVE_DATA))
     }
 }

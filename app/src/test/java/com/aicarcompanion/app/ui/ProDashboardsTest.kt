@@ -45,6 +45,8 @@ import com.aicarcompanion.app.ui.home.ADVANCED_DASHBOARD_TAG
 import com.aicarcompanion.app.ui.home.ADVANCED_MIC_TAG
 import com.aicarcompanion.app.ui.home.DIY_DASHBOARD_TAG
 import com.aicarcompanion.app.ui.home.DIY_ORB_TAG
+import com.aicarcompanion.app.ui.home.DiyDashboard
+import com.aicarcompanion.app.ui.home.ProDashboardActions
 import com.aicarcompanion.app.ui.home.EVERYDAY_DASHBOARD_TAG
 import com.aicarcompanion.app.ui.home.HOME_SUGGESTIONS
 import com.aicarcompanion.app.ui.home.HomeContent
@@ -121,6 +123,35 @@ class ProDashboardsTest {
         return taps
     }
 
+    /**
+     * The preserved legacy DIY dashboard ([DiyDashboard]): no longer routed since Phase 1C, kept until the
+     * cleanup stage. These tests keep their original assertions so the component stays correct.
+     */
+    private fun renderLegacyDiy(
+        ui: HomeUiState = liveUi,
+        voice: VoiceState = VoiceState.Idle,
+        dashboard: DashboardSettings = DashboardSettings(),
+    ): Taps {
+        val taps = Taps()
+        compose.setContent {
+            CarCompanionTheme(themeMode = ThemeMode.DARK, reduceMotion = true) {
+                DiyDashboard(
+                    contentPadding = PaddingValues(), voice = voice, conversationActive = false, micLevel = 0f,
+                    assistantName = "Penelope", ui = ui, items = DashboardPlanner.itemsFor(ExplanationLevel.DIY, dashboard),
+                    actions = ProDashboardActions(
+                        onMic = { taps.mic++ }, onPause = {}, onEnd = {}, onAsk = {}, onOpenChat = {},
+                        onOpenResults = { taps.results++ }, onOpenDiagnostics = { taps.diagnostics++ },
+                        onOpenLiveData = { taps.liveData++ }, onOpenAdapter = { taps.adapter++ }, onOpenHistory = { taps.history++ },
+                        onOpenGarage = {}, onOpenSettings = {}, onOpenExtras = {}, onOpenConnectionSettings = {},
+                        onAddVehicle = {}, onOpenAppSettings = {},
+                    ),
+                    now = now,
+                )
+            }
+        }
+        return taps
+    }
+
     private fun assertTag(vararg present: String, absent: List<String> = emptyList()) {
         present.forEach { compose.onNodeWithTag(it).assertExists() }
         absent.forEach { compose.onNodeWithTag(it).assertDoesNotExist() }
@@ -171,7 +202,7 @@ class ProDashboardsTest {
     // ---- DIY: medium orb, health card, shortcuts -----------------------------------------------
 
     @Test fun diyShowsMediumOrbHealthCardAndAtMostThreeSuggestions() {
-        val taps = render(ExplanationLevel.DIY, ui = liveUi.copy(codes = listOf(dtc()), lastRead = read))
+        val taps = renderLegacyDiy(ui = liveUi.copy(codes = listOf(dtc()), lastRead = read))
         compose.onNodeWithTag(DIY_ORB_TAG).assertExists()
         val orbHeight = compose.onNodeWithTag(DIY_ORB_TAG).fetchSemanticsNode().size.height
         val dp = orbHeight / compose.activity.resources.displayMetrics.density
@@ -186,7 +217,7 @@ class ProDashboardsTest {
     }
 
     @Test fun diyDiagnosticShortcutsOpenRealScreens() {
-        val taps = render(ExplanationLevel.DIY)
+        val taps = renderLegacyDiy()
         compose.onNodeWithContentDescription("Diagnostics, Read and explain codes").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Live readings, Sensors from the car").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Adapter connection, Connected", substring = true).performScrollTo().performClick()
@@ -212,7 +243,7 @@ class ProDashboardsTest {
     // ---- Real values only ------------------------------------------------------------------------
 
     @Test fun diyAndAdvancedShowRealReadings() {
-        render(ExplanationLevel.DIY)
+        renderLegacyDiy()
         compose.onNodeWithContentDescription("Coolant temperature, 92 degrees Celsius, PID 05").performScrollTo().assertExists()
         compose.onNodeWithContentDescription("Control module voltage, 14.2 volts, PID 42").performScrollTo().assertExists()
     }
@@ -234,7 +265,7 @@ class ProDashboardsTest {
     }
 
     @Test fun diyShowsDashWithReasonWhenDisconnected() {
-        render(ExplanationLevel.DIY, ui = HomeUiState(vehicle = car, loaded = true))
+        renderLegacyDiy(ui = HomeUiState(vehicle = car, loaded = true))
         compose.onNodeWithContentDescription("Battery voltage, no reading. Connect your adapter").performScrollTo().assertExists()
         compose.onNodeWithContentDescription("Coolant temperature, no reading. Connect your adapter").assertExists()
         compose.onAllNodesWithText("Connect your adapter").assertCountEquals(2)
@@ -248,7 +279,7 @@ class ProDashboardsTest {
     }
 
     @Test fun diySampleReadingsAreLabeled() {
-        render(ExplanationLevel.DIY, ui = HomeUiState(vehicle = car, readings = sample, loaded = true))
+        renderLegacyDiy(ui = HomeUiState(vehicle = car, readings = sample, loaded = true))
         compose.onAllNodesWithText("Sample data").assertCountEquals(2)
     }
 

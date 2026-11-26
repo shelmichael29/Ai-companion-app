@@ -37,11 +37,12 @@ object LevelNavigation {
             NavTab(Destination.MY_VEHICLE),
             NavTab(Destination.MORE),
         )
+        // Garage is under More for DIY: Live Data is a first-class tab instead (Phase 1C).
         ExplanationLevel.DIY -> listOf(
-            NavTab(Destination.HOME),
+            NavTab(Destination.HOME, "Overview"),
+            NavTab(Destination.LIVE_DATA),
             NavTab(Destination.DIAGNOSTICS),
             NavTab(Destination.DRIVE),
-            NavTab(Destination.GARAGE),
             NavTab(Destination.MORE),
         )
         ExplanationLevel.ADVANCED -> listOf(

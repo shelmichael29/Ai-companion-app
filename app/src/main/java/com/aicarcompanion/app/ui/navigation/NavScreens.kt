@@ -49,8 +49,29 @@ enum class MoreAction(val label: String, val subtitle: String, val icon: ImageVe
     GARAGE("Garage", "Your vehicles", PenelopeIcons.Garage),
 }
 
+/**
+ * The row's second line. Everyday keeps [MoreAction.subtitle] exactly; DIY says more about what is
+ * behind each row so the technical tools are easy to find.
+ */
+fun MoreAction.subtitleFor(level: ExplanationLevel): String =
+    if (level != ExplanationLevel.DIY) subtitle else when (this) {
+        MoreAction.CHAT -> "Ask a question or talk it through"
+        MoreAction.HISTORY -> "Code reads, service and mileage records"
+        MoreAction.SETTINGS -> "Personality, voice, level, appearance"
+        MoreAction.ADAPTER -> "Choose, connect or test your adapter"
+        MoreAction.CONNECTION -> "Protocol, timing, adapter test, communication log"
+        MoreAction.EXTRAS -> "More tools and shortcuts"
+        MoreAction.GARAGE -> "Your vehicles and their profiles"
+    }
+
 /** Rows shown on the More screen for [level], in order. */
-fun moreActions(level: ExplanationLevel): List<MoreAction> = buildList {
+fun moreActions(level: ExplanationLevel): List<MoreAction> = if (level == ExplanationLevel.DIY) {
+    // DIY: vehicle and records first, then connection tools, then the app itself.
+    listOf(
+        MoreAction.GARAGE, MoreAction.HISTORY, MoreAction.ADAPTER, MoreAction.CONNECTION,
+        MoreAction.SETTINGS, MoreAction.CHAT, MoreAction.EXTRAS,
+    )
+} else buildList {
     add(MoreAction.CHAT)
     add(MoreAction.HISTORY)
     add(MoreAction.SETTINGS)
@@ -81,7 +102,7 @@ fun MoreScreen(level: ExplanationLevel, assistantName: String, contentPadding: P
                                 if (action == MoreAction.CHAT) "Chat with $assistantName" else action.label,
                                 style = MaterialTheme.typography.titleMedium, color = t.textPrimary,
                             )
-                            Text(action.subtitle, style = MaterialTheme.typography.bodyMedium, color = t.textSecondary)
+                            Text(action.subtitleFor(level), style = MaterialTheme.typography.bodyMedium, color = t.textSecondary)
                         }
                         Icon(PenelopeIcons.ChevronRight, contentDescription = null, tint = t.textSecondary, modifier = Modifier.size(20.dp))
                     }

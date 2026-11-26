@@ -45,6 +45,7 @@ fun HomeScreen(
     onOpenConnectionSettings: () -> Unit = {},
     onOpenDiagnostics: (() -> Unit)? = null,
     onOpenLiveData: (() -> Unit)? = null,
+    onOpenDrive: () -> Unit = {},
     assistant: AssistantViewModel = viewModel(factory = AppViewModelProvider.Factory),
     home: HomeViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
@@ -60,6 +61,9 @@ fun HomeScreen(
     val vehicleId = ui.vehicle?.id
     val photo: Bitmap? = rememberVehiclePhoto(home.photos, vehicleId, versions[vehicleId])
     val kind = DashboardKind.forLevel(settings.explanationLevel)
+    // Only the DIY Overview reads Live Data and the conversation; Everyday never creates these.
+    val diyLive = if (kind == DashboardKind.WORKSHOP) rememberDiyLiveInput(ui.vehicle != null) else null
+    val turns = if (kind == DashboardKind.WORKSHOP) assistant.turns.collectAsStateWithLifecycle().value else emptyList()
     // Tick so "stale" readings are noticed; the Everyday dashboard shows no readings, so it doesn't tick.
     val now by androidx.compose.runtime.produceState(java.time.Instant.now(), kind) {
         if (kind != DashboardKind.COMPANION) {
@@ -101,7 +105,21 @@ fun HomeScreen(
         onSelectVehicle = home::select,
         onPhotoPicked = { uri -> vehicleId?.let { home.savePhoto(it, uri) } },
         clearCodes = if (kind == DashboardKind.WORKSHOP) ({ com.aicarcompanion.app.ui.results.ClearCodesControl() }) else null,
+        diyLive = diyLive,
+        turns = turns,
+        profileName = if (kind == DashboardKind.WORKSHOP) settings.profile.name else null,
+        onOpenDrive = onOpenDrive,
     )
+}
+
+/** The DIY Overview's live strip input, from the same Live Data view model the Live Data tab uses. */
+@Composable
+private fun rememberDiyLiveInput(homeHasVehicle: Boolean): com.aicarcompanion.app.ui.diy.DiyLiveInput {
+    val live: com.aicarcompanion.app.ui.livedata.LiveDataViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    val state by live.state.collectAsStateWithLifecycle()
+    return remember(state.hasVehicle, state.active, state.states, homeHasVehicle) {
+        com.aicarcompanion.app.ui.diy.diyLiveInputFor(state, homeHasVehicle)
+    }
 }
 
 /** Stateless home layout (previewable and screenshot-testable). */
@@ -144,6 +162,13 @@ fun HomeContent(
     now: java.time.Instant = java.time.Instant.now(),
     /** The DIY dashboard's "Clear codes…" button; supplied by [HomeScreen]. */
     clearCodes: (@Composable () -> Unit)? = null,
+    /** The DIY Overview's live strip (the active Live Data layout and its states); null shows no readings. */
+    diyLive: com.aicarcompanion.app.ui.diy.DiyLiveInput? = null,
+    /** Recent conversation turns for the DIY Overview's expandable voice panel. */
+    turns: List<com.aicarcompanion.app.assistant.conversation.ConversationTurn> = emptyList(),
+    /** Name of the selected personality, shown in the DIY voice panel. */
+    profileName: String? = null,
+    onOpenDrive: () -> Unit = {},
 ) {
     if (kind == DashboardKind.COMPANION) {
         EverydayDriverDashboard(
@@ -171,12 +196,13 @@ fun HomeContent(
         onOpenLiveData = onOpenLiveData ?: onOpenAdapter, onOpenAdapter = onOpenAdapter, onOpenHistory = onOpenHistory,
         onOpenGarage = onOpenGarage, onOpenSettings = onOpenSettings, onOpenExtras = onOpenExtras,
         onOpenConnectionSettings = onOpenConnectionSettings, onAddVehicle = onAddVehicle, onOpenAppSettings = onOpenAppSettings,
-        clearCodes = clearCodes,
+        clearCodes = clearCodes, onOpenDrive = onOpenDrive, onSelectVehicle = onSelectVehicle,
     )
     when (kind) {
         DashboardKind.COMPANION -> Unit
-        DashboardKind.WORKSHOP -> DiyDashboard(
+        DashboardKind.WORKSHOP -> com.aicarcompanion.app.ui.diy.DiyOverview(
             contentPadding, voice, conversationActive, micLevel, assistantName, ui, items, actions, now,
+            diyLive, turns, aiStatus, profileName,
         )
         DashboardKind.TELEMETRY -> AdvancedDashboard(
             contentPadding, voice, conversationActive, assistantName, ui, items, actions, now,
