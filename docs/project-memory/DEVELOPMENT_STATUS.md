@@ -51,7 +51,7 @@ When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/
 
 **v0.8.0 (9), assistant personalization and voice overhaul:** merged (#72, 2026-11-25); automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
 
-**v0.11.1 (13), Priority 0 (4A) OfflineKnowledgeTest flake:** root cause established (test-JVM heap exhaustion under Robolectric, test-only); fix verified by 40 of 40 independent CI runs; PR open, not merged. Device re-check of the offline pack NOT RUN (`docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md` section 8). Prompt 4B (Phase 1D) is queued behind it.
+**v0.11.1 (13), Priority 0 (4A) OfflineKnowledgeTest flake:** root cause established (test-JVM heap exhaustion under Robolectric, test-only); fix verified by 40 of 40 independent CI runs; merged (#81, 2026-11-26). Device re-check of the offline pack NOT RUN (`docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md` section 8). Prompt 4B (Phase 1D) is queued behind it.
 
 **v0.11.0 (12), Phase 1C Prompt 3 (DIY dashboard modernization):** merged (#79, 2026-11-26); automated tests and Robolectric renders only (fakes, not device captures). Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0g). STOP: Prompt 4 (Testing and Stabilization) waits for the owner.
 
