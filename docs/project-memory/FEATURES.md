@@ -37,7 +37,7 @@ Status labels are explained in [README.md](README.md). Only the features under *
 | Item | Where |
 |---|---|
 | ChatGPT memory import | waiting for the owner to provide it (`IMPORT_REVIEW.md`) |
-| Phase 1D stabilization (v0.12.0): DIY nav touch-target fix; regression and visual QA tests; no new feature | PR #83 open, not merged (`docs/PHASE1D_STABILIZATION.md`) |
+| Phase 1D stabilization (v0.12.0): DIY nav touch-target fix; regression and visual QA tests; no new feature | Merged (#83, squash e63e3d0, 2026-11-26) (`docs/PHASE1D_STABILIZATION.md`) |
 
 ## Proposed (📋)
 - **Hands-free:** answering calls, calling by name (needs the contacts permission), background voice and car microphone (H5), navigation. (Media, reading and replying to messages and the call handoff are built in Drive.)

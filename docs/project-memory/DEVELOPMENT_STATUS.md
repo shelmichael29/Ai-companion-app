@@ -25,7 +25,7 @@ Snapshot as of **2026-11-26**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 ## Active pull requests
 | PR | What | State |
 |---|---|---|
-| #83 Phase 1D (Prompt 4B) | Final testing and stabilization, v0.12.0 (14), branch `stabilization/phase1d-prompt4b` | 🔵 PR open, not merged (owner review) |
+| #83 Phase 1D (Prompt 4B) | Final testing and stabilization, v0.12.0 (14), branch `stabilization/phase1d-prompt4b` | ✅ Merged (squash e63e3d0, 2026-11-26) |
 | — | ENET work lives in the separate `Enet-Development` repository (2026-11-23) | — |
 
 ## Outstanding tasks
@@ -52,7 +52,7 @@ When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/
 
 **v0.8.0 (9), assistant personalization and voice overhaul:** merged (#72, 2026-11-25); automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
 
-**v0.12.0 (14), Phase 1D Prompt 4B (final testing and stabilization):** PR #83 open, not merged. Baseline gate on untouched `main` 1302/0, final --release gate 1473/0; one defect fixed (DIY nav tabs under 48 dp at 320 dp and 200 % font); visual QA audit, in-place update and voice-during-Live-Data tests added; offline knowledge tests 20 of 20 independent runs passed. Open: L-1 Home polls readings it no longer shows (owner decision), L-2 labels at 320 dp and 200 % font, L-3 to L-6 minor. Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0h). Report: `docs/PHASE1D_STABILIZATION.md`. STOP after 4B.
+**v0.12.0 (14), Phase 1D Prompt 4B (final testing and stabilization):** Merged (#83, squash e63e3d0, 2026-11-26). Baseline gate on untouched `main` 1302/0, final --release gate 1473/0; one defect fixed (DIY nav tabs under 48 dp at 320 dp and 200 % font); visual QA audit, in-place update and voice-during-Live-Data tests added; offline knowledge tests 20 of 20 independent runs passed. Open: L-1 Home polls readings it no longer shows (owner decision), L-2 labels at 320 dp and 200 % font, L-3 to L-6 minor. Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0h). Report: `docs/PHASE1D_STABILIZATION.md`. STOP after 4B.
 
 **v0.11.1 (13), Priority 0 (4A) OfflineKnowledgeTest flake:** root cause established (test-JVM heap exhaustion under Robolectric, test-only); fix verified by 40 of 40 independent CI runs; merged (#81, 2026-11-26). Device re-check of the offline pack NOT RUN (`docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md` section 8).
 
