@@ -49,7 +49,7 @@ All of these passed the automated gate; none is device-verified yet (`docs/QUALI
 
 ## Next (recommended order)
 0. **Priority 0 (4A):** intermittent OfflineKnowledgeTest failure: root cause found and fixed (v0.11.1), merged (#81).
-0. **Phase 1D (Prompt 4B, v0.12.0):** final testing and stabilization. PR #83 open, not merged; waits for owner review. One accessibility fix; open decisions L-1 (unseen Home polling) and L-2 (labels at 320 dp, 200 % font). Then the owner's device pass (`docs/DEVICE_TESTING.md` 0h). Report: `docs/PHASE1D_STABILIZATION.md`.
+0. **Phase 1D (Prompt 4B, v0.12.0):** final testing and stabilization. PR #83 open, not merged; waits for owner review. One accessibility fix; open decision L-1 (unseen Home polling); L-2 (labels at 320 dp, 200 % font) declined by the owner. Then the owner's device pass (`docs/DEVICE_TESTING.md` 0h). Report: `docs/PHASE1D_STABILIZATION.md`.
 0. **Knowledge-level overhaul (4 prompts):** Prompt 1 (two levels, v0.9.0) merged; Prompt 2 (Advanced features into DIY, v0.10.0) merged (#75). Prompt 3 (DIY dashboard modernization, v0.11.0) built, merged (#79). Prompt 4 ran as 4A (merged #81) and 4B (Phase 1D, PR open). Panel-level Overview customization (show, hide, reorder panels; choosing strip gauges separately from Live Data; several saved home configurations) needs separate owner approval and is not built.
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
    ELM327 transcripts (DIY → Advanced connection settings → communication log → Copy log) and turn them into parser test fixtures.
