@@ -198,6 +198,87 @@ Change the level under **Settings → Detail level**.
 9. **Over car Bluetooth:** Penelope's prompts are audible and the confirmation works by voice.
 
 
+## 0h. Phase 1D: final stabilization checklist (v0.12.0, build 14) (NOT RUN: every item needs the owner's hardware)
+Galaxy S26 Ultra and the 2011 BMW 528i F10 (N52N, engine code N52B30, inline-six). Automated tests use fakes (`FakeElmAdapter`, fake speech, fake AI), so nothing below has been run. Record each item as PASS, FAIL or NOT RUN with the date and build. Report: `docs/PHASE1D_STABILIZATION.md`.
+
+Where each item runs: **[Phone]** the phone alone; **[Adapter]** phone plus the OBD-II adapter (a 12 V supply or the car with the ignition on); **[Vehicle]** phone, adapter and the 528i.
+
+**Safe conditions for every [Vehicle] item:** parked on level ground, parking brake on, transmission in P. Ignition on with the engine off unless an item says to run the engine; run the engine only outdoors. Never test while driving; a second person handles the phone if the car must move. Never use **Clear codes** unless you really want the codes cleared: it keeps its confirmation, its engine-off check and its re-read, and no step below needs it.
+
+### 1. Install and updates
+1. [Phone] Install v0.12.0 (14) **over** v0.11.1 (13) without uninstalling. Android installs it as an update; the app opens without asking to sign in again or re-add anything. (Needs the fixed `DEBUG_KEYSTORE_BASE64` signing key; a build signed with another key is refused as an update.)
+2. [Phone] Settings, About: "v0.12.0-beta • Build 14" and a revision matching the PR head. The home build label (Everyday, at the bottom) shows the same.
+3. [Phone] After the update: vehicles, history, maintenance records, Live Data layouts, knowledge level, home layout, personality, custom name, speech speed and pitch, Online/Offline voice and continuous conversation are all as before.
+4. [Phone] If an older build with Advanced selected is still available: install it, pick Advanced, then update straight to 0.12.0. The app opens at DIY with its layouts and personality intact.
+5. [Phone] Firebase build only: Gemini answers after the update without registering a new App Check debug token (same signing key).
+
+### 2. Everyday Driver
+1. [Phone] Home, Drive, My Vehicle and More look as in `docs/screenshots/phase1/1-everyday-home.png` and the Phase 1C Everyday renders (nothing new, no technical terms).
+2. [Phone] Large orb and mic start a conversation; suggestions open Chat; Extras and the layout grid icon still work.
+3. [Adapter] Everyday connects automatically with the recommended settings even if DIY has custom ones saved (change the DIY poll interval first, then switch to Everyday and connect).
+4. [Vehicle] Vehicle health in plain words after Read codes; recalls and VIN scan flows still open from My Vehicle.
+5. [Phone] Profiles: add, edit and switch vehicles; maintenance history entries save and show.
+
+### 3. DIY Enthusiast
+1. [Phone] Tabs read Overview, Live Data, Diagnostics, Drive, More. More lists Garage, History, OBD-II adapter, Connection, Settings, Chat, Extras.
+2. [Vehicle] Overview: connection steps, health counts after Read codes, the live strip matches the Live Data tab, history and maintenance panel, shortcuts.
+3. [Adapter] Connection screen: protocol, timing, poll interval, reconnection, adapter test, communication log, read-only console. The console refuses `04` and any write. Restore recommended works.
+4. [Vehicle] Diagnostics tab: read codes, technical explanations, "Tell me more"; "Clear codes…" shows its confirmation (cancel it).
+5. [Phone] Manual adapter selection from the OBD-II adapter screen lists paired devices; choosing one connects to it.
+
+### 4. Voice and personalities (critical)
+1. [Phone] Each of the 10 profiles: select, preview, then talk. The voice matches the profile; personalities sound different where the phone has enough voices. The custom name appears in Home, Chat, Drive and More and is recognised when spoken.
+2. [Phone] Continuous conversation, tap-to-interrupt, Pause and End, at both levels.
+3. [Phone] Switch Everyday, DIY, Everyday: profile, voice, speed, pitch and Online/Offline do not change.
+4. [Phone] Force-stop the app and reopen: same profile and voice. Repeat after the in-place update in 1.1.
+5. [Phone] Online/Offline: Offline (default) never uses a network voice; Online prefers network voices and falls back without going silent when the phone goes offline.
+6. [Vehicle] Voice during Live Data: DIY, Live Data tab open and polling, ask "what's my coolant temperature?" and "show me sensor readings". The answers arrive without a noticeably longer wait than with Live Data closed (expected: at most one extra adapter answer per reading). Note the times.
+
+### 5. Bluetooth
+1. [Adapter] First connection, then automatic reconnect when the app is reopened.
+2. [Adapter] Turn Bluetooth off while connected: the status changes from connected to reconnecting or not connected within a few seconds on Home (Everyday and DIY); turn it back on and reconnect.
+3. [Adapter] Unplug the adapter or cut its power while connected: the same; no frozen screen, no "connected" left showing.
+4. [Phone] Adapter unavailable (switched off or out of range): a plain-language message, no endless spinner.
+5. [Adapter] Pairing prompt and Bluetooth permission prompt appear once and are explained.
+
+### 6. Live Data
+1. [Vehicle] Gauges update about once a second; unsupported sensors read "Not supported"; values are never invented (ignition off: "Vehicle not responding", not zeros).
+2. [Vehicle] A second screen with readings (Overview strip plus Live Data tab) does not slow updates.
+3. [Vehicle] Leave Live Data and the Overview: the communication log shows polling stops on screens without readings (note: Home still polls a few readings in the background to keep the connection status honest; see `docs/PHASE1D_STABILIZATION.md`, finding L-1).
+4. [Vehicle] Saved layouts: create, rename, switch, delete; gauge styles (analog, digital, line graph, numeric, status) and units.
+
+### 7. Diagnostics
+1. [Vehicle] Read codes: stored and pending counts match the Diagnostics tab and the check-engine wording.
+2. [Vehicle] With the ignition off, Read codes says the vehicle is not responding instead of "no codes".
+3. [Vehicle] Diagnostic history keeps each read with its time; no VIN appears in logs or shared reports.
+4. [Vehicle] Clear codes (only if you want codes cleared, engine off): confirmation, engine-off check, re-read and history note all happen. Never from automated tests.
+
+### 8. Dashboard customization
+1. [Phone] Easy and Customizable home layouts at each level are independent of the knowledge level and of each other.
+2. [Phone] Customizable: add, remove and move shortcuts; Car Health and Extras cannot be hidden; restart keeps the choice.
+3. [Phone] Overview panel show, hide and reorder is **not built** (owner decision pending); nothing should offer it.
+
+### 9. Firebase and Gemini
+1. [Phone] Firebase build with the App Check token: Settings, Connection status shows Gemini working; a real answer arrives.
+2. [Phone] Airplane mode mid-question: a plain-language fallback answer within the timeout; the app never freezes; answers return when online again.
+3. [Phone] Personality wording differs between two profiles; facts and safety advice do not.
+4. [Phone] Debug build only: Settings, About, Send test crash report; the report appears in Crashlytics without any user identifier.
+
+### 10. Accessibility
+1. [Phone] TalkBack on Home (both levels), Live Data, Diagnostics, Drive, More, Settings and Chat: every control is announced; the orb is not read twice; status changes are spoken once.
+2. [Phone] Font size 150% and maximum, display size default and largest: no clipped or overlapping text; every button reachable; the floating navigation tabs stay easy to tap (Phase 1D fix for narrow displays at large font).
+3. [Phone] Light and dark, Midnight and Amethyst; Reduce motion.
+4. [Phone] Landscape: Home, Live Data and Chat scroll and stay usable (the Everyday orb fills the first screen; scroll for the mic).
+
+### 11. Persistence
+1. [Phone] Force-stop and reopen; then reboot the phone and reopen: level, layouts, personality, voice settings, connection settings, vehicles and Live Data layouts are kept.
+2. [Phone] Switch level with the Live Data tab open, then back: no data lost, back navigation sensible.
+
+### 12. Offline knowledge
+1. [Phone] First launch after the update: the offline pack installs once (Settings, Connection status log: the "Offline knowledge" entry says available, with no failure stage); later launches reuse it.
+2. [Phone] Airplane mode: ask about a trouble code and a recall; offline answers arrive and say they are offline.
+3. [Phone] Storage (Settings, Apps, Penelope, Storage) shows one pack, not two, after the update.
+
 ## 0g. Phase 1C: DIY Overview (v0.11.0, build 12) (NOT RUN in automated tests)
 1. Upgrade in place from v0.10.0 at DIY: vehicles, history, personality, voice, home layout and Live Data layouts intact. The tab bar reads Overview, Live Data, Diagnostics, Drive, More; Garage is under More.
 2. Galaxy S26 Ultra, light and dark, normal and 200% font, TalkBack on: the pinned vehicle header and voice bar never hide the first panel; the voice bar stays one short row; nothing overlaps or is cut off; the nav bar clears the last panel.
