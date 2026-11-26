@@ -129,11 +129,11 @@ class InPlaceUpdatePersistenceTest {
     @Test fun `the update keeps the application id and moves the version code forward`() {
         // Changing the application id would install a second app instead of updating; a lower version code is refused.
         assertEquals("com.aicarcompanion.app", BuildConfig.APPLICATION_ID)
-        assertTrue("versionCode ${BuildConfig.VERSION_CODE} must be above build 13 (v0.11.1)", BuildConfig.VERSION_CODE > LAST_MERGED_VERSION_CODE)
+        assertTrue("versionCode ${BuildConfig.VERSION_CODE} must be above build 14 (v0.12.0)", BuildConfig.VERSION_CODE > LAST_MERGED_VERSION_CODE)
     }
 
     private companion object {
         /** v0.11.1, the build on main before Phase 1D. */
-        const val LAST_MERGED_VERSION_CODE = 13
+        const val LAST_MERGED_VERSION_CODE = 14
     }
 }

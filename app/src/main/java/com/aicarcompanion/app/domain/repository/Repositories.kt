@@ -34,6 +34,13 @@ interface DiagnosticsRepository {
     fun sensorReadings(vehicleId: String): Flow<List<SensorReading>>
 
     /**
+     * Home's connection heartbeat: one sensor instead of the full list (see
+     * [com.aicarcompanion.app.diagnostics.obd.ObdConnection.connectionHeartbeat]). Demonstration mode
+     * yields sample readings and never touches the adapter.
+     */
+    fun connectionHeartbeat(vehicleId: String): Flow<List<SensorReading>> = sensorReadings(vehicleId)
+
+    /**
      * Per-sensor state for exactly [pids]. Only these sensors are requested from the vehicle, and
      * only while the flow is collected. Demonstration mode yields labelled sample states only.
      */
