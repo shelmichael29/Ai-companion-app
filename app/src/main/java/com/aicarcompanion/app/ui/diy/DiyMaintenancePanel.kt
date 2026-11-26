@@ -5,6 +5,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import com.aicarcompanion.app.domain.model.DataOrigin
 import com.aicarcompanion.app.domain.model.MaintenanceRecord
 import com.aicarcompanion.app.domain.model.TroubleCodeRead
@@ -26,10 +27,13 @@ fun DiyMaintenancePanel(
     onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
     zone: ZoneId = ZoneId.systemDefault(),
+    divider: Boolean = true,
 ) {
     val k = diyTokens()
-    DiyPanel(modifier.testTag(DIY_MAINTENANCE_TAG)) {
-        DiySectionHeader("History and maintenance")
+    DiySection(modifier.testTag(DIY_MAINTENANCE_TAG), divider) {
+        DiySectionHeader("History and maintenance") {
+            DiyTextButton("Open History", onOpenHistory, icon = PenelopeIcons.History)
+        }
         Text(
             lastRead?.let { "Last code read: ${READ_TIME.format(it.readAt.atZone(zone))}" } ?: "No code reads yet.",
             style = MaterialTheme.typography.bodyMedium,
@@ -39,11 +43,10 @@ fun DiyMaintenancePanel(
         if (lastService == null) {
             Text("No service records yet.", style = MaterialTheme.typography.bodyMedium, color = k.textSecondary)
         } else {
-            Text("Last service: ${lastService.title}", style = MaterialTheme.typography.bodyLarge, color = k.textPrimary)
+            Text("Last service: ${lastService.title}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = k.textPrimary)
             val odo = lastService.odometerMiles?.let { " · %,d mi".format(Locale.US, it) }.orEmpty()
-            Text(SERVICE_DATE.format(lastService.date) + odo, style = MaterialTheme.typography.bodyMedium, color = k.textSecondary)
+            Text(SERVICE_DATE.format(lastService.date) + odo, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), color = k.textSecondary)
             if (lastService.origin == DataOrigin.SAMPLE) DiyStatusTag("Sample data", k.warn, PenelopeIcons.Info)
         }
-        DiyTextButton("Open History", onOpenHistory, icon = PenelopeIcons.History)
     }
 }

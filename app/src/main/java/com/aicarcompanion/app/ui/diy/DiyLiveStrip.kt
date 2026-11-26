@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,9 +70,10 @@ fun DiyLiveStrip(
     now: Instant,
     onOpenLiveData: () -> Unit,
     modifier: Modifier = Modifier,
+    divider: Boolean = true,
 ) {
     val k = diyTokens()
-    DiyPanel(modifier.testTag(DIY_LIVE_TAG)) {
+    DiySection(modifier.testTag(DIY_LIVE_TAG), divider) {
         DiySectionHeader("Live data") {
             DiyTextButton("Open Live Data", onOpenLiveData, icon = PenelopeIcons.ChevronRight)
         }
@@ -150,23 +149,21 @@ private fun Tile(
         modifier
             .heightIn(min = DiyDimens.MinTouch)
             .clip(DiyDimens.ChipShape)
-            .background(k.raised)
-            .border(1.dp, k.hairline, DiyDimens.ChipShape)
             .clickable(role = Role.Button, onClickLabel = "open Live Data", onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = GaugeSemantics.gaugeDescription(sensor, state, spec.unit, now) }
-            .padding(horizontal = DiyDimens.M, vertical = DiyDimens.S),
+            .padding(vertical = DiyDimens.Xs),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(sensor.label, style = MaterialTheme.typography.labelMedium, color = k.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(sensor.label, style = DiyType.caption, color = k.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(DiyDimens.Xs)) {
             Text(
                 if (shownValue != null) GaugeSemantics.valueText(sensor, shownValue, unit) else "—",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
                 color = valueColor,
                 maxLines = 1,
             )
             if (shownValue != null && unit != null) {
-                Text(unit.symbol, style = MaterialTheme.typography.labelMedium, color = k.textSecondary, maxLines = 1, modifier = Modifier.padding(bottom = 4.dp))
+                Text(unit.symbol, style = MaterialTheme.typography.labelMedium, color = k.textSecondary, maxLines = 1, modifier = Modifier.padding(bottom = 2.dp))
             }
         }
         if (note != null) Text(note, style = MaterialTheme.typography.labelSmall, color = noteColor, maxLines = 2)

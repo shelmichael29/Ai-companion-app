@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -54,6 +56,44 @@ fun DiyPanel(
     )
 }
 
+/** The one continuous dashboard surface: sections sit inside it, separated by hairlines. */
+@Composable
+fun DiySurface(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val k = diyTokens()
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(DiyDimens.PanelShape)
+            .background(k.surface)
+            .border(1.dp, k.hairline, DiyDimens.PanelShape),
+        content = content,
+    )
+}
+
+/** A section of the [DiySurface]: a hairline on top (unless [divider] is false) and 16/12 dp padding. */
+@Composable
+fun DiySection(
+    modifier: Modifier = Modifier,
+    divider: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val k = diyTokens()
+    Column(modifier.fillMaxWidth()) {
+        if (divider) Box(Modifier.fillMaxWidth().height(1.dp).background(k.hairline))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = DiyDimens.L, vertical = DiyDimens.M),
+            verticalArrangement = Arrangement.spacedBy(DiyDimens.M),
+            content = content,
+        )
+    }
+}
+
+/** A thin vertical hairline between inline values. */
+@Composable
+fun DiyVerticalRule(modifier: Modifier = Modifier) {
+    Box(modifier.width(1.dp).background(diyTokens().hairline))
+}
+
 /**
  * Panel title, with an optional trailing link or status. Announced as a heading. At large font sizes
  * the trailing part moves under the title so the title is never squeezed into a narrow column.
@@ -64,8 +104,8 @@ fun DiySectionHeader(title: String, modifier: Modifier = Modifier, trailing: @Co
     val titleText = @Composable { m: Modifier ->
         Text(
             title,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = k.textPrimary,
+            style = DiyType.sectionLabel,
+            color = k.textSecondary,
             modifier = m.semantics { heading() },
         )
     }
@@ -156,6 +196,7 @@ fun DiyChip(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     clickLabel: String = "open $label",
+    outlined: Boolean = true,
 ) {
     val k = diyTokens()
     Row(
@@ -163,11 +204,10 @@ fun DiyChip(
             .heightIn(min = DiyDimens.MinTouch)
             .widthIn(min = DiyDimens.MinTouch)
             .clip(DiyDimens.ChipShape)
-            .background(k.raised)
-            .border(1.dp, k.hairline, DiyDimens.ChipShape)
+            .then(if (outlined) Modifier.background(k.raised).border(1.dp, k.hairline, DiyDimens.ChipShape) else Modifier)
             .clickable(role = Role.Button, onClickLabel = clickLabel, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = spoken }
-            .padding(horizontal = DiyDimens.M, vertical = DiyDimens.S),
+            .padding(horizontal = if (outlined) DiyDimens.M else DiyDimens.S, vertical = DiyDimens.S),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DiyDimens.S, Alignment.CenterHorizontally),
     ) {
@@ -176,20 +216,16 @@ fun DiyChip(
     }
 }
 
-/** A small status label with an icon and words (never color alone). */
+/** A small inline status: icon and words (never color alone), with no box around it. */
 @Composable
 fun DiyStatusTag(text: String, color: Color, icon: ImageVector, modifier: Modifier = Modifier) {
     val k = diyTokens()
     Row(
-        modifier
-            .clip(RoundedCornerShape(50))
-            .background(k.raised)
-            .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(50))
-            .padding(horizontal = DiyDimens.M, vertical = DiyDimens.Xs + 2.dp),
+        modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DiyDimens.Xs + 2.dp),
     ) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = k.textPrimary)
+        Text(text, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium), color = k.textPrimary)
     }
 }

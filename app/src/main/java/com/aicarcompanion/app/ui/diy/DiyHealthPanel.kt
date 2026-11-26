@@ -2,14 +2,15 @@ package com.aicarcompanion.app.ui.diy
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -52,12 +54,13 @@ fun DiyHealthPanel(
     onOpenDiagnostics: () -> Unit,
     modifier: Modifier = Modifier,
     clearCodes: (@Composable () -> Unit)? = null,
+    divider: Boolean = true,
 ) {
     val k = diyTokens()
     val health = everydayHealth(ui.vehicle, ui.codes, ui.lastRead, ui.obdState)
     val counts = codeCounts(ui.codes)
     val read = ui.lastRead != null || ui.codes.isNotEmpty()
-    DiyPanel(modifier.testTag(DIY_HEALTH_TAG)) {
+    DiySection(modifier.testTag(DIY_HEALTH_TAG), divider) {
         DiySectionHeader("Vehicle health") {
             val (icon, color) = when (health.tone) {
                 HealthTone.GOOD -> PenelopeIcons.Check to k.ok
@@ -81,46 +84,40 @@ fun DiyHealthPanel(
     }
 }
 
+/**
+ * Check engine, stored, pending and permanent as one compact row of label and value pairs with thin
+ * dividers (two by two at larger font sizes, so no label is cut).
+ */
 @Composable
 private fun CountsStrip(c: CodeCounts, read: Boolean) {
     val k = diyTokens()
     val mil = if (!read) "Not read" else if (c.milLikely) "Likely on" else "Likely off"
     val milSpoken = if (!read) "Check engine light: not read yet" else "Check engine light: ${mil.lowercase()}"
-    val cells: List<Triple<String, String, String>> = listOf(
-        Triple("Check engine", mil, milSpoken),
-        Triple("Stored", if (read) c.stored.toString() else "—", if (read) "Stored codes: ${c.stored}" else "Stored codes: not read yet"),
-        Triple("Pending", if (read) c.pending.toString() else "—", if (read) "Pending codes: ${c.pending}" else "Pending codes: not read yet"),
-        Triple("Permanent", if (read) c.permanent.toString() else "—", if (read) "Permanent codes: ${c.permanent}" else "Permanent codes: not read yet"),
+    val cells: List<Pair<String, String>> = listOf(
+        "Check engine" to mil,
+        "Stored" to if (read) c.stored.toString() else "—",
+        "Pending" to if (read) c.pending.toString() else "—",
+        "Permanent" to if (read) c.permanent.toString() else "—",
     )
     val spokenAll = if (read) spokenCounts(c) else "Codes: not read yet"
-    // Two by two: four cells in one row would cut their labels at 360 dp.
-    val rows = cells.chunked(2)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val compact = LocalDensity.current.fontScale <= 1.15f && maxWidth >= 340.dp
     Column(
         Modifier.fillMaxWidth().semantics(mergeDescendants = true) { contentDescription = "$milSpoken. $spokenAll" },
         verticalArrangement = Arrangement.spacedBy(DiyDimens.S),
     ) {
-        rows.forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DiyDimens.S)) {
-                row.forEach { (label, value, _) ->
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .clip(DiyDimens.ChipShape)
-                            .background(k.raised)
-                            .border(1.dp, k.hairline, DiyDimens.ChipShape)
-                            .padding(horizontal = DiyDimens.M, vertical = DiyDimens.S),
-                    ) {
-                        Text(label, style = MaterialTheme.typography.labelSmall, color = k.textSecondary, maxLines = 1)
-                        Text(
-                            value,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum"),
-                            color = k.textPrimary,
-                            maxLines = 1,
-                        )
+        cells.chunked(if (compact) 4 else 2).forEach { row ->
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(DiyDimens.S)) {
+                row.forEachIndexed { n, (label, value) ->
+                    if (n > 0) DiyVerticalRule()
+                    Column(Modifier.weight(if (compact && label == "Check engine") 1.5f else 1f)) {
+                        Text(label, style = DiyType.caption, color = k.textSecondary)
+                        Text(value, style = DiyType.value, color = k.textPrimary)
                     }
                 }
             }
         }
+    }
     }
 }
 
@@ -140,7 +137,7 @@ private fun CodeRow(c: DiagnosticTroubleCode, onOpen: () -> Unit) {
     ) {
         Text(
             c.code,
-            style = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = MaterialTheme.typography.titleSmall.fontSize),
+            style = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = MaterialTheme.typography.titleSmall.fontSize, fontFeatureSettings = "tnum"),
             color = if (c.status == DtcStatus.PERMANENT) k.fault else k.warn,
         )
         Column(Modifier.weight(1f)) {

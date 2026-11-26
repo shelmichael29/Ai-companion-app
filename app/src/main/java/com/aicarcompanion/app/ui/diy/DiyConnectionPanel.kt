@@ -1,22 +1,19 @@
 package com.aicarcompanion.app.ui.diy
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -25,6 +22,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicarcompanion.app.dashboard.DiyConnectionStage
 import com.aicarcompanion.app.dashboard.DiyConnectionStatus
@@ -109,8 +107,9 @@ private fun DiyConnectionStage.color(): Color {
 }
 
 /**
- * Bluetooth, adapter and vehicle ECU as three separate steps. Only a step that has really happened
- * is ticked; a Bluetooth link alone leaves "Vehicle ECU" waiting.
+ * Bluetooth, adapter and vehicle ECU as three separate steps on one compact row (stacked only at large
+ * font sizes), then one status line. Only a step that has really happened is ticked; a Bluetooth link
+ * alone leaves "Vehicle ECU" waiting.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -120,9 +119,10 @@ fun DiyConnectionPanel(
     onOpenAdapter: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    divider: Boolean = true,
 ) {
     val k = diyTokens()
-    DiyPanel(modifier.testTag(DIY_CONNECTION_TAG)) {
+    DiySection(modifier.testTag(DIY_CONNECTION_TAG), divider) {
         DiySectionHeader("Connection") {
             DiyStatusTag(
                 status.stage.headline(),
@@ -139,11 +139,11 @@ fun DiyConnectionPanel(
         val steps = ConnectionStep.entries
         if (stacked) {
             Column(verticalArrangement = Arrangement.spacedBy(DiyDimens.S)) {
-                steps.forEach { Step(it, status, Modifier.fillMaxWidth(), horizontal = true) }
+                steps.forEach { Step(it, status, Modifier.fillMaxWidth()) }
             }
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(DiyDimens.S)) {
-                steps.forEach { Step(it, status, Modifier.weight(1f), horizontal = false) }
+                steps.forEach { Step(it, status, Modifier.weight(1f)) }
             }
         }
         Text(
@@ -158,8 +158,8 @@ fun DiyConnectionPanel(
             status.lastDataAt?.let { "Last data: ${LiveDataStatus.ageLabel(it, now)}" },
         )
         if (details.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                details.forEach { Text(it, style = MaterialTheme.typography.labelMedium, color = k.textSecondary) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(DiyDimens.M), verticalArrangement = Arrangement.spacedBy(DiyDimens.Xs)) {
+                details.forEach { Text(it, style = DiyType.mono, color = k.textSecondary) }
             }
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(DiyDimens.S)) {
@@ -169,37 +169,18 @@ fun DiyConnectionPanel(
     }
 }
 
+/** One stepper cell: a small state icon, the step name and its words. Spoken as one phrase. */
 @Composable
-private fun Step(step: ConnectionStep, status: DiyConnectionStatus, modifier: Modifier, horizontal: Boolean) {
+private fun Step(step: ConnectionStep, status: DiyConnectionStatus, modifier: Modifier) {
     val k = diyTokens()
     val state = status.stateOf(step)
     val word = stepWord(step, state, status.stage)
     val color = state.color()
-    val icon = @Composable {
-        Box(
-            Modifier.size(28.dp).clip(CircleShape).border(1.5.dp, color, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(state.icon(), contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+    Column(modifier.semantics(mergeDescendants = true) { contentDescription = "${step.title}: $word" }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DiyDimens.Xs)) {
+            Icon(state.icon(), contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            Text(step.title, style = DiyType.caption, color = k.textSecondary)
         }
-    }
-    val texts = @Composable {
-        Column {
-            Text(step.title, style = MaterialTheme.typography.labelMedium, color = k.textSecondary)
-            Text(word, style = MaterialTheme.typography.labelLarge, color = k.textPrimary)
-        }
-    }
-    val spoken = "${step.title}: $word"
-    if (horizontal) {
-        Row(
-            modifier.semantics(mergeDescendants = true) { contentDescription = spoken },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DiyDimens.M),
-        ) { icon(); texts() }
-    } else {
-        Column(
-            modifier.semantics(mergeDescendants = true) { contentDescription = spoken },
-            verticalArrangement = Arrangement.spacedBy(DiyDimens.Xs + 2.dp),
-        ) { icon(); texts() }
+        Text(word, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium), color = k.textPrimary)
     }
 }

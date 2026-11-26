@@ -35,18 +35,19 @@ internal fun DiyShortcuts(
     onOpenDrive: () -> Unit,
     onCustomize: () -> Unit,
     modifier: Modifier = Modifier,
+    divider: Boolean = true,
 ) {
-    DiyPanel(modifier.testTag(DIY_SHORTCUTS_TAG)) {
+    DiySection(modifier.testTag(DIY_SHORTCUTS_TAG), divider) {
         DiySectionHeader("Tools and shortcuts") {
             DiyTextButton("Customize", onCustomize, icon = PenelopeIcons.Tune)
         }
         FlowRow(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(DiyDimens.S),
-            verticalArrangement = Arrangement.spacedBy(DiyDimens.S),
+            horizontalArrangement = Arrangement.spacedBy(DiyDimens.Xs),
+            verticalArrangement = Arrangement.spacedBy(DiyDimens.Xs),
         ) {
-            shortcuts.forEach { s -> DiyChip(s.label, s.spoken, s.onClick, icon = s.item.icon()) }
-            DiyChip("Drive", "Drive, hands-free tools for the road", onOpenDrive, icon = PenelopeIcons.Drive)
+            shortcuts.forEach { s -> DiyChip(s.label, s.spoken, s.onClick, icon = s.item.icon(), outlined = false) }
+            DiyChip("Drive", "Drive, hands-free tools for the road", onOpenDrive, icon = PenelopeIcons.Drive, outlined = false)
         }
     }
 }

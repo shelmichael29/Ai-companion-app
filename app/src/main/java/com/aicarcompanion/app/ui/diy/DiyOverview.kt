@@ -84,11 +84,13 @@ internal fun DiyOverview(
                 visible = expanded, voice = voice, turns = turns, assistantName = assistantName, aiStatus = aiStatus, profileName = profileName,
                 onAsk = actions.onAsk, onOpenChat = actions.onOpenChat, onOpenSettings = actions.onOpenSettings,
             )
-            DiyConnectionPanel(connection, now, actions.onOpenAdapter, actions.onOpenConnectionSettings)
-            DiyHealthPanel(ui, actions.onOpenResults, actions.onOpenDiagnostics, clearCodes = actions.clearCodes)
-            DiyLiveStrip(live, now, actions.onOpenLiveData)
-            DiyMaintenancePanel(ui.lastRead, ui.lastService, actions.onOpenHistory)
-            DiyShortcuts(homeShortcuts(items, ui, actions), actions.onOpenDrive, actions.onOpenSettings)
+            DiySurface {
+                DiyConnectionPanel(connection, now, actions.onOpenAdapter, actions.onOpenConnectionSettings, divider = false)
+                DiyHealthPanel(ui, actions.onOpenResults, actions.onOpenDiagnostics, clearCodes = actions.clearCodes)
+                DiyLiveStrip(live, now, actions.onOpenLiveData)
+                DiyMaintenancePanel(ui.lastRead, ui.lastService, actions.onOpenHistory)
+                DiyShortcuts(homeShortcuts(items, ui, actions), actions.onOpenDrive, actions.onOpenSettings)
+            }
             if (AppBuildInfo.showOnHome) BuildLabel(Modifier.fillMaxWidth().padding(bottom = DiyDimens.S))
         }
     }

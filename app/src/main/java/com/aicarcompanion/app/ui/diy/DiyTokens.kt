@@ -7,7 +7,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
 import com.aicarcompanion.app.ui.theme.Penelope
 import com.aicarcompanion.app.ui.theme.PenelopeTokens
 
@@ -68,7 +73,27 @@ fun diyTokens(): DiyTokens {
     return remember(t) { diyTokensFor(t) }
 }
 
-/** Spacing steps (4, 8, 12, 16, 20) and shapes used across the Overview. */
+/**
+ * The Overview's tighter type scale. Section labels are small, semi-bold and letter-spaced; numbers use
+ * tabular figures so columns of readings line up; codes and protocol lines are monospace.
+ */
+object DiyType {
+    val sectionLabel: TextStyle
+        @Composable get() = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+
+    /** Counts and readings: tabular numerals. */
+    val value: TextStyle
+        @Composable get() = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum")
+
+    val caption: TextStyle
+        @Composable get() = MaterialTheme.typography.labelSmall
+
+    /** Protocol, adapter and code text. */
+    val mono: TextStyle
+        @Composable get() = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace, fontFeatureSettings = "tnum")
+}
+
+/** Spacing steps (4, 8, 12, 16, 20) and shapes used across the Overview. 12 dp inside and between rows, 16 dp at the edges. */
 object DiyDimens {
     val Margin = 16.dp
     val Xs = 4.dp
