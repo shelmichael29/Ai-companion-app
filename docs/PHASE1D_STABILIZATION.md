@@ -97,8 +97,8 @@ Inspected: one poller for the whole app, leases released when screens leave, `co
 |---|---|
 | Baseline gate, untouched `main` | PASS: 1302 run, 0 failed; Detekt 0; Lint 0 errors, 2 warnings |
 | First final gate, `--release` (33b06e4) | **BLOCKED** by Detekt: 2 `EmptyElseBlock` findings in the new `Phase1dVisualQaTest` (one-line `while` loops). Everything else passed: build, release build, 1473 tests run 0 failed, Lint 0 errors 2 warnings, secret scan. Fixed in the test code (no rule or baseline change) and the gate was rerun. |
-| Final gate, `--release` | {{FINAL_GATE}} |
-| GitHub Actions on the PR | {{CI}} |
+| Final gate, `--release` | PASS (NEEDS MANUAL VERIFICATION) at ed3fce8: build, release build, Detekt 0 issues, Lint 0 errors and 2 warnings (unchanged), secret scan PASS; **1473 run, 1473 passed, 0 failed, 0 skipped** (unit 766, integration 649, regression 41, accessibility 17); line coverage 71.6 % |
+| GitHub Actions on the PR | PR #83: see section 19 |
 
 Tests added: `NavBarTouchTargetRegressionTest` (5), `Phase1dVisualQaTest` (160), `InPlaceUpdatePersistenceTest` (4), `VoiceReadDuringLivePollingTest` (2). No test was skipped, ignored or weakened; no Lint or Detekt setting changed; no baseline added.
 
@@ -122,3 +122,6 @@ The full checklist is `docs/DEVICE_TESTING.md`, section 0h, in 12 categories (in
 3. Approve or decline the small label fixes in L-2 (Chat header is in the protected voice UI folder).
 4. L-4 installer cleanup on the reuse path, with a test, in a small follow-up.
 5. Then the next roadmap item (owner's choice); Overview panel customization stays ❓ until decided.
+
+## 19. Pull request and CI
+PR #83 (`stabilization/phase1d-prompt4b` into `main`), open, **not merged**; STOP after 4B for owner review. GitHub Actions results are reported on the PR.
