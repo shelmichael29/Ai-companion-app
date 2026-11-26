@@ -53,7 +53,7 @@ import org.robolectric.annotation.Config
 @Config(application = Application::class, sdk = [35])
 class OfflineKnowledgeTest {
 
-    private val kb by lazy { SqliteOfflineKnowledge(ApplicationProvider.getApplicationContext()).also { assertTrue("pack installs", it.install()) } }
+    private val kb by lazy { SqliteOfflineKnowledge(ApplicationProvider.getApplicationContext()).also { assertTrue("pack installs: ${it.lastFailure}", it.install()) } }
 
     private val bmw = Vehicle(
         id = "bmw", year = 2011, make = "BMW", model = "528i", trim = "F10",
