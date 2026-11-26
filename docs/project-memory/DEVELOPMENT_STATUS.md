@@ -51,7 +51,7 @@ When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/
 
 **v0.8.0 (9), assistant personalization and voice overhaul:** merged (#72, 2026-11-25); automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
 
-**v0.11.0 (12), Phase 1C Prompt 3 (DIY dashboard modernization):** PR #79 open, not merged; automated tests and Robolectric renders only (fakes, not device captures). Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0g). STOP: Prompt 4 (Testing and Stabilization) waits for the owner.
+**v0.11.0 (12), Phase 1C Prompt 3 (DIY dashboard modernization):** merged (#79, 2026-11-26); automated tests and Robolectric renders only (fakes, not device captures). Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0g). STOP: Prompt 4 (Testing and Stabilization) waits for the owner.
 
 **v0.10.0 (11), Phase 1B Prompt 2 (Advanced features into DIY):** merged (#75, 2026-11-25); automated tests only (fakes). Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0f).
 
