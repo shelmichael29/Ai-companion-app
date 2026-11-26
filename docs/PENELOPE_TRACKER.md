@@ -1,6 +1,6 @@
 # Penelope — Development Notes & To-Dos
 
-**Updated:** 2026-11-21  
+**Updated:** 2026-11-26  
 **Purpose:** Active checklist, testing notes, decisions, and PR handoffs.  
 **Scope:** Penelope app (`main`); experimental ENET tester is separate.
 
@@ -81,6 +81,7 @@ Source: user-provided `bmw-cheap-elm327-clones-guide.md` (prepared 2026-11-21). 
 4. When an implementation changes a product decision/status, update the appropriate `docs/project-memory/` file **in the same PR**.
 5. Keep secret tokens, full VINs, Bluetooth addresses, and private identifiers out of this tracker.
 - [ ] Assistant personalization (v0.8.0, build 9): ten profiles, honest voice selection, custom name. Device checks pending: `docs/DEVICE_TESTING.md` section 0d.
+- [ ] Phase 1D, Prompt 4B (v0.12.0, build 14): final testing, stabilization and regression protection. One defect fixed (DIY nav tabs under 48 dp on narrow displays at large font, with a regression test); new visual QA audit (160 renders), in-place update persistence and voice-during-Live-Data tests; offline knowledge tests 20 of 20 independent runs passed; remaining findings L-1 to L-6 need owner decisions or the phone. PR open, not merged; STOP after 4B for owner review. Report: `docs/PHASE1D_STABILIZATION.md`; device checklist `docs/DEVICE_TESTING.md` 0h (all NOT RUN).
 - [x] Priority 0 (4A, v0.11.1, build 13): intermittent OfflineKnowledgeTest failure. Root cause: test-JVM heap exhaustion under Robolectric (not a production bug); fixed with a 1 GB test heap, guard test, better install-failure reporting and a hardened installer. 40 of 40 CI runs passed. Merged (#81, squash 1c60be8, 2026-11-26). Prompt 4B waits for this. Report: `docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md`.
 - [x] Phase 1C, Prompt 3 of 4 (v0.11.0, build 12): DIY Overview modernization (compact voice bar, Bluetooth/Adapter/ECU connection steps, health counts, Live Data strip, tabs Overview, Live Data, Diagnostics, Drive, More). Voice, personalities and Everyday untouched. merged (#79, 2026-11-26). STOP after Prompt 3: Prompt 4 (Testing and Stabilization) does not start until the owner approves. Device checks: `docs/DEVICE_TESTING.md` section 0g.
 - [x] Phase 1B, Prompt 2 of 4 (v0.10.0, build 11): Advanced features integrated into DIY (connection settings apply at DIY, trims/MAP/MAF, protocol and drivetrain replies, Diagnostics from home Results, custom-settings tip). Voice and Everyday untouched. Merged (#75; docs #76). Device checks: `docs/DEVICE_TESTING.md` section 0f.

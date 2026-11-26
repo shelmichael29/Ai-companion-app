@@ -304,13 +304,9 @@ class Phase1dVisualQaTest(private val shot: Shot) {
         }
         visit(compose.onNodeWithTag(ROOT).fetchSemanticsNode())
 
-        fun related(a: SemanticsNode, b: SemanticsNode): Boolean {
-            var p = a.parent
-            while (p != null) { if (p.id == b.id) return true; p = p.parent }
-            p = b.parent
-            while (p != null) { if (p.id == a.id) return true; p = p.parent }
-            return false
-        }
+        fun isAncestor(ancestor: SemanticsNode, node: SemanticsNode): Boolean =
+            generateSequence(node.parent) { it.parent }.any { it.id == ancestor.id }
+        fun related(a: SemanticsNode, b: SemanticsNode) = isAncestor(a, b) || isAncestor(b, a)
         // Content scrolled under the floating navigation bar is meant to pass beneath it.
         val content = clickables.filter { n -> navTop == null || n.boundsInRoot.top < navTop || isNav(n) }
         for (i in content.indices) for (j in i + 1 until content.size) {

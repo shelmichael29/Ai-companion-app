@@ -1,6 +1,6 @@
 # Development status
 
-Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`.
+Snapshot as of **2026-11-26**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`.
 
 ## Verified milestones
 **Verified on the phone:** the VIN scanner, decoder and recalls (#41, #45) on the Galaxy S26 Ultra, build 0.7.1 (8), 2026-11-21, by the owner (scan from paper and from the 528i, recalls online and offline, Penelope's recall answer, camera indicator). Everything else below passed the automated quality gate and CI but hasn't been checked on the phone, adapter or car yet.
@@ -25,7 +25,8 @@ Snapshot as of **2026-11-21**. Per-stage gate results: `docs/QUALITY_SUMMARY.md`
 ## Active pull requests
 | PR | What | State |
 |---|---|---|
-| — | None open. ENET work moved to the separate `Enet-Development` repository (2026-11-23) | — |
+| Phase 1D (Prompt 4B) | Final testing and stabilization, v0.12.0 (14), branch `stabilization/phase1d-prompt4b` | 🔵 PR open, not merged (owner review) |
+| — | ENET work lives in the separate `Enet-Development` repository (2026-11-23) | — |
 
 ## Outstanding tasks
 - **Owner:** done, as reported by the owner on 2026-11-21: the `DEBUG_KEYSTORE_BASE64` secret, the App Check debug token, and the "Fresh" tag.
@@ -51,7 +52,9 @@ When something is verified, mark it ✅ in [FEATURES.md](FEATURES.md) and `docs/
 
 **v0.8.0 (9), assistant personalization and voice overhaul:** merged (#72, 2026-11-25); automated tests only. Voice gender, engine lists, network voices and TalkBack are NOT verified on a device.
 
-**v0.11.1 (13), Priority 0 (4A) OfflineKnowledgeTest flake:** root cause established (test-JVM heap exhaustion under Robolectric, test-only); fix verified by 40 of 40 independent CI runs; merged (#81, 2026-11-26). Device re-check of the offline pack NOT RUN (`docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md` section 8). Prompt 4B (Phase 1D) is queued behind it.
+**v0.12.0 (14), Phase 1D Prompt 4B (final testing and stabilization):** PR open, not merged. Baseline gate on untouched `main` 1302/0; one defect fixed (DIY nav tabs under 48 dp at 320 dp and 200 % font); visual QA audit, in-place update and voice-during-Live-Data tests added; offline knowledge tests 20 of 20 independent runs passed. Open: L-1 Home polls readings it no longer shows (owner decision), L-2 labels at 320 dp and 200 % font, L-3 to L-6 minor. Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0h). Report: `docs/PHASE1D_STABILIZATION.md`. STOP after 4B.
+
+**v0.11.1 (13), Priority 0 (4A) OfflineKnowledgeTest flake:** root cause established (test-JVM heap exhaustion under Robolectric, test-only); fix verified by 40 of 40 independent CI runs; merged (#81, 2026-11-26). Device re-check of the offline pack NOT RUN (`docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md` section 8).
 
 **v0.11.0 (12), Phase 1C Prompt 3 (DIY dashboard modernization):** merged (#79, 2026-11-26); automated tests and Robolectric renders only (fakes, not device captures). Device checks NOT RUN (`docs/DEVICE_TESTING.md` 0g). STOP: Prompt 4 (Testing and Stabilization) waits for the owner.
 
