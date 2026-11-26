@@ -83,6 +83,16 @@ android {
     }
 }
 
+// Robolectric reads each bundled ~41 MB knowledge-pack asset into one heap array, and that array stays
+// reachable through a finalizable Asset until the finalizer thread and a later GC release it. Measured:
+// about 94 MB baseline plus one ~41 MB array per install that lingers, so the ~17 installs in
+// OfflineKnowledgeTest need up to roughly 750 MB when the finalizer lags on a busy runner. Gradle's
+// default 512 MB test heap left ~90 MB of headroom and failed 3 of 25 CI runs with OutOfMemoryError
+// inside the install. OfflineKnowledgeTest asserts this setting so removing it fails loudly.
+tasks.withType<Test>().configureEach {
+    maxHeapSize = "1g"
+}
+
 ksp {
     // Room schema history is committed so future database migrations can be verified.
     arg("room.schemaLocation", "$projectDir/schemas")

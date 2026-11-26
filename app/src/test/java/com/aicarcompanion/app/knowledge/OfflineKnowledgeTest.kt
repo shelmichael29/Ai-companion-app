@@ -39,6 +39,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,7 +54,18 @@ import org.robolectric.annotation.Config
 @Config(application = Application::class, sdk = [35])
 class OfflineKnowledgeTest {
 
-    private val kb by lazy { SqliteOfflineKnowledge(ApplicationProvider.getApplicationContext()).also { assertTrue("pack installs: ${it.lastFailure}", it.install()) } }
+    private var kbOpened = false
+    private val kb by lazy {
+        SqliteOfflineKnowledge(ApplicationProvider.getApplicationContext()).also {
+            kbOpened = true
+            assertTrue("pack installs: ${it.lastFailure}", it.install())
+        }
+    }
+
+    /** JUnit builds a new instance per test; without this every test leaves a SQLite connection open. */
+    @After fun closeKnowledge() {
+        if (kbOpened) kb.close()
+    }
 
     private val bmw = Vehicle(
         id = "bmw", year = 2011, make = "BMW", model = "528i", trim = "F10",
@@ -61,6 +73,18 @@ class OfflineKnowledgeTest {
     )
 
     // ---- The pack itself --------------------------------------------------------------------------
+
+    /**
+     * Robolectric reads each ~41 MB pack asset into ONE heap array, and that array stays reachable
+     * through a finalizable Asset until the finalizer thread and a later GC release it. On a busy CI
+     * runner the arrays of several tests pile up, and Gradle's default 512 MB test heap ran out
+     * (OutOfMemoryError in the install, about 1 run in 8). app/build.gradle.kts gives the test JVM 1 GB.
+     * If this fails, the maxHeapSize setting for unit tests was removed or lowered: restore it.
+     */
+    @Test fun `the test JVM keeps the heap that Robolectric's whole-asset reads need`() {
+        val maxMb = Runtime.getRuntime().maxMemory() / (1024 * 1024)
+        assertTrue("test heap is ${maxMb} MB; unit tests need maxHeapSize = 1g (see app/build.gradle.kts)", maxMb >= 900)
+    }
 
     @Test fun `the pack installs from the APK, passes its checksum and opens read-only`() {
         assertTrue(kb.available)

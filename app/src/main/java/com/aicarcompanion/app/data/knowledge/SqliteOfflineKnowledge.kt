@@ -87,39 +87,27 @@ class SqliteOfflineKnowledge(
         stage = InstallStage.DIR
         val dir = File(context.noBackupFilesDir, "knowledge").apply { mkdirs() }
         installDir = dir
-        val target = File(dir, "penelope_knowledge_${sha.take(12)}.db")
-        installTarget = target
-        if (!target.exists()) {
-            val temp = File(dir, "installing.tmp")
-            installTemp = temp
-            try {
-                val digest = MessageDigest.getInstance("SHA-256")
-                stage = InstallStage.SOURCE_OPEN
-                packStream().use { input ->
-                    stage = InstallStage.COPY
-                    copied = 0
-                    temp.outputStream().buffered().use { out ->
-                        val buf = ByteArray(1 shl 16)
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            digest.update(buf, 0, n)
-                            out.write(buf, 0, n)
-                            copied += n
-                        }
-                    }
-                }
-                stage = InstallStage.VERIFY
-                val actual = digest.digest().joinToString("") { "%02x".format(it) }
-                check(actual == sha) { "Knowledge pack checksum mismatch" }
-                stage = InstallStage.RENAME
-                check(temp.renameTo(target)) { "Couldn't install knowledge pack" }
-            } finally {
-                temp.delete() // never leave a partial file behind (no space, bad checksum)
+        val installer = KnowledgePackInstaller(
+            dir = dir,
+            expectedSha = sha,
+            expectedBytes = expectedBytes,
+            openPack = { packStream() },
+            isUsableDb = { canOpen(it) },
+            onStage = { stage = it },
+        )
+        installTarget = installer.target
+        val outcome = try {
+            installer.install()
+        } finally {
+            copied = installer.copied
+            installTemp = installer.temp
+        }
+        val target = when (outcome) {
+            is KnowledgePackInstaller.Outcome.Ready -> outcome.target
+            is KnowledgePackInstaller.Outcome.Failed -> {
+                stage = outcome.stage
+                throw outcome.error
             }
-            // Older packs are removed only once the new one is verified and in place.
-            stage = InstallStage.CLEANUP
-            dir.listFiles()?.filter { it != target }?.forEach { it.delete() }
         }
         stage = InstallStage.OPEN
         db = SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS)
@@ -170,6 +158,23 @@ class SqliteOfflineKnowledge(
             "heapMax=${rt.maxMemory()} heapTotal=${rt.totalMemory()} heapFree=${rt.freeMemory()} " +
             "thread=${sanitize(t.name)} interrupted=${t.isInterrupted} " +
             "elapsedMs=${(System.nanoTime() - startedNanos) / 1_000_000} threads=${Thread.activeCount()}"
+    }
+
+    /** A reused pack must open read-only and answer a trivial query; anything else is replaced. */
+    private fun canOpen(f: File): Boolean = runCatching {
+        SQLiteDatabase.openDatabase(f.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS).use { d ->
+            d.rawQuery("SELECT count(*) FROM sqlite_master", null).use { it.moveToFirst() && it.getInt(0) > 0 }
+        }
+    }.getOrDefault(false)
+
+    /** Closes the database and makes the pack unavailable again. Safe to call more than once. */
+    @Synchronized
+    fun close() {
+        val d = db
+        db = null
+        info = null
+        guides = null
+        runCatching { d?.close() }
     }
 
     private fun openAsset(name: String): java.io.InputStream = openAssetFn(name)
