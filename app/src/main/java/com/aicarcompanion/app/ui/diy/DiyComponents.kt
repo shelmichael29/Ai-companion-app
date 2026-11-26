@@ -99,7 +99,7 @@ fun DiyIconButton(
             .clip(CircleShape)
             .background(k.raised)
             .border(1.dp, ring, CircleShape)
-            .clickable(role = Role.Button, onClickLabel = description, onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {

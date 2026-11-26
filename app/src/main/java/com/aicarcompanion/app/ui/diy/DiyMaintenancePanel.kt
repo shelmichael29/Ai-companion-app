@@ -35,6 +35,7 @@ fun DiyMaintenancePanel(
             style = MaterialTheme.typography.bodyMedium,
             color = if (lastRead == null) k.textSecondary else k.textPrimary,
         )
+        if (lastRead?.origin == DataOrigin.SAMPLE) DiyStatusTag("Sample data", k.warn, PenelopeIcons.Info)
         if (lastService == null) {
             Text("No service records yet.", style = MaterialTheme.typography.bodyMedium, color = k.textSecondary)
         } else {

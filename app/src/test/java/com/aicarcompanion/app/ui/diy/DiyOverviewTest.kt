@@ -12,6 +12,13 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import com.aicarcompanion.app.ui.livedata.LiveDataUiState
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -125,6 +132,8 @@ class DiyOverviewTest {
         profileName: String? = "Penelope Classic",
         aiStatus: AiStatus = AiStatus.Off,
         conversationActive: Boolean = false,
+        kind: DashboardKind = DashboardKind.WORKSHOP,
+        clearCodes: (@androidx.compose.runtime.Composable () -> Unit)? = null,
     ): Taps {
         val taps = Taps()
         compose.setContent {
@@ -139,7 +148,7 @@ class DiyOverviewTest {
                         onOpenResults = { taps.results++ }, onAddVehicle = { taps.addVehicle++ },
                         onSelectVehicle = { taps.selected += it }, onPhotoPicked = {},
                         onOpenHistory = { taps.history++ }, aiStatus = aiStatus,
-                        items = DashboardPlanner.itemsFor(ExplanationLevel.DIY, dashboard), kind = DashboardKind.WORKSHOP,
+                        items = DashboardPlanner.itemsFor(ExplanationLevel.DIY, dashboard), kind = kind, clearCodes = clearCodes,
                         onOpenChat = { taps.chat++ }, onOpenDiagnostics = { taps.diagnostics++ },
                         onOpenLiveData = { taps.liveData++ }, onOpenConnectionSettings = { taps.connection++ }, now = now,
                         diyLive = live, turns = turns, profileName = profileName, onOpenDrive = { taps.drive++ },
@@ -476,5 +485,60 @@ class DiyOverviewTest {
         }
         val chip = compose.onNodeWithContentDescription("Car Health, Not checked").performScrollTo().fetchSemanticsNode()
         assertEquals(Role.Button, chip.config.getOrNull(SemanticsProperties.Role))
+    }
+
+    // ---- Review fixes -------------------------------------------------------------------------
+
+    @Test fun theClearCodesControlLivesInsideTheDiyHealthPanel() {
+        render(clearCodes = { Text("Clear codes…", Modifier.testTag("cc")) })
+        compose.onNode(hasTestTag("cc") and hasAnyAncestor(hasTestTag(DIY_HEALTH_TAG)), useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun everydayNeverShowsTheClearCodesSlot() {
+        render(kind = DashboardKind.COMPANION, clearCodes = { Text("Clear codes…", Modifier.testTag("cc")) })
+        compose.onNodeWithTag("cc", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test fun theLiveAnnouncementNeverCarriesThePartialTranscript() {
+        render(voice = VoiceState.Listening("check"))
+        val live = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).fetchSemanticsNodes()
+        assertTrue(live.isNotEmpty())
+        live.forEach { n ->
+            val words = n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
+                n.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+            words.forEach { assertTrue("live region says \"$it\"", !it.contains("check", ignoreCase = true)) }
+        }
+        assertTrue(
+            live.any { "Listening" in n(it) },
+        )
+    }
+
+    private fun n(node: androidx.compose.ui.semantics.SemanticsNode) =
+        node.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+
+    @Test fun aProblemIsAnnouncedInFullButStillOnlyOnce() {
+        render(voice = VoiceState.Error("The microphone is busy"))
+        val live = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)).fetchSemanticsNodes()
+        assertTrue(live.any { "The microphone is busy" in n(it) })
+    }
+
+    @Test fun aKnownVehicleWithNoLayoutYetSaysItIsWaiting() {
+        render(live = DiyLiveInput(hasVehicle = true, gauges = emptyList(), states = emptyMap(), loading = true))
+        compose.onNodeWithText("Waiting for the first reading").assertExists()
+        compose.onNodeWithText("Add a vehicle to see live readings.").assertDoesNotExist()
+        compose.onNodeWithText("No gauges chosen yet. Choose them in Live Data.").assertDoesNotExist()
+    }
+
+    @Test fun liveInputKnowsTheVehicleBeforeLiveDataHasEmitted() {
+        val cold = diyLiveInputFor(LiveDataUiState(), homeHasVehicle = true)
+        assertTrue(cold.hasVehicle)
+        assertTrue(cold.loading)
+        val none = diyLiveInputFor(LiveDataUiState(), homeHasVehicle = false)
+        assertTrue(!none.hasVehicle && !none.loading)
+    }
+
+    @Test fun sampleCodeReadsAreTaggedInHistoryAndMaintenance() {
+        render(ui = ui.copy(lastRead = read.copy(origin = DataOrigin.SAMPLE)))
+        compose.onNode(hasText("Sample data") and hasAnyAncestor(hasTestTag(DIY_MAINTENANCE_TAG))).assertExists()
     }
 }

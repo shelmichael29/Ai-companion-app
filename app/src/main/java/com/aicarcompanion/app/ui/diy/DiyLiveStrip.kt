@@ -44,7 +44,23 @@ data class DiyLiveInput(
     val hasVehicle: Boolean,
     val gauges: List<GaugeSpec>,
     val states: Map<Int, SensorValueState>,
+    /** The vehicle is known but its Live Data layout has not loaded yet (cold start): say so instead of claiming no gauges. */
+    val loading: Boolean = false,
 )
+
+/**
+ * The strip's input from the Live Data state. The home screen already knows the vehicle before the Live Data
+ * view model has emitted its layout, so a known vehicle with no layout yet is "loading", never "no vehicle".
+ */
+internal fun diyLiveInputFor(state: com.aicarcompanion.app.ui.livedata.LiveDataUiState, homeHasVehicle: Boolean): DiyLiveInput {
+    val layoutReady = state.hasVehicle && state.active != null
+    return DiyLiveInput(
+        hasVehicle = state.hasVehicle || homeHasVehicle,
+        gauges = state.active?.gauges.orEmpty(),
+        states = state.states,
+        loading = homeHasVehicle && !layoutReady,
+    )
+}
 
 /**
  * The first gauges of the active Live Data layout. A number appears only for a live value, a stale
@@ -67,6 +83,7 @@ fun DiyLiveStrip(
             .take(LIVE_STRIP_GAUGES)
         when {
             live == null -> EmptyNote("Open Live Data to see readings", onOpenLiveData)
+            live.loading -> Text("Waiting for the first reading", style = MaterialTheme.typography.bodyMedium, color = k.textSecondary)
             !live.hasVehicle -> Text("Add a vehicle to see live readings.", style = MaterialTheme.typography.bodyMedium, color = k.textSecondary)
             tiles.isEmpty() -> EmptyNote("No gauges chosen yet. Choose them in Live Data.", onOpenLiveData)
             else -> {

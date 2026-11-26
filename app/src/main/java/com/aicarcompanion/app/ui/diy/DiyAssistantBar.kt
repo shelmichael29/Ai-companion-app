@@ -33,6 +33,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.invisibleToUser
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -44,6 +46,7 @@ import com.aicarcompanion.app.assistant.VoiceState
 import com.aicarcompanion.app.assistant.conversation.ConversationTurn
 import com.aicarcompanion.app.assistant.conversation.Speaker
 import com.aicarcompanion.app.ui.assistant.VoiceSessionControls
+import com.aicarcompanion.app.ui.assistant.shortLabel
 import com.aicarcompanion.app.ui.assistant.statusText
 import com.aicarcompanion.app.ui.design.OrbMode
 import com.aicarcompanion.app.ui.design.PenelopeIcons
@@ -61,6 +64,10 @@ private const val MAX_SUGGESTIONS = 3
 /** The one line of status shown in the bar. Same wording as everywhere else, except a ready state that fits one line. */
 internal fun diyVoiceLine(voice: VoiceState, name: String): String =
     if (voice == VoiceState.Idle) "Ready. Tap the mic and start talking." else voice.statusText(name)
+
+/** What TalkBack announces for a voice state: the short state name, or the whole message for a pause or problem. */
+internal fun voiceAnnouncement(voice: VoiceState, name: String): String =
+    if (voice is VoiceState.Error || voice is VoiceState.Paused) voice.statusText(name) else voice.shortLabel()
 
 /**
  * A compact voice bar that stays pinned above the Overview. It only reflects and drives the existing
@@ -118,18 +125,30 @@ fun DiyAssistantBar(
                 tint = if (expanded) k.accent else k.textPrimary,
             )
         }
-        Row(Modifier.fillMaxWidth().padding(start = DiyDimens.S, end = DiyDimens.S), verticalAlignment = Alignment.CenterVertically) {
+        // TalkBack gets one short, polite announcement per state change ("Listening", "Speaking"; the whole
+        // message for a problem or a pause). The visible line is hidden from it: it changes with every partial
+        // transcript while listening, and reading that aloud would talk over the driver and be heard by the mic.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = DiyDimens.S, end = DiyDimens.S)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = voiceAnnouncement(voice, assistantName)
+                },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 diyVoiceLine(voice, assistantName),
                 style = MaterialTheme.typography.labelMedium,
                 color = if (voice is VoiceState.Error) k.warn else k.textPrimary,
-                // One line keeps the pinned bar a fixed, small height; the full text is read by TalkBack and shown in the panel.
+                // One line keeps the pinned bar a fixed, small height; the full text is shown in the panel.
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
                     .testTag(DIY_VOICE_STATUS_TAG)
-                    .semantics { liveRegion = LiveRegionMode.Polite },
+                    .semantics { invisibleToUser() },
             )
         }
         if (needsPermission) DiyTextButton("Allow the microphone", onOpenAppSettings, icon = PenelopeIcons.Alert)

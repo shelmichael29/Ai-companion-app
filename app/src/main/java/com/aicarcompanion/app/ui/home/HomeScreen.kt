@@ -62,7 +62,7 @@ fun HomeScreen(
     val photo: Bitmap? = rememberVehiclePhoto(home.photos, vehicleId, versions[vehicleId])
     val kind = DashboardKind.forLevel(settings.explanationLevel)
     // Only the DIY Overview reads Live Data and the conversation; Everyday never creates these.
-    val diyLive = if (kind == DashboardKind.WORKSHOP) rememberDiyLiveInput() else null
+    val diyLive = if (kind == DashboardKind.WORKSHOP) rememberDiyLiveInput(ui.vehicle != null) else null
     val turns = if (kind == DashboardKind.WORKSHOP) assistant.turns.collectAsStateWithLifecycle().value else emptyList()
     // Tick so "stale" readings are noticed; the Everyday dashboard shows no readings, so it doesn't tick.
     val now by androidx.compose.runtime.produceState(java.time.Instant.now(), kind) {
@@ -114,11 +114,11 @@ fun HomeScreen(
 
 /** The DIY Overview's live strip input, from the same Live Data view model the Live Data tab uses. */
 @Composable
-private fun rememberDiyLiveInput(): com.aicarcompanion.app.ui.diy.DiyLiveInput {
+private fun rememberDiyLiveInput(homeHasVehicle: Boolean): com.aicarcompanion.app.ui.diy.DiyLiveInput {
     val live: com.aicarcompanion.app.ui.livedata.LiveDataViewModel = viewModel(factory = AppViewModelProvider.Factory)
     val state by live.state.collectAsStateWithLifecycle()
-    return remember(state.hasVehicle, state.active, state.states) {
-        com.aicarcompanion.app.ui.diy.DiyLiveInput(state.hasVehicle, state.active?.gauges.orEmpty(), state.states)
+    return remember(state.hasVehicle, state.active, state.states, homeHasVehicle) {
+        com.aicarcompanion.app.ui.diy.diyLiveInputFor(state, homeHasVehicle)
     }
 }
 
