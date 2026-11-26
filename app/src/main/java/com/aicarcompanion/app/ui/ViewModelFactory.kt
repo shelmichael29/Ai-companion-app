@@ -15,6 +15,7 @@ import com.aicarcompanion.app.ui.livedata.LiveDataViewModel
 import com.aicarcompanion.app.ui.settings.SettingsViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleEditViewModel
 import com.aicarcompanion.app.ui.vehicles.VehicleListViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /** Creates ViewModels with dependencies from the application's [com.aicarcompanion.app.AppContainer]. */
@@ -22,7 +23,8 @@ object AppViewModelProvider {
     val Factory = viewModelFactory {
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container
-            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos, c.maintenanceRepository)
+            HomeViewModel(c.vehicleRepository, c.diagnosticsRepository, c.historyRepository, c.obdConnection, c.vehiclePhotos, c.maintenanceRepository,
+                c.settings.settings.map { it.explanationLevel }.distinctUntilChanged())
         }
         initializer {
             val c = (this[APPLICATION_KEY] as CarCompanionApplication).container

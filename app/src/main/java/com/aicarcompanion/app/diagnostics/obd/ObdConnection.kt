@@ -75,6 +75,13 @@ interface ObdConnection {
     val liveReadings: Flow<List<SensorReading>>
 
     /**
+     * Home's lightweight connection check: polls a single sensor (engine speed, else coolant temperature,
+     * else control module voltage) so a lost vehicle link is noticed quickly without the cost of
+     * [liveReadings]. Implementations without the distinction fall back to [liveReadings].
+     */
+    val connectionHeartbeat: Flow<List<SensorReading>> get() = liveReadings
+
+    /**
      * Demand-driven polling of exactly [pids]. Reads only these sensors, only while collected,
      * and nothing while disconnected, unhealthy, or while trouble codes are being cleared.
      */

@@ -36,6 +36,8 @@ class DefaultDiagnosticsRepository(
     private val settings: SettingsStore,
     private val knowledge: DtcKnowledgeSource,
     private val liveReadings: Flow<List<SensorReading>>,
+    /** One-sensor connection check for Home (see [ObdConnection.connectionHeartbeat]). */
+    private val heartbeat: Flow<List<SensorReading>> = liveReadings,
     /** Demand-driven polling of exactly the requested sensors (see [ObdConnection.livePids]). */
     private val livePids: (Set<Int>) -> Flow<LivePollSnapshot> = { flowOf(LivePollSnapshot()) },
     private val connection: StateFlow<ObdConnectionState> = MutableStateFlow(ObdConnectionState.Disconnected),
@@ -71,6 +73,10 @@ class DefaultDiagnosticsRepository(
 
     override fun sensorReadings(vehicleId: String): Flow<List<SensorReading>> = demo.flatMapLatest { on ->
         if (on) flowOf(SampleData.sensorReadings()) else liveReadings
+    }
+
+    override fun connectionHeartbeat(vehicleId: String): Flow<List<SensorReading>> = demo.flatMapLatest { on ->
+        if (on) flowOf(SampleData.sensorReadings()) else heartbeat
     }
 
     override fun liveSensors(pids: Set<Int>): Flow<Map<Int, SensorValueState>> = demo.flatMapLatest { on ->

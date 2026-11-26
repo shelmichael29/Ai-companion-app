@@ -53,7 +53,12 @@ class KnowledgePackInstaller(
             check(dir.isDirectory || dir.mkdirs() || dir.isDirectory) { "Couldn't create knowledge folder" }
             deleteStaleTemps()
             if (target.exists()) {
-                if (isReusable()) return Outcome.Ready(target)
+                if (isReusable()) {
+                    // The app may have been killed after installing this pack but before removing the old one.
+                    enter(InstallStage.CLEANUP)
+                    cleanupOthers()
+                    return Outcome.Ready(target)
+                }
                 enter(InstallStage.CLEANUP)
                 check(target.delete() || !target.exists()) { "Couldn't remove damaged knowledge pack" }
             }

@@ -25,8 +25,11 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -679,6 +682,30 @@ class ObdManager(
         }
     }.shareIn(scope, SharingStarted.WhileSubscribed(3_000), replay = 1)
 
+    /**
+     * Home's connection heartbeat: one cheap read-only request per round instead of the whole list, so
+     * Home still notices quickly that the ignition went off or the adapter lost power (link health is
+     * driven by request failures) without queueing voice answers behind a dozen polls. Reads the first
+     * supported of [HEARTBEAT_PIDS] only; an empty list when the car supports none (nothing is invented).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override val connectionHeartbeat: Flow<List<SensorReading>> = _supported
+        .map { supported -> HEARTBEAT_PIDS.firstOrNull { it.pid in supported } }
+        .distinctUntilChanged()
+        .flatMapLatest { pid ->
+            if (pid == null) {
+                flowOf(emptyList())
+            } else {
+                combine(state, poller.request(setOf(pid.pid))) { s, snap ->
+                    if (s !is ObdConnectionState.Connected || s.vehicleProtocol == null || s.health != LinkHealth.OK) {
+                        emptyList()
+                    } else {
+                        listOfNotNull((snap.perPid[pid.pid] as? PidSample.Ok)?.let { SensorReading(pid.label, it.value, pid.unit, it.at, DataOrigin.OBD_BLUETOOTH, pid.command) })
+                    }
+                }
+            }
+        }.shareIn(scope, SharingStarted.WhileSubscribed(3_000), replay = 1)
+
     /** An answer that means the vehicle didn't respond, as opposed to an unusual but valid one. */
     private fun vehicleSilent(raw: String): Boolean {
         val r = raw.uppercase()
@@ -690,6 +717,9 @@ class ObdManager(
 
     companion object {
         private val SILENCE_MARKERS = listOf("NO DATA", "UNABLE TO CONNECT", "CAN ERROR", "BUS ERROR", "BUS INIT", "STOPPED", "BUFFER FULL")
+
+        /** Candidates for the Home heartbeat, first supported wins. */
+        val HEARTBEAT_PIDS = listOf(ObdPid.ENGINE_RPM, ObdPid.COOLANT_TEMP, ObdPid.CONTROL_MODULE_VOLTAGE)
 
         /** Standard PIDs polled for the live view, most useful first. */
         val LIVE_PIDS = listOf(

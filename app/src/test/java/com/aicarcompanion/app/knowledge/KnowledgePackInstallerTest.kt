@@ -131,6 +131,27 @@ class KnowledgePackInstallerTest {
         assertEquals(stamp, first.lastModified())
     }
 
+    @Test fun `reusing a verified target also removes an old pack left by an interrupted update`() {
+        val dir = tmp.newFolder("k")
+        val old = pack(3)
+        val oldTarget = (installer(dir, old).install() as Outcome.Ready).target
+        // The new pack was installed, then the app was killed before the old one (and its side files) was deleted.
+        val fresh = pack(4)
+        val current = (installer(dir, fresh).install() as Outcome.Ready).target
+        oldTarget.writeBytes(old)
+        File(dir, oldTarget.name + "-journal").writeBytes(ByteArray(3))
+        File(dir, oldTarget.name + "-wal").writeBytes(ByteArray(3))
+        File(dir, oldTarget.name + "-shm").writeBytes(ByteArray(3))
+        current.setLastModified(1_000_000_000_000L)
+        val stamp = current.lastModified()
+        val opened = AtomicInteger()
+        val again = installer(dir, fresh, opened = opened).install()
+        assertEquals(Outcome.Ready(current), again)
+        assertEquals(0, opened.get())
+        assertEquals(stamp, current.lastModified())
+        assertEquals(listOf(current), dir.listFiles().orEmpty().toList())
+    }
+
     @Test fun `an update replaces older packs only after the new one is verified`() {
         val dir = tmp.newFolder("k")
         val old = pack(8)

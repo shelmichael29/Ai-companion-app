@@ -18,7 +18,11 @@ import com.aicarcompanion.app.domain.repository.MaintenanceRepository
 import com.aicarcompanion.app.domain.repository.VehicleHistoryRepository
 import com.aicarcompanion.app.domain.repository.VehicleRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.aicarcompanion.app.data.local.ExplanationLevel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -48,13 +52,19 @@ class HomeViewModel(
     obd: ObdConnection,
     val photos: VehiclePhotoStore,
     maintenance: MaintenanceRepository,
+    level: Flow<ExplanationLevel> = flowOf(ExplanationLevel.EVERYDAY),
 ) : ViewModel() {
 
     val state: StateFlow<HomeUiState> = vehicles.activeVehicleId.flatMapLatest { id ->
         if (id == null) {
             combine(vehicles.vehicles, obd.state) { all, o -> HomeUiState(null, all, o, loaded = true) }
         } else {
-            val extras = combine(diagnostics.sensorReadings(id), maintenance.history(id)) { r, m ->
+            // Everyday and DIY show no Home readings, so Home polls one heartbeat sensor only; the
+            // internal Advanced dashboard still gets the full list.
+            val readings = level.map { it == ExplanationLevel.ADVANCED }.distinctUntilChanged().flatMapLatest { full ->
+                if (full) diagnostics.sensorReadings(id) else diagnostics.connectionHeartbeat(id)
+            }
+            val extras = combine(readings, maintenance.history(id)) { r, m ->
                 r to m.maxByOrNull { it.date }
             }
             combine(

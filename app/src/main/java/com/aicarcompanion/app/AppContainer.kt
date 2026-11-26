@@ -244,6 +244,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     override val diagnosticsRepository: DiagnosticsRepository by lazy {
         DefaultDiagnosticsRepository(
             historyRepository, settings, dtcKnowledge, obdManager.liveReadings,
+            heartbeat = obdManager.connectionHeartbeat,
             livePids = obdManager::livePids, connection = obdManager.state,
         )
     }
