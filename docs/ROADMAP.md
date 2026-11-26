@@ -48,6 +48,7 @@ All of these passed the automated gate; none is device-verified yet (`docs/QUALI
 6. **Navigation and the iOS app**: separate tracks, using the same `handsfree` contracts.
 
 ## Next (recommended order)
+0. **Priority 0 (4A):** intermittent OfflineKnowledgeTest failure: root cause found and fixed (v0.11.1), PR open for owner approval. Prompt 4B (Phase 1D, Final Testing and Stabilization) starts after it.
 0. **Knowledge-level overhaul (4 prompts):** Prompt 1 (two levels, v0.9.0) merged; Prompt 2 (Advanced features into DIY, v0.10.0) merged (#75). Prompt 3 (DIY dashboard modernization, v0.11.0) built, merged (#79). **STOP after Prompt 3:** Prompt 4 (Testing and Stabilization) does not start until the owner approves. Panel-level Overview customization (show, hide, reorder panels; choosing strip gauges separately from Live Data; several saved home configurations) needs separate owner approval and is not built.
 1. **Real-hardware validation** with the Panlong adapter on the 2011 BMW 528i: capture raw
    ELM327 transcripts (DIY → Advanced connection settings → communication log → Copy log) and turn them into parser test fixtures.

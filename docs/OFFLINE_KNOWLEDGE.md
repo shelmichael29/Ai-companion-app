@@ -59,7 +59,10 @@ python3 -m unittest discover -s tests
 ```
 Then run the quality gate. The downloads are never committed (`.gitignore`). The manifest records every input's SHA-256, the row counts and the build date. A changed pack installs automatically on the next launch, because the file name includes its checksum. The old pack is removed only after the new one is verified, and a failed install leaves no partial file and is retried on the next launch.
 
-## 5. Still to do
+## 5. Test-failure investigation (2026-11-26)
+The intermittent `OfflineKnowledgeTest` CI failure was a test-only heap exhaustion under Robolectric. The fix and the hardened installer are covered in `docs/OFFLINE_KNOWLEDGE_TEST_FLAKE.md`.
+
+## 6. Still to do
 - **Check on the phone:** first-launch install time, storage use, answers to "any recalls?" and "what does P2096 mean?", and adding a car in airplane mode.
 - **Review sample accuracy:** about 100 random OBDex codes and the BMW-specific Wal33D meanings, before relying on them for anything beyond explanations.
 - **Production licensing:** the EPA and NHTSA terms are stated by the sources but not legally reviewed.

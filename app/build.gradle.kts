@@ -34,8 +34,8 @@ android {
         // API 26 gives us java.time and a modern Bluetooth stack for future OBD-II work.
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.11.0"
+        versionCode = 13
+        versionName = "0.11.1"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "SOURCE_REVISION", "\"$sourceRevision\"")
     }
