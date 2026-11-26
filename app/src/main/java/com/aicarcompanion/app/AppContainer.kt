@@ -382,7 +382,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
     init {
         appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val ok = offlineKnowledge.install()
-            connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Offline knowledge", mapOf("available" to ok, "built" to offlineKnowledge.info?.builtUtc))
+            connectionLog.record(com.aicarcompanion.app.connectivity.LogArea.APP, "Offline knowledge", mapOf("available" to ok, "built" to offlineKnowledge.info?.builtUtc, "failStage" to offlineKnowledge.lastFailure?.let { "${it.stage}/${it.error.substringAfterLast('.')}" }))
         }
         announcer.watch(obdManager.state)
         // Live polling covers only the readings the user's detail level shows.

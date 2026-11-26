@@ -25,68 +25,171 @@ import java.util.zip.GZIPInputStream
  *
  * Nothing here is ever written, uploaded or logged; queries take only codes and year/make/model.
  */
-class SqliteOfflineKnowledge(private val context: Context) : OfflineKnowledge {
+class SqliteOfflineKnowledge(
+    private val context: Context,
+    private val openAssetFn: (String) -> java.io.InputStream = { context.assets.open(it) },
+) : OfflineKnowledge {
 
     @Volatile private var db: SQLiteDatabase? = null
     @Volatile override var info: KnowledgeInfo? = null
         private set
     override val available: Boolean get() = db != null
 
-    /** Installs (first launch or new pack) and opens the database. Call off the main thread. */
+    /** Why the last [install] failed (stage, error class, sanitized details); null if it hasn't failed. No user data. */
+    @Volatile var lastFailure: InstallFailure? = null
+        private set
+
+    @Volatile private var stage = InstallStage.MANIFEST
+    @Volatile private var source = "none"
+    @Volatile private var copied = -1L
+    @Volatile private var expectedBytes = -1L
+    @Volatile private var installDir: File? = null
+    @Volatile private var installTarget: File? = null
+    @Volatile private var installTemp: File? = null
+
+    /**
+     * Installs (first launch or new pack) and opens the database. Call off the main thread.
+     *
+     * Exceptions are recorded in [lastFailure] and reported as `false`. Errors are NOT swallowed: for
+     * an OutOfMemoryError or other VirtualMachineError the failure is recorded first (best effort)
+     * and the error is rethrown so the real stack trace surfaces instead of a silent "unavailable".
+     */
     @Synchronized
     fun install(): Boolean {
         if (db != null) return true
-        return runCatching {
-            val manifest = JSONObject(context.assets.open(MANIFEST).bufferedReader().use { it.readText() })
-            val sha = manifest.getString("database_sha256")
-            val dir = File(context.noBackupFilesDir, "knowledge").apply { mkdirs() }
-            val target = File(dir, "penelope_knowledge_${sha.take(12)}.db")
-            if (!target.exists()) {
-                val temp = File(dir, "installing.tmp")
-                try {
-                val digest = MessageDigest.getInstance("SHA-256")
-                packStream().use { input ->
-                    temp.outputStream().buffered().use { out ->
-                        val buf = ByteArray(1 shl 16)
-                        while (true) {
-                            val n = input.read(buf)
-                            if (n < 0) break
-                            digest.update(buf, 0, n)
-                            out.write(buf, 0, n)
-                        }
-                    }
-                }
-                val actual = digest.digest().joinToString("") { "%02x".format(it) }
-                check(actual == sha) { "Knowledge pack checksum mismatch" }
-                check(temp.renameTo(target)) { "Couldn't install knowledge pack" }
-                } finally {
-                    temp.delete() // never leave a partial file behind (no space, bad checksum)
-                }
-                // Older packs are removed only once the new one is verified and in place.
-                dir.listFiles()?.filter { it != target }?.forEach { it.delete() }
-            }
-            db = SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS)
-            info = KnowledgeInfo(
-                builtUtc = manifest.optString("built_utc"),
-                recallSnapshot = manifest.optJSONArray("sources")?.let { arr ->
-                    (0 until arr.length()).map { arr.getJSONObject(it) }
-                        .firstOrNull { it.optString("id") == "nhtsa_recall_post2010" }?.optString("downloaded_utc")?.take(10)
-                },
-            )
+        val started = System.nanoTime()
+        stage = InstallStage.MANIFEST
+        source = "none"
+        copied = -1L
+        expectedBytes = -1L
+        installDir = null
+        installTarget = null
+        installTemp = null
+        return try {
+            doInstall()
+            lastFailure = null
             true
-        }.getOrElse {
-            Log.w(TAG, "Offline knowledge unavailable: ${it.javaClass.simpleName}")
+        } catch (e: VirtualMachineError) {
+            record(e, started)
+            throw e
+        } catch (e: Exception) {
+            record(e, started)
+            Log.w(TAG, "Offline knowledge unavailable: stage=$stage error=${e.javaClass.simpleName} ${lastFailure?.message.orEmpty()}")
             false
         }
     }
+
+    private fun doInstall() {
+        stage = InstallStage.MANIFEST
+        val manifest = JSONObject(openAsset(MANIFEST).bufferedReader().use { it.readText() })
+        val sha = manifest.getString("database_sha256")
+        expectedBytes = manifest.optLong("database_bytes", -1L)
+        stage = InstallStage.DIR
+        val dir = File(context.noBackupFilesDir, "knowledge").apply { mkdirs() }
+        installDir = dir
+        val installer = KnowledgePackInstaller(
+            dir = dir,
+            expectedSha = sha,
+            expectedBytes = expectedBytes,
+            openPack = { packStream() },
+            isUsableDb = { canOpen(it) },
+            onStage = { stage = it },
+        )
+        installTarget = installer.target
+        val outcome = try {
+            installer.install()
+        } finally {
+            copied = installer.copied
+            installTemp = installer.temp
+        }
+        val target = when (outcome) {
+            is KnowledgePackInstaller.Outcome.Ready -> outcome.target
+            is KnowledgePackInstaller.Outcome.Failed -> {
+                stage = outcome.stage
+                throw outcome.error
+            }
+        }
+        stage = InstallStage.OPEN
+        db = SQLiteDatabase.openDatabase(target.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS)
+        stage = InstallStage.INFO
+        info = KnowledgeInfo(
+            builtUtc = manifest.optString("built_utc"),
+            recallSnapshot = manifest.optJSONArray("sources")?.let { arr ->
+                (0 until arr.length()).map { arr.getJSONObject(it) }
+                    .firstOrNull { it.optString("id") == "nhtsa_recall_post2010" }?.optString("downloaded_utc")?.take(10)
+            },
+        )
+    }
+
+    /** Best effort; never throws. */
+    private fun record(t: Throwable, startedNanos: Long) {
+        try {
+            val causes = generateSequence(t.cause) { it.cause }.take(4).map { it.javaClass.name }.toList()
+            val frames = t.stackTrace.take(5).map { "${it.className}.${it.methodName}:${it.lineNumber}" }
+            lastFailure = InstallFailure(
+                stage = stage,
+                error = t.javaClass.name,
+                message = sanitize(t.message),
+                causes = causes,
+                frames = frames,
+                snapshot = snapshot(startedNanos),
+            )
+        } catch (_: Throwable) {
+            // Recording must never mask the original failure.
+        }
+    }
+
+    private fun sanitize(m: String?): String =
+        (m ?: "").map { if (it.code in 32..126) it else '?' }.joinToString("").take(MAX_MESSAGE)
+
+    private fun fileInfo(f: File?): String = when {
+        f == null -> "n/a"
+        f.exists() -> "yes/${f.length()}"
+        else -> "no"
+    }
+
+    /** Free bytes for the app per StatFs (Lint: File.usableSpace can be inaccurate); -1 if unknown. */
+    private fun availableBytes(dir: File?): Long =
+        dir?.let { runCatching { android.os.StatFs(it.path).availableBytes }.getOrNull() } ?: -1L
+
+    private fun snapshot(startedNanos: Long): String {
+        val dir = installDir
+        val listing = dir?.listFiles()?.joinToString(",") { "${it.name}:${it.length()}" }.orEmpty()
+        val rt = Runtime.getRuntime()
+        val t = Thread.currentThread()
+        return "source=$source copied=$copied manifestBytes=$expectedBytes target=${fileInfo(installTarget)} " +
+            "temp=${fileInfo(installTemp)} dir=[$listing] available=${availableBytes(dir)} " +
+            "heapMax=${rt.maxMemory()} heapTotal=${rt.totalMemory()} heapFree=${rt.freeMemory()} " +
+            "thread=${sanitize(t.name)} interrupted=${t.isInterrupted} " +
+            "elapsedMs=${(System.nanoTime() - startedNanos) / 1_000_000} threads=${Thread.activeCount()}"
+    }
+
+    /** A reused pack must open read-only and answer a trivial query; anything else is replaced. */
+    private fun canOpen(f: File): Boolean = runCatching {
+        SQLiteDatabase.openDatabase(f.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS).use { d ->
+            d.rawQuery("SELECT count(*) FROM sqlite_master", null).use { it.moveToFirst() && it.getInt(0) > 0 }
+        }
+    }.getOrDefault(false)
+
+    /** Closes the database and makes the pack unavailable again. Safe to call more than once. */
+    @Synchronized
+    fun close() {
+        val d = db
+        db = null
+        info = null
+        guides = null
+        runCatching { d?.close() }
+    }
+
+    private fun openAsset(name: String): java.io.InputStream = openAssetFn(name)
 
     /**
      * The build tools unpack `*.gz` assets when packaging (the APK's own zip compression still
      * applies), so the plain database is normally present; the gzip form is the fallback.
      */
     private fun packStream(): java.io.InputStream =
-        runCatching { context.assets.open(PACK_PLAIN).buffered() }.getOrNull()
-            ?: GZIPInputStream(context.assets.open(PACK_GZ).buffered())
+        runCatching { openAsset(PACK_PLAIN).buffered() }.getOrNull()?.also { source = "plain" }
+            ?: GZIPInputStream(openAsset(PACK_GZ).buffered()).also { source = "gz" }
 
     private inline fun <T> query(sql: String, args: Array<String>, read: (Cursor) -> T): T? {
         val d = db ?: return null
@@ -218,5 +321,21 @@ class SqliteOfflineKnowledge(private val context: Context) : OfflineKnowledge {
         const val PACK_PLAIN = "knowledge/penelope_knowledge.db"
         const val PACK_GZ = "knowledge/penelope_knowledge.db.gz"
         const val MANIFEST = "knowledge/knowledge_manifest.json"
+        const val MAX_MESSAGE = 160
     }
+}
+
+enum class InstallStage { MANIFEST, DIR, SOURCE_OPEN, COPY, VERIFY, RENAME, CLEANUP, OPEN, INFO }
+
+/** Diagnostic detail for a failed knowledge-pack install. Names, sizes and counts only; no user data. */
+data class InstallFailure(
+    val stage: InstallStage,
+    val error: String,
+    val message: String,
+    val causes: List<String>,
+    val frames: List<String>,
+    val snapshot: String,
+) {
+    override fun toString(): String =
+        "InstallFailure(stage=$stage error=$error message=\"$message\" causes=$causes frames=$frames $snapshot)"
 }

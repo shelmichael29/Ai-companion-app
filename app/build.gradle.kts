@@ -34,8 +34,8 @@ android {
         // API 26 gives us java.time and a modern Bluetooth stack for future OBD-II work.
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "0.11.0"
+        versionCode = 13
+        versionName = "0.11.1"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "SOURCE_REVISION", "\"$sourceRevision\"")
     }
@@ -81,6 +81,16 @@ android {
         // Robolectric needs the merged resources and manifest for Compose UI tests.
         unitTests.isIncludeAndroidResources = true
     }
+}
+
+// Robolectric reads each bundled ~41 MB knowledge-pack asset into one heap array, and that array stays
+// reachable through a finalizable Asset until the finalizer thread and a later GC release it. Measured:
+// about 94 MB baseline plus one ~41 MB array per install that lingers, so the ~17 installs in
+// OfflineKnowledgeTest need up to roughly 750 MB when the finalizer lags on a busy runner. Gradle's
+// default 512 MB test heap left ~90 MB of headroom and failed 3 of 25 CI runs with OutOfMemoryError
+// inside the install. OfflineKnowledgeTest asserts this setting so removing it fails loudly.
+tasks.withType<Test>().configureEach {
+    maxHeapSize = "1g"
 }
 
 ksp {
